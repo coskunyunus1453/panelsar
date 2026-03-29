@@ -19,6 +19,9 @@ import (
 
 const jwtTypTerminal = "terminal_ws"
 
+// Kurulumda /usr/local/sbin/panelsar-terminal-root + sudoers ile root login kabuğu (www-data → sudo NOPASSWD).
+const terminalRootLauncher = "/usr/local/sbin/panelsar-terminal-root"
+
 var upgrader = websocket.Upgrader{
 	ReadBufferSize:  4096,
 	WriteBufferSize: 4096,
@@ -76,7 +79,15 @@ func HandleWS(cfg *config.Config, log *logrus.Logger) gin.HandlerFunc {
 			shell = "/bin/bash"
 		}
 
-		cmd := exec.Command(shell, "-i")
+		var cmd *exec.Cmd
+		if os.Getenv("PANELSAR_TERMINAL_NO_ROOT") == "1" {
+			cmd = exec.Command(shell, "-i")
+		} else if fi, err := os.Stat(terminalRootLauncher); err == nil && !fi.IsDir() && fi.Mode()&0o111 != 0 {
+			cmd = exec.Command("sudo", "-n", terminalRootLauncher)
+		} else {
+			cmd = exec.Command(shell, "-i")
+		}
+
 		cmd.Env = append(os.Environ(),
 			"TERM=xterm-256color",
 			"SHELL="+shell,

@@ -27,8 +27,8 @@
   },
   "terminal": {
     "title": "SSH-Terminal",
-    "subtitle": "Shell as the same user as the engine (www-data). Requires Nginx /engine-ws/ proxy and ENGINE_API_SECRET matching engine jwt_secret.",
-    "warning": "This is not full root access; use carefully. Per-customer jailed shells may be added later.",
+    "subtitle": "Root login shell (via sudo). Admin only; Nginx /engine-ws/ and ENGINE_API_SECRET required.",
+    "warning": "Full root access. Set PANELSAR_TERMINAL_NO_ROOT=1 on the engine service for the old engine-user shell.",
     "status_online": "Connected",
     "status_connecting": "Connecting…",
     "status_offline": "Offline",

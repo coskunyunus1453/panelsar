@@ -29,6 +29,7 @@
 #   WITH_APACHE=1               # apache2; Nginx 80 ile çakışmaz — Apache :8080 + engine apache_http_port: 8080
 #   WITH_LOCAL_POSTFIX=1        # Postfix + mailutils (panel giden posta: sendmail; Admin → Giden posta’dan SMTP’ye geçilebilir)
 #   SKIP_DB_SEED=1              # migrate sonrası db:seed atla
+#   (engine systemd drop-in) PANELSAR_TERMINAL_NO_ROOT=1  # web terminali www-data kabuğunda (varsayılan: root sudo)
 #   PANELSAR_ADMIN_EMAIL=...    # ilk admin e-posta (varsayılan admin@panelsar.com)
 #   PANELSAR_ADMIN_PASSWORD=... # sabit şifre; verilmezse kurulumda rastgele üretilir
 #
@@ -242,9 +243,13 @@ fi
 if [[ -f "$REPO_ROOT/deploy/host/panelsar-stack-install" ]]; then
   install -m 755 "$REPO_ROOT/deploy/host/panelsar-stack-install" /usr/local/sbin/panelsar-stack-install
 fi
+if [[ -f "$REPO_ROOT/deploy/host/panelsar-terminal-root" ]]; then
+  install -m 755 "$REPO_ROOT/deploy/host/panelsar-terminal-root" /usr/local/sbin/panelsar-terminal-root
+fi
 cat > /etc/sudoers.d/panelsar-engine <<'SUDOERS'
 www-data ALL=(root) NOPASSWD: /usr/local/sbin/panelsar-nginx-vhost
 www-data ALL=(root) NOPASSWD: /usr/local/sbin/panelsar-stack-install
+www-data ALL=(root) NOPASSWD: /usr/local/sbin/panelsar-terminal-root
 SUDOERS
 chmod 440 /etc/sudoers.d/panelsar-engine
 visudo -cf /etc/sudoers.d/panelsar-engine

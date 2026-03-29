@@ -73,8 +73,8 @@
   },
   "terminal": {
     "title": "SSH terminal",
-    "subtitle": "Sunucuda engine ile aynı kullanıcı (www-data) kabuğu. Nginx’in /engine-ws/ proxy’si ve ENGINE_API_SECRET gerekir.",
-    "warning": "Tam sunucu kökü değildir; yine de dikkatli kullanın. Müşteri hesapları için ayrı kısıtlı kabuk ileride eklenebilir.",
+    "subtitle": "Sunucuda root login kabuğu (sudo ile). Yalnızca yönetici; Nginx /engine-ws/ ve ENGINE_API_SECRET gerekir.",
+    "warning": "Tam root erişimidir: yanlış komut sunucuyu bozabilir. Yalnızca güvendiğiniz yöneticiler kullanmalı. Eski davranış için engine ortamında PANELSAR_TERMINAL_NO_ROOT=1 verilebilir.",
     "status_online": "Bağlı",
     "status_connecting": "Bağlanıyor…",
     "status_offline": "Kapalı",
