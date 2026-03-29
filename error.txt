@@ -1,80 +1,234 @@
 root@vmi2616585:~# curl -fsSL "https://raw.githubusercontent.com/coskunyunus1453/panelsar/main/deploy/host/install.sh" | bash
 ==> Güncelleniyor: /var/www/panelsar
-remote: Enumerating objects: 15, done.
-remote: Counting objects: 100% (15/15), done.
+remote: Enumerating objects: 16, done.
+remote: Counting objects: 100% (16/16), done.
 remote: Compressing objects: 100% (4/4), done.
 remote: Total 9 (delta 4), reused 9 (delta 4), pack-reused 0 (from 0)
-Unpacking objects: 100% (9/9), 8.16 KiB | 928.00 KiB/s, done.
+Unpacking objects: 100% (9/9), 4.74 KiB | 1.58 MiB/s, done.
 From https://github.com/coskunyunus1453/panelsar
  * branch            main       -> FETCH_HEAD
- + afe8690...faa6ae3 main       -> origin/main  (forced update)
+ + db6ca38...739a850 main       -> origin/main  (forced update)
+M	panel/bootstrap/cache/.gitignore
+M	panel/storage/app/.gitignore
+M	panel/storage/app/private/.gitignore
+M	panel/storage/app/public/.gitignore
+M	panel/storage/framework/.gitignore
+M	panel/storage/framework/cache/.gitignore
+M	panel/storage/framework/cache/data/.gitignore
+M	panel/storage/framework/sessions/.gitignore
+M	panel/storage/framework/testing/.gitignore
+M	panel/storage/framework/views/.gitignore
 Already on 'main'
 Your branch and 'origin/main' have diverged,
 and have 1 and 1 different commits each, respectively.
   (use "git pull" to merge the remote branch into yours)
-HEAD is now at faa6ae3 Go toolchain: ensure-go-toolchain, install-production
+HEAD is now at 739a850 Kurulum: PHP 8.4 (Ondrej/Sury), git safe.directory, git clean
 ==> Kurulum (install-production.sh) başlıyor...
-2026-03-29 16:36:12 - Installing pre-requisites
-Hit:1 http://security.ubuntu.com/ubuntu jammy-security InRelease
-Hit:2 http://archive.ubuntu.com/ubuntu jammy InRelease
-Hit:3 http://archive.ubuntu.com/ubuntu jammy-updates InRelease
-Hit:4 https://deb.nodesource.com/node_20.x nodistro InRelease
-Hit:5 http://archive.ubuntu.com/ubuntu jammy-backports InRelease
-Reading package lists... Done
-Building dependency tree... Done
-Reading state information... Done
-All packages are up to date.
-Reading package lists... Done
-Building dependency tree... Done
-Reading state information... Done
-ca-certificates is already the newest version (20240203~22.04.1).
-curl is already the newest version (7.81.0-1ubuntu1.23).
-gnupg is already the newest version (2.2.27-3ubuntu2.5).
-apt-transport-https is already the newest version (2.4.14).
-0 upgraded, 0 newly installed, 0 to remove and 0 not upgraded.
+PPA publishes dbgsym, you may need to include 'main/debug' component
+Repository: 'deb https://ppa.launchpadcontent.net/ondrej/php/ubuntu/ jammy main'
+Description:
+Co-installable PHP versions: PHP 5.6, PHP 7.x, PHP 8.x and most requested extensions are included. Packages are provided for *Current* Ubuntu *LTS* releases (https://wiki.ubuntu.com/Releases).  Expanded Security Maintenance releases ARE NOT supported.
+
+Debian stable, oldstable and Debian LTS packages are provided from a separate repository: https://deb.sury.org/#debian-dpa
+
+You can get more information about the packages at https://deb.sury.org
+
+BUGS&FEATURES: This PPA has a issue tracker:
+https://deb.sury.org/#bug-reporting
+
+Issues reported in a private email don't scale and most likely will be ignored.  I simply don't have capacity to answer questions privately.
+
+CAVEATS:
+1. If you are using apache2, you are advised to add ppa:ondrej/apache2
+2. If you are using nginx, you are advised to add ppa:ondrej/nginx
+
+DONATION: If you like my work and you want to show appreciation, please consider donating regularly: https://donate.sury.org/
+
+COMMERCIAL SUPPORT: Support for PHP packages for older Debian and Ubuntu release can be bought from https://www.freexian.com/lts/php/
+More info: https://launchpad.net/~ondrej/+archive/ubuntu/php
+Adding repository.
+Adding deb entry to /etc/apt/sources.list.d/ondrej-ubuntu-php-jammy.list
+Adding disabled deb-src entry to /etc/apt/sources.list.d/ondrej-ubuntu-php-jammy.list
+Adding key to /etc/apt/trusted.gpg.d/ondrej-ubuntu-php.gpg with fingerprint B8DC7E53946656EFBCE4C1DD71DAEAAB4AD4CAB6
 Hit:1 http://archive.ubuntu.com/ubuntu jammy InRelease
-Hit:2 http://security.ubuntu.com/ubuntu jammy-security InRelease    
-Hit:3 http://archive.ubuntu.com/ubuntu jammy-updates InRelease      
-Hit:4 https://deb.nodesource.com/node_20.x nodistro InRelease
-Hit:5 http://archive.ubuntu.com/ubuntu jammy-backports InRelease
+Hit:2 http://security.ubuntu.com/ubuntu jammy-security InRelease                                           
+Hit:3 http://archive.ubuntu.com/ubuntu jammy-updates InRelease                                             
+Hit:4 https://deb.nodesource.com/node_20.x nodistro InRelease       
+Hit:5 http://archive.ubuntu.com/ubuntu jammy-backports InRelease    
+Get:6 https://ppa.launchpadcontent.net/ondrej/php/ubuntu jammy InRelease [24.6 kB]
+Get:7 https://ppa.launchpadcontent.net/ondrej/php/ubuntu jammy/main amd64 Packages [150 kB]
+Get:8 https://ppa.launchpadcontent.net/ondrej/php/ubuntu jammy/main Translation-en [46.9 kB]
+Fetched 221 kB in 1s (220 kB/s)                                    
 Reading package lists... Done
-Building dependency tree... Done
-Reading state information... Done
-All packages are up to date.
-2026-03-29 16:36:24 - Repository configured successfully.
-2026-03-29 16:36:24 - To install Node.js, run: apt install nodejs -y
-2026-03-29 16:36:24 - You can use N|solid Runtime as a node.js alternative
-2026-03-29 16:36:24 - To install N|solid Runtime, run: apt install nsolid -y 
+(Reading database ... 89934 files and directories currently installed.)
+Preparing to unpack .../00-php-common_2%3a101~+ubuntu22.04.1+deb.sury.org+1_all.deb ...
+Unpacking php-common (2:101~+ubuntu22.04.1+deb.sury.org+1) over (2:92ubuntu1) ...
+Selecting previously unselected package php8.4-common.
+Preparing to unpack .../01-php8.4-common_8.4.18-2+ubuntu22.04.1+deb.sury.org+1_amd64.deb ...
+Unpacking php8.4-common (8.4.18-2+ubuntu22.04.1+deb.sury.org+1) ...
+Selecting previously unselected package php8.4-bcmath.
+Preparing to unpack .../02-php8.4-bcmath_8.4.18-2+ubuntu22.04.1+deb.sury.org+1_amd64.deb ...
+Unpacking php8.4-bcmath (8.4.18-2+ubuntu22.04.1+deb.sury.org+1) ...
+Selecting previously unselected package php8.4-opcache.
+Preparing to unpack .../03-php8.4-opcache_8.4.18-2+ubuntu22.04.1+deb.sury.org+1_amd64.deb ...
+Unpacking php8.4-opcache (8.4.18-2+ubuntu22.04.1+deb.sury.org+1) ...
+Selecting previously unselected package php8.4-readline.
+Preparing to unpack .../04-php8.4-readline_8.4.18-2+ubuntu22.04.1+deb.sury.org+1_amd64.deb ...
+Unpacking php8.4-readline (8.4.18-2+ubuntu22.04.1+deb.sury.org+1) ...
+Selecting previously unselected package php8.4-cli.
+Preparing to unpack .../05-php8.4-cli_8.4.18-2+ubuntu22.04.1+deb.sury.org+1_amd64.deb ...
+Unpacking php8.4-cli (8.4.18-2+ubuntu22.04.1+deb.sury.org+1) ...
+Selecting previously unselected package php8.4-curl.
+Preparing to unpack .../06-php8.4-curl_8.4.18-2+ubuntu22.04.1+deb.sury.org+1_amd64.deb ...
+Unpacking php8.4-curl (8.4.18-2+ubuntu22.04.1+deb.sury.org+1) ...
+Selecting previously unselected package php8.4-fpm.
+Preparing to unpack .../07-php8.4-fpm_8.4.18-2+ubuntu22.04.1+deb.sury.org+1_amd64.deb ...
+Unpacking php8.4-fpm (8.4.18-2+ubuntu22.04.1+deb.sury.org+1) ...
+Selecting previously unselected package php8.4-intl.
+Preparing to unpack .../08-php8.4-intl_8.4.18-2+ubuntu22.04.1+deb.sury.org+1_amd64.deb ...
+Unpacking php8.4-intl (8.4.18-2+ubuntu22.04.1+deb.sury.org+1) ...
+Selecting previously unselected package php8.4-mbstring.
+Preparing to unpack .../09-php8.4-mbstring_8.4.18-2+ubuntu22.04.1+deb.sury.org+1_amd64.deb ...
+Unpacking php8.4-mbstring (8.4.18-2+ubuntu22.04.1+deb.sury.org+1) ...
+Selecting previously unselected package php8.4-mysql.
+Preparing to unpack .../10-php8.4-mysql_8.4.18-2+ubuntu22.04.1+deb.sury.org+1_amd64.deb ...
+Unpacking php8.4-mysql (8.4.18-2+ubuntu22.04.1+deb.sury.org+1) ...
+Selecting previously unselected package php8.4-pgsql.
+Preparing to unpack .../11-php8.4-pgsql_8.4.18-2+ubuntu22.04.1+deb.sury.org+1_amd64.deb ...
+Unpacking php8.4-pgsql (8.4.18-2+ubuntu22.04.1+deb.sury.org+1) ...
+Selecting previously unselected package php8.4-sqlite3.
+Preparing to unpack .../12-php8.4-sqlite3_8.4.18-2+ubuntu22.04.1+deb.sury.org+1_amd64.deb ...
+Unpacking php8.4-sqlite3 (8.4.18-2+ubuntu22.04.1+deb.sury.org+1) ...
+Selecting previously unselected package php8.4-xml.
+Preparing to unpack .../13-php8.4-xml_8.4.18-2+ubuntu22.04.1+deb.sury.org+1_amd64.deb ...
+Unpacking php8.4-xml (8.4.18-2+ubuntu22.04.1+deb.sury.org+1) ...
+Selecting previously unselected package php8.4-zip.
+Preparing to unpack .../14-php8.4-zip_8.4.18-2+ubuntu22.04.1+deb.sury.org+1_amd64.deb ...
+Unpacking php8.4-zip (8.4.18-2+ubuntu22.04.1+deb.sury.org+1) ...
+Setting up php-common (2:101~+ubuntu22.04.1+deb.sury.org+1) ...
+Setting up php8.4-common (8.4.18-2+ubuntu22.04.1+deb.sury.org+1) ...
 
-Synchronizing state of mariadb.service with SysV service script with /lib/systemd/systemd-sysv-install.
-Executing: /lib/systemd/systemd-sysv-install enable mariadb
-deploy/bootstrap/install-production.sh: line 149: ensure_go_toolchain: command not found
-root@vmi2616585:~# curl -fsSL "https://raw.githubusercontent.com/coskunyunus1453/panelsar/main/deploy/host/install.sh" | bash
-==> Güncelleniyor: /var/www/panelsar
-remote: Enumerating objects: 9, done.
-remote: Counting objects: 100% (9/9), done.
-remote: Compressing objects: 100% (2/2), done.
-remote: Total 5 (delta 3), reused 5 (delta 3), pack-reused 0 (from 0)
-Unpacking objects: 100% (5/5), 557 bytes | 185.00 KiB/s, done.
-From https://github.com/coskunyunus1453/panelsar
- * branch            main       -> FETCH_HEAD
- + faa6ae3...db6ca38 main       -> origin/main  (forced update)
-Already on 'main'
-Your branch and 'origin/main' have diverged,
-and have 1 and 1 different commits each, respectively.
-  (use "git pull" to merge the remote branch into yours)
-HEAD is now at db6ca38 fix: source ensure-go-toolchain.sh
-==> Kurulum (install-production.sh) başlıyor...
-2026-03-29 16:40:20 - Installing pre-requisites
+Creating config file /etc/php/8.4/mods-available/calendar.ini with new version
+
+Creating config file /etc/php/8.4/mods-available/ctype.ini with new version
+
+Creating config file /etc/php/8.4/mods-available/exif.ini with new version
+
+Creating config file /etc/php/8.4/mods-available/fileinfo.ini with new version
+
+Creating config file /etc/php/8.4/mods-available/ffi.ini with new version
+
+Creating config file /etc/php/8.4/mods-available/ftp.ini with new version
+
+Creating config file /etc/php/8.4/mods-available/gettext.ini with new version
+
+Creating config file /etc/php/8.4/mods-available/iconv.ini with new version
+
+Creating config file /etc/php/8.4/mods-available/pdo.ini with new version
+
+Creating config file /etc/php/8.4/mods-available/phar.ini with new version
+
+Creating config file /etc/php/8.4/mods-available/posix.ini with new version
+
+Creating config file /etc/php/8.4/mods-available/shmop.ini with new version
+
+Creating config file /etc/php/8.4/mods-available/sockets.ini with new version
+
+Creating config file /etc/php/8.4/mods-available/sysvmsg.ini with new version
+
+Creating config file /etc/php/8.4/mods-available/sysvsem.ini with new version
+
+Creating config file /etc/php/8.4/mods-available/sysvshm.ini with new version
+
+Creating config file /etc/php/8.4/mods-available/tokenizer.ini with new version
+Setting up php8.4-curl (8.4.18-2+ubuntu22.04.1+deb.sury.org+1) ...
+
+Creating config file /etc/php/8.4/mods-available/curl.ini with new version
+Setting up php8.4-pgsql (8.4.18-2+ubuntu22.04.1+deb.sury.org+1) ...
+
+Creating config file /etc/php/8.4/mods-available/pgsql.ini with new version
+
+Creating config file /etc/php/8.4/mods-available/pdo_pgsql.ini with new version
+Setting up php8.4-sqlite3 (8.4.18-2+ubuntu22.04.1+deb.sury.org+1) ...
+
+Creating config file /etc/php/8.4/mods-available/sqlite3.ini with new version
+
+Creating config file /etc/php/8.4/mods-available/pdo_sqlite.ini with new version
+Setting up php8.4-bcmath (8.4.18-2+ubuntu22.04.1+deb.sury.org+1) ...
+
+Creating config file /etc/php/8.4/mods-available/bcmath.ini with new version
+Setting up php8.4-zip (8.4.18-2+ubuntu22.04.1+deb.sury.org+1) ...
+
+Creating config file /etc/php/8.4/mods-available/zip.ini with new version
+Setting up php8.4-xml (8.4.18-2+ubuntu22.04.1+deb.sury.org+1) ...
+
+Creating config file /etc/php/8.4/mods-available/dom.ini with new version
+
+Creating config file /etc/php/8.4/mods-available/simplexml.ini with new version
+
+Creating config file /etc/php/8.4/mods-available/xml.ini with new version
+
+Creating config file /etc/php/8.4/mods-available/xmlreader.ini with new version
+
+Creating config file /etc/php/8.4/mods-available/xmlwriter.ini with new version
+
+Creating config file /etc/php/8.4/mods-available/xsl.ini with new version
+Setting up php8.4-opcache (8.4.18-2+ubuntu22.04.1+deb.sury.org+1) ...
+
+Creating config file /etc/php/8.4/mods-available/opcache.ini with new version
+Setting up php8.4-intl (8.4.18-2+ubuntu22.04.1+deb.sury.org+1) ...
+
+Creating config file /etc/php/8.4/mods-available/intl.ini with new version
+Setting up php8.4-readline (8.4.18-2+ubuntu22.04.1+deb.sury.org+1) ...
+
+Creating config file /etc/php/8.4/mods-available/readline.ini with new version
+Setting up php8.4-mbstring (8.4.18-2+ubuntu22.04.1+deb.sury.org+1) ...
+
+Creating config file /etc/php/8.4/mods-available/mbstring.ini with new version
+Setting up php8.4-mysql (8.4.18-2+ubuntu22.04.1+deb.sury.org+1) ...
+
+Creating config file /etc/php/8.4/mods-available/mysqlnd.ini with new version
+
+Creating config file /etc/php/8.4/mods-available/mysqli.ini with new version
+
+Creating config file /etc/php/8.4/mods-available/pdo_mysql.ini with new version
+Setting up php8.4-cli (8.4.18-2+ubuntu22.04.1+deb.sury.org+1) ...
+
+Creating config file /etc/php/8.4/cli/php.ini with new version
+Setting up php8.4-fpm (8.4.18-2+ubuntu22.04.1+deb.sury.org+1) ...
+
+Creating config file /etc/php/8.4/fpm/php.ini with new version
+Created symlink /etc/systemd/system/multi-user.target.wants/php8.4-fpm.service → /lib/systemd/system/php8.4-fpm.service.
+Processing triggers for man-db (2.10.2-1) ...
+Processing triggers for php8.4-cli (8.4.18-2+ubuntu22.04.1+deb.sury.org+1) ...
+Processing triggers for php8.4-fpm (8.4.18-2+ubuntu22.04.1+deb.sury.org+1) ...
+Scanning processes...                                                                                                   
+Scanning linux images...                                                                                                
+
+Running kernel seems to be up-to-date.
+
+No services need to be restarted.
+
+No containers need to be restarted.
+
+No user sessions are running outdated binaries.
+
+No VM guests are running outdated hypervisor (qemu) binaries on this host.
+update-alternatives: using /usr/bin/php8.4 to provide /usr/bin/php (php) in manual mode
+Synchronizing state of php8.4-fpm.service with SysV service script with /lib/systemd/systemd-sysv-install.
+Executing: /lib/systemd/systemd-sysv-install enable php8.4-fpm
+==> PHP hazır: PHP 8.4.18 (cli) (built: Feb 13 2026 15:59:43) (NTS)
+2026-03-29 16:49:54 - Installing pre-requisites
 Hit:1 http://security.ubuntu.com/ubuntu jammy-security InRelease
-Hit:2 http://archive.ubuntu.com/ubuntu jammy InRelease
-Hit:3 http://archive.ubuntu.com/ubuntu jammy-updates InRelease
-Hit:4 https://deb.nodesource.com/node_20.x nodistro InRelease
+Hit:2 http://archive.ubuntu.com/ubuntu jammy InRelease                                                     
+Hit:3 https://deb.nodesource.com/node_20.x nodistro InRelease                                              
+Hit:4 http://archive.ubuntu.com/ubuntu jammy-updates InRelease      
 Hit:5 http://archive.ubuntu.com/ubuntu jammy-backports InRelease
+Hit:6 https://ppa.launchpadcontent.net/ondrej/php/ubuntu jammy InRelease
 Reading package lists... Done
 Building dependency tree... Done
 Reading state information... Done
-All packages are up to date.
+29 packages can be upgraded. Run 'apt list --upgradable' to see them.
 Reading package lists... Done
 Building dependency tree... Done
 Reading state information... Done
@@ -82,116 +236,33 @@ ca-certificates is already the newest version (20240203~22.04.1).
 curl is already the newest version (7.81.0-1ubuntu1.23).
 gnupg is already the newest version (2.2.27-3ubuntu2.5).
 apt-transport-https is already the newest version (2.4.14).
-0 upgraded, 0 newly installed, 0 to remove and 0 not upgraded.
-Hit:1 http://security.ubuntu.com/ubuntu jammy-security InRelease
-Hit:2 http://archive.ubuntu.com/ubuntu jammy InRelease
-Hit:3 https://deb.nodesource.com/node_20.x nodistro InRelease
-Hit:4 http://archive.ubuntu.com/ubuntu jammy-updates InRelease
-Hit:5 http://archive.ubuntu.com/ubuntu jammy-backports InRelease
+0 upgraded, 0 newly installed, 0 to remove and 29 not upgraded.
+Hit:1 http://archive.ubuntu.com/ubuntu jammy InRelease
+Hit:2 http://security.ubuntu.com/ubuntu jammy-security InRelease                                                       
+Hit:3 http://archive.ubuntu.com/ubuntu jammy-updates InRelease                                                         
+Hit:4 http://archive.ubuntu.com/ubuntu jammy-backports InRelease                                          
+Hit:5 https://deb.nodesource.com/node_20.x nodistro InRelease                       
+Hit:6 https://ppa.launchpadcontent.net/ondrej/php/ubuntu jammy InRelease
 Reading package lists... Done
 Building dependency tree... Done
 Reading state information... Done
-All packages are up to date.
-2026-03-29 16:40:30 - Repository configured successfully.
-2026-03-29 16:40:30 - To install Node.js, run: apt install nodejs -y
-2026-03-29 16:40:30 - You can use N|solid Runtime as a node.js alternative
-2026-03-29 16:40:30 - To install N|solid Runtime, run: apt install nsolid -y 
+29 packages can be upgraded. Run 'apt list --upgradable' to see them.
+2026-03-29 16:50:09 - Repository configured successfully.
+2026-03-29 16:50:09 - To install Node.js, run: apt install nodejs -y
+2026-03-29 16:50:09 - You can use N|solid Runtime as a node.js alternative
+2026-03-29 16:50:09 - To install N|solid Runtime, run: apt install nsolid -y 
 
 Synchronizing state of mariadb.service with SysV service script with /lib/systemd/systemd-sysv-install.
 Executing: /lib/systemd/systemd-sysv-install enable mariadb
-==> Go 1.22.3 kuruluyor (engine derlemesi için; mevcut: 1.18.1)...
-==> Go hazır: go version go1.22.3 linux/amd64
-Created symlink /etc/systemd/system/multi-user.target.wants/panelsar-engine.service → /etc/systemd/system/panelsar-engine.service.
 Panel MySQL şifresi: /root/panelsar-panel-mysql.secret
-The repository at "/var/www/panelsar/panel" does not have the correct ownership and git refuses to use it:
-
-fatal: detected dubious ownership in repository at '/var/www/panelsar'
-To add an exception for this directory, call:
-
-git config --global --add safe.directory /var/www/panelsar
-
 Installing dependencies from lock file
 Verifying lock file contents can be installed on current platform.
-Your lock file does not contain a compatible set of packages. Please run composer update.
+Package operations: 90 installs, 0 updates, 0 removals
 
-  Problem 1
-    - Root composer.json requires php ^8.2 but your php version (8.1.2) does not satisfy that requirement.
-  Problem 2
-    - brick/math is locked to version 0.14.8 and an update of this package was not requested.
-    - brick/math 0.14.8 requires php ^8.2 -> your php version (8.1.2) does not satisfy that requirement.
-  Problem 3
-    - dragonmantank/cron-expression is locked to version v3.6.0 and an update of this package was not requested.
-    - dragonmantank/cron-expression v3.6.0 requires php ^8.2|^8.3|^8.4|^8.5 -> your php version (8.1.2) does not satisfy that requirement.
-  Problem 4
-    - laravel/framework is locked to version v11.51.0 and an update of this package was not requested.
-    - laravel/framework v11.51.0 requires php ^8.2 -> your php version (8.1.2) does not satisfy that requirement.
-  Problem 5
-    - laravel/sanctum is locked to version v4.3.1 and an update of this package was not requested.
-    - laravel/sanctum v4.3.1 requires php ^8.2 -> your php version (8.1.2) does not satisfy that requirement.
-  Problem 6
-    - nette/utils is locked to version v4.1.3 and an update of this package was not requested.
-    - nette/utils v4.1.3 requires php 8.2 - 8.5 -> your php version (8.1.2) does not satisfy that requirement.
-  Problem 7
-    - nunomaduro/termwind is locked to version v2.4.0 and an update of this package was not requested.
-    - nunomaduro/termwind v2.4.0 requires php ^8.2 -> your php version (8.1.2) does not satisfy that requirement.
-  Problem 8
-    - spatie/laravel-backup is locked to version 9.3.6 and an update of this package was not requested.
-    - spatie/laravel-backup 9.3.6 requires php ^8.2 -> your php version (8.1.2) does not satisfy that requirement.
-  Problem 9
-    - spatie/laravel-signal-aware-command is locked to version 2.1.2 and an update of this package was not requested.
-    - spatie/laravel-signal-aware-command 2.1.2 requires php ^8.2 -> your php version (8.1.2) does not satisfy that requirement.
-  Problem 10
-    - spatie/laravel-translatable is locked to version 6.13.0 and an update of this package was not requested.
-    - spatie/laravel-translatable 6.13.0 requires php ^8.3 -> your php version (8.1.2) does not satisfy that requirement.
-  Problem 11
-    - symfony/clock is locked to version v8.0.0 and an update of this package was not requested.
-    - symfony/clock v8.0.0 requires php >=8.4 -> your php version (8.1.2) does not satisfy that requirement.
-  Problem 12
-    - symfony/console is locked to version v7.4.7 and an update of this package was not requested.
-    - symfony/console v7.4.7 requires php >=8.2 -> your php version (8.1.2) does not satisfy that requirement.
-  Problem 13
-    - symfony/css-selector is locked to version v8.0.6 and an update of this package was not requested.
-    - symfony/css-selector v8.0.6 requires php >=8.4 -> your php version (8.1.2) does not satisfy that requirement.
-  Problem 14
-    - symfony/error-handler is locked to version v7.4.4 and an update of this package was not requested.
-    - symfony/error-handler v7.4.4 requires php >=8.2 -> your php version (8.1.2) does not satisfy that requirement.
-  Problem 15
-    - symfony/event-dispatcher is locked to version v8.0.4 and an update of this package was not requested.
-    - symfony/event-dispatcher v8.0.4 requires php >=8.4 -> your php version (8.1.2) does not satisfy that requirement.
-  Problem 16
-    - symfony/finder is locked to version v7.4.6 and an update of this package was not requested.
-    - symfony/finder v7.4.6 requires php >=8.2 -> your php version (8.1.2) does not satisfy that requirement.
-  Problem 17
-    - symfony/http-foundation is locked to version v7.4.7 and an update of this package was not requested.
-    - symfony/http-foundation v7.4.7 requires php >=8.2 -> your php version (8.1.2) does not satisfy that requirement.
-  Problem 18
-    - symfony/http-kernel is locked to version v7.4.7 and an update of this package was not requested.
-    - symfony/http-kernel v7.4.7 requires php >=8.2 -> your php version (8.1.2) does not satisfy that requirement.
-  Problem 19
-    - symfony/mailer is locked to version v7.4.6 and an update of this package was not requested.
-    - symfony/mailer v7.4.6 requires php >=8.2 -> your php version (8.1.2) does not satisfy that requirement.
-  Problem 20
-    - symfony/mime is locked to version v7.4.7 and an update of this package was not requested.
-    - symfony/mime v7.4.7 requires php >=8.2 -> your php version (8.1.2) does not satisfy that requirement.
-  Problem 21
-    - symfony/process is locked to version v7.4.5 and an update of this package was not requested.
-    - symfony/process v7.4.5 requires php >=8.2 -> your php version (8.1.2) does not satisfy that requirement.
-  Problem 22
-    - symfony/routing is locked to version v7.4.6 and an update of this package was not requested.
-    - symfony/routing v7.4.6 requires php >=8.2 -> your php version (8.1.2) does not satisfy that requirement.
-  Problem 23
-    - symfony/string is locked to version v8.0.6 and an update of this package was not requested.
-    - symfony/string v8.0.6 requires php >=8.4 -> your php version (8.1.2) does not satisfy that requirement.
-  Problem 24
-    - symfony/translation is locked to version v8.0.6 and an update of this package was not requested.
-    - symfony/translation v8.0.6 requires php >=8.4 -> your php version (8.1.2) does not satisfy that requirement.
-  Problem 25
-    - symfony/uid is locked to version v7.4.4 and an update of this package was not requested.
-    - symfony/uid v7.4.4 requires php >=8.2 -> your php version (8.1.2) does not satisfy that requirement.
-  Problem 26
-    - symfony/var-dumper is locked to version v7.4.6 and an update of this package was not requested.
-    - symfony/var-dumper v7.4.6 requires php >=8.2 -> your php version (8.1.2) does not satisfy that requirement.
-  Problem 27
-    - ramsey/uuid is locked to version 4.9.2 and an update of this package was not requested.
-    - brick/math 0.14.8 requires php ^8.2 -> your php version (8.1.2) does not satisfy that requirement.
-    - ramsey/uuid 4.9.2 requires brick/math ^0.8.16 || ^0.9 || ^0.10 || ^0.11 || ^0.12 || ^0.13 || ^0.14 -> satisfiable by brick/math[0.14.8].
+In Filesystem.php line 261:
+                                                                           
+  /var/www/panelsar/panel/vendor does not exist and could not be created:  
+                                                                           
+
+install [--prefer-source] [--prefer-dist] [--prefer-install PREFER-INSTALL] [--dry-run] [--download-only] [--dev] [--no-suggest] [--no-dev] [--no-security-blocking] [--no-autoloader] [--no-progress] [--no-install] [--audit] [--audit-format AUDIT-FORMAT] [-v|vv|vvv|--verbose] [-o|--optimize-autoloader] [-a|--classmap-authoritative] [--apcu-autoloader] [--apcu-autoloader-prefix APCU-AUTOLOADER-PREFIX] [--ignore-platform-req IGNORE-PLATFORM-REQ] [--ignore-platform-reqs] [--] [<packages>...]
+

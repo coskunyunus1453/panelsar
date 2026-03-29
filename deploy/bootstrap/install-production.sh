@@ -216,7 +216,9 @@ if [[ "${WITH_MARIADB}" == "1" ]] || [[ "${WITH_MARIADB}" == "yes" ]]; then
   echo "Panel MySQL şifresi: /root/panelsar-panel-mysql.secret"
 fi
 
-chown -R www-data:www-data "$PANEL_ROOT/storage" "$PANEL_ROOT/bootstrap/cache"
+# Composer www-data ile çalışır; panel/ yalnızca storage/cache www-data ise vendor/ oluşturulamaz
+mkdir -p "$PANEL_ROOT/vendor"
+chown -R www-data:www-data "$PANEL_ROOT"
 chmod -R ug+rwx "$PANEL_ROOT/storage" "$PANEL_ROOT/bootstrap/cache"
 
 panelsar_git_safe_directory "$REPO_ROOT"
