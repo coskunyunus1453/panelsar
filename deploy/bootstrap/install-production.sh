@@ -19,6 +19,7 @@
 #   WITH_POSTGRES=1        # Engine için PostgreSQL (isteğe bağlı)
 #   WITH_NODE_REPO=1       # NodeSource 20.x ekle (frontend build için önerilir)
 #   PANELSAR_GO_VERSION=1.22.3  # engine/go.mod ile uyumlu (varsayılan; go.dev'den kurulur)
+#   PANELSAR_PHP_VERSION=8.4    # panel/composer.lock (Ondrej/Sury); Symfony 8 için 8.4 önerilir
 #
 set -euo pipefail
 
@@ -31,6 +32,8 @@ WITH_NODE_REPO="${WITH_NODE_REPO:-1}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=ensure-go-toolchain.sh
 source "$SCRIPT_DIR/ensure-go-toolchain.sh"
+# shellcheck source=ensure-php-packages.sh
+source "$SCRIPT_DIR/ensure-php-packages.sh"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 PANELSAR_HOME="${PANELSAR_HOME:-/var/www/panelsar}"
 SERVER_NAME="${SERVER_NAME:-_}"
@@ -49,13 +52,21 @@ export DEBIAN_FRONTEND=noninteractive
 
 detect_php_fpm_sock() {
   local s
-  for s in /run/php/php8.3-fpm.sock /run/php/php8.2-fpm.sock /run/php/php-fpm.sock; do
+  for s in /run/php/php8.4-fpm.sock /run/php/php8.3-fpm.sock /run/php/php8.2-fpm.sock /run/php/php-fpm.sock; do
     if [[ -S "$s" ]]; then
       echo "$s"
       return 0
     fi
   done
-  echo "/run/php/php8.2-fpm.sock"
+  echo "/run/php/php8.4-fpm.sock"
+}
+
+panelsar_git_safe_directory() {
+  local d="$1"
+  [[ -d "$d/.git" ]] || return 0
+  if ! git config --system --get-all safe.directory 2>/dev/null | grep -qxF "$d"; then
+    git config --system --add safe.directory "$d"
+  fi
 }
 
 # apt kurulumu
@@ -69,22 +80,12 @@ if [[ "${SKIP_APT:-}" != "1" ]]; then
     rsync \
     unzip \
     sqlite3 \
-    acl
+    acl \
+    software-properties-common \
+    lsb-release \
+    gnupg
 
-  # PHP 8.2+ (Ubuntu/Debian paket adları)
-  apt-get install -y -qq \
-    php-fpm \
-    php-cli \
-    php-common \
-    php-curl \
-    php-mbstring \
-    php-xml \
-    php-bcmath \
-    php-zip \
-    php-intl \
-    php-sqlite3 \
-    php-mysql \
-    php-pgsql || true
+  ensure_php_fpm_packages
 
   if [[ "${WITH_NODE_REPO}" == "1" ]] || [[ "${WITH_NODE_REPO}" == "yes" ]]; then
     if [[ ! -f /etc/apt/sources.list.d/nodesource.list ]]; then
@@ -110,6 +111,8 @@ if [[ "${SKIP_APT:-}" != "1" ]]; then
     apt-get install -y -qq postgresql postgresql-client
     systemctl enable --now postgresql
   fi
+else
+  require_php_for_composer
 fi
 
 # PHP-FPM soketi (apt sonrası)
@@ -215,6 +218,8 @@ fi
 
 chown -R www-data:www-data "$PANEL_ROOT/storage" "$PANEL_ROOT/bootstrap/cache"
 chmod -R ug+rwx "$PANEL_ROOT/storage" "$PANEL_ROOT/bootstrap/cache"
+
+panelsar_git_safe_directory "$REPO_ROOT"
 
 sudo -u www-data composer --working-dir="$PANEL_ROOT" install --no-dev --optimize-autoloader --no-interaction
 

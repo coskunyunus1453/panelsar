@@ -75,6 +75,7 @@ if [[ -d "$PANELSAR_HOME/.git" ]]; then
   git fetch origin "$PANELSAR_BRANCH" --depth 1
   git checkout "$PANELSAR_BRANCH"
   git reset --hard "origin/$PANELSAR_BRANCH"
+  git clean -fd
 else
   echo "==> Klonlanıyor: $PANELSAR_REPO_URL ($PANELSAR_BRANCH)"
   rm -rf "$PANELSAR_HOME"
