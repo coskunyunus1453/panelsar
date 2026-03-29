@@ -23,10 +23,18 @@ class CronJobController extends Controller
         return response()->json($jobs);
     }
 
+    public function summary(Request $request): JsonResponse
+    {
+        return response()->json([
+            'quota' => $this->quota->cronQuotaSummary($request->user()),
+            'timezone_hint' => config('app.timezone', 'UTC'),
+        ]);
+    }
+
     public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'schedule' => 'required|string|max:64',
+            'schedule' => ['required', 'string', 'max:80', $this->cronScheduleRule()],
             'command' => 'required|string|max:2000',
             'description' => 'nullable|string|max:255',
         ]);
@@ -59,6 +67,48 @@ class CronJobController extends Controller
         ], 201);
     }
 
+    public function update(Request $request, CronJob $cronJob): JsonResponse
+    {
+        if ($cronJob->user_id !== $request->user()->id && ! $request->user()->isAdmin()) {
+            abort(403);
+        }
+
+        $validated = $request->validate([
+            'schedule' => ['required', 'string', 'max:80', $this->cronScheduleRule()],
+            'command' => 'required|string|max:2000',
+            'description' => 'nullable|string|max:255',
+        ]);
+
+        $eid = $cronJob->engine_job_id;
+        if ($eid === null || $eid === '') {
+            $eid = (string) $cronJob->id;
+        }
+
+        $engine = $this->engine->engineCronUpdate($eid, [
+            'schedule' => $validated['schedule'],
+            'command' => $validated['command'],
+            'description' => $validated['description'] ?? '',
+        ]);
+
+        if (! empty($engine['error'])) {
+            return response()->json([
+                'message' => $engine['error'],
+                'engine' => $engine,
+            ], 502);
+        }
+
+        $cronJob->update([
+            'schedule' => $validated['schedule'],
+            'command' => $validated['command'],
+            'description' => $validated['description'] ?? null,
+        ]);
+
+        return response()->json([
+            'message' => __('cron.updated'),
+            'job' => $cronJob->fresh(),
+        ]);
+    }
+
     public function destroy(Request $request, CronJob $cronJob): JsonResponse
     {
         if ($cronJob->user_id !== $request->user()->id && ! $request->user()->isAdmin()) {
@@ -74,5 +124,23 @@ class CronJobController extends Controller
             'message' => __('cron.deleted'),
             'engine' => $this->engine->engineCronDelete($eid),
         ]);
+    }
+
+    /**
+     * @return \Closure(string, mixed, \Closure): void
+     */
+    private function cronScheduleRule(): \Closure
+    {
+        return function (string $attribute, mixed $value, \Closure $fail): void {
+            if (! is_string($value)) {
+                $fail(__('cron.invalid_schedule'));
+
+                return;
+            }
+            $parts = preg_split('/\s+/', trim($value), -1, PREG_SPLIT_NO_EMPTY);
+            if ($parts === false || count($parts) !== 5) {
+                $fail(__('cron.invalid_schedule'));
+            }
+        };
     }
 }

@@ -317,6 +317,48 @@ func CronDelete(cfg *config.Config, id string) error {
 	return writeCron(path, next)
 }
 
+// CronUpdate engine-state/cron.json içindeki kaydı günceller (id veya panel job id ile).
+func CronUpdate(cfg *config.Config, id, schedule, command, desc string) error {
+	mu.Lock()
+	defer mu.Unlock()
+	path := filepath.Join(dir(cfg), "cron.json")
+	jobs, err := readCron(path)
+	if err != nil {
+		return err
+	}
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return fmt.Errorf("empty id")
+	}
+	var panelID uint
+	allDigits := true
+	for _, r := range id {
+		if r < '0' || r > '9' {
+			allDigits = false
+			break
+		}
+	}
+	if allDigits {
+		_, _ = fmt.Sscanf(id, "%d", &panelID)
+	}
+	updated := false
+	for i := range jobs {
+		match := jobs[i].ID == id || (panelID != 0 && jobs[i].PanelJobID == panelID)
+		if !match {
+			continue
+		}
+		jobs[i].Schedule = schedule
+		jobs[i].Command = command
+		jobs[i].Description = desc
+		updated = true
+		break
+	}
+	if !updated {
+		return fmt.Errorf("cron job not found: %s", id)
+	}
+	return writeCron(path, jobs)
+}
+
 // FTPAccounts domain başına.
 func FTPAccounts(cfg *config.Config, domain string) ([]gin.H, error) {
 	d := safeDomain(domain)

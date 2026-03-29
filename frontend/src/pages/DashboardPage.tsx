@@ -4,17 +4,8 @@ import { useQuery } from '@tanstack/react-query'
 import { useAuthStore } from '../store/authStore'
 import api from '../services/api'
 import type { DashboardData } from '../types'
-import {
-  Globe,
-  Database,
-  Mail,
-  HardDrive,
-  Activity,
-  Cpu,
-  MemoryStick,
-  Plus,
-  Users,
-} from 'lucide-react'
+import { Globe, Database, Mail, HardDrive, Plus, Users } from 'lucide-react'
+import ResourceChartsSection from '../components/dashboard/ResourceChartsSection'
 
 export default function DashboardPage() {
   const { t } = useTranslation()
@@ -24,6 +15,7 @@ export default function DashboardPage() {
   const dashQ = useQuery({
     queryKey: ['dashboard'],
     queryFn: async () => (await api.get('/dashboard')).data.dashboard as DashboardData,
+    refetchInterval: isAdmin ? 8_000 : false,
   })
 
   const d = dashQ.data
@@ -83,35 +75,6 @@ export default function DashboardPage() {
       ]
     : []
 
-  const systemCards =
-    sys != null
-      ? [
-          {
-            label: t('dashboard.cpu_usage'),
-            value: `${Math.round(sys.cpu_usage ?? 0)}%`,
-            icon: Cpu,
-            progress: Math.min(100, Math.round(sys.cpu_usage ?? 0)),
-            color:
-              (sys.cpu_usage ?? 0) > 80 ? 'bg-red-500' : 'bg-green-500',
-          },
-          {
-            label: t('dashboard.memory_usage'),
-            value: `${Math.round(sys.memory_percent ?? 0)}%`,
-            icon: MemoryStick,
-            progress: Math.min(100, Math.round(sys.memory_percent ?? 0)),
-            color:
-              (sys.memory_percent ?? 0) > 80 ? 'bg-red-500' : 'bg-yellow-500',
-          },
-          {
-            label: t('dashboard.bandwidth'),
-            value: sys.uptime != null ? `${Math.floor(sys.uptime / 3600)}h` : '—',
-            icon: Activity,
-            progress: 0,
-            color: 'bg-blue-500',
-          },
-        ]
-      : []
-
   const quickActions = [
     { label: t('dashboard.create_site'), icon: Globe, path: '/domains' },
     { label: t('dashboard.create_database'), icon: Database, path: '/databases' },
@@ -160,37 +123,22 @@ export default function DashboardPage() {
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
             {t('dashboard.system_status')}
           </h3>
-          {!isAdmin || !sys ? (
+          {!isAdmin ? (
             <p className="text-sm text-gray-500 dark:text-gray-400">
-              {isAdmin
-                ? 'Engine çalışmıyorsa sunucu istatistikleri görünmez. Engine ve ENGINE_INTERNAL_KEY kontrol edin.'
-                : 'Sunucu kaynak özeti yalnızca yöneticiler için engine üzerinden gösterilir.'}
+              {t('dashboard.system_admin_only')}
+            </p>
+          ) : !sys ? (
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              {t('dashboard.system_engine_hint')}
             </p>
           ) : (
             <div className="space-y-4">
-              {systemCards.map((item) => (
-                <div key={item.label} className="flex items-center gap-4">
-                  <div className="p-2 rounded-lg bg-gray-100 dark:bg-gray-800">
-                    <item.icon className="h-5 w-5 text-gray-600 dark:text-gray-400" />
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                        {item.label}
-                      </span>
-                      <span className="text-sm font-semibold text-gray-900 dark:text-white">
-                        {item.value}
-                      </span>
-                    </div>
-                    <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                      <div
-                        className={`${item.color} h-2 rounded-full transition-all`}
-                        style={{ width: `${item.progress}%` }}
-                      />
-                    </div>
-                  </div>
-                </div>
-              ))}
+              <ResourceChartsSection stats={sys} loading={dashQ.isLoading} />
+              {sys.uptime != null && (
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  {t('dashboard.uptime_approx')}: {Math.floor(sys.uptime / 3600)}h
+                </p>
+              )}
             </div>
           )}
         </div>

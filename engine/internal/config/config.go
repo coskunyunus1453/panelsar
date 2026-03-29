@@ -89,6 +89,8 @@ type HostingConfig struct {
 	ApacheSitesAvailable   string `mapstructure:"apache_sites_available"`
 	ApacheSitesEnabled     string `mapstructure:"apache_sites_enabled"`
 	ApacheReloadAfterVhost bool   `mapstructure:"apache_reload_after_vhost"`
+	// ApacheHTTPPort — Nginx panel 80 kullanırken 8080 (çakışmasız). 0 veya yoksa 80.
+	ApacheHTTPPort int `mapstructure:"apache_http_port"`
 
 	ManageSSL          bool   `mapstructure:"manage_ssl"`
 	CertbotPath        string `mapstructure:"certbot_path"`
@@ -204,6 +206,7 @@ func setDefaults() {
 	viper.SetDefault("hosting.apache_sites_available", "/etc/apache2/sites-available")
 	viper.SetDefault("hosting.apache_sites_enabled", "/etc/apache2/sites-enabled")
 	viper.SetDefault("hosting.apache_reload_after_vhost", false)
+	viper.SetDefault("hosting.apache_http_port", 80)
 
 	viper.SetDefault("hosting.manage_ssl", false)
 	viper.SetDefault("hosting.certbot_path", "")

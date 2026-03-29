@@ -67,6 +67,8 @@ hosting:
   nginx_reload_after_vhost: true
   php_fpm_manage_pools: false
   apache_manage_vhosts: false
+  # Nginx panel 80/443 kullanır; Apache HTTP bu portta (çakışma yok)
+  apache_http_port: 8080
   manage_ssl: true
   certbot_path: "/usr/bin/certbot"
   lets_encrypt_email: "__LETS_ENCRYPT_EMAIL__"

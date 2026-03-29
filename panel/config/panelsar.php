@@ -12,6 +12,9 @@ return [
     'engine_internal_key' => env('ENGINE_INTERNAL_KEY', ''),
     'engine_secret' => env('ENGINE_API_SECRET', ''),
 
+    /** Web terminal WebSocket URL’si (wss) — HTTP panelde kapalı; TLS/Cloudflare sonrası true yapın */
+    'force_wss_terminal' => filter_var(env('FORCE_WSS_TERMINAL', false), FILTER_VALIDATE_BOOLEAN),
+
     /** Let’s Encrypt: istekte e-posta yoksa engine `hosting.lets_encrypt_email` ile birlikte kullanılır */
     'lets_encrypt_email' => env('PANELSAR_LETS_ENCRYPT_EMAIL', ''),
 

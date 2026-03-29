@@ -27,6 +27,7 @@
 #   WITH_PHPMYADMIN=1           # apt phpMyAdmin + Nginx /phpmyadmin + PHPMYADMIN_URL
 #   WITH_CERTBOT=1              # certbot + python3-certbot-nginx (Let's Encrypt)
 #   WITH_APACHE=1               # apache2; Nginx 80 ile çakışmaz — Apache :8080 + engine apache_http_port: 8080
+#   WITH_LOCAL_POSTFIX=1        # Postfix + mailutils (panel giden posta: sendmail; Admin → Giden posta’dan SMTP’ye geçilebilir)
 #   SKIP_DB_SEED=1              # migrate sonrası db:seed atla
 #   PANELSAR_ADMIN_EMAIL=...    # ilk admin e-posta (varsayılan admin@panelsar.com)
 #   PANELSAR_ADMIN_PASSWORD=... # sabit şifre; verilmezse kurulumda rastgele üretilir
@@ -167,6 +168,14 @@ if [[ "${SKIP_APT:-}" != "1" ]]; then
     apt-get install -y -qq phpmyadmin
   fi
 
+  if [[ "${WITH_LOCAL_POSTFIX:-1}" == "1" ]] || [[ "${WITH_LOCAL_POSTFIX:-1}" == "yes" ]]; then
+    echo "postfix postfix/main_mailer_type select Internet Site" | debconf-set-selections
+    echo "postfix postfix/mailname string $(hostname -f 2>/dev/null || hostname)" | debconf-set-selections
+    apt-get install -y -qq postfix mailutils
+    systemctl enable postfix
+    systemctl restart postfix
+  fi
+
   if [[ "${WITH_POSTGRES:-}" == "1" ]] || [[ "${WITH_POSTGRES:-}" == "yes" ]]; then
     apt-get install -y -qq postgresql postgresql-client
     systemctl enable --now postgresql
@@ -272,6 +281,14 @@ update_env "ENGINE_INTERNAL_KEY" "$INTERNAL_KEY"
 update_env "ENGINE_API_SECRET" "$ENGINE_JWT"
 update_env "LOG_LEVEL" "error"
 
+# Yerel Postfix: Laravel sendmail ile gönderir; SMTP’yi panelden (Admin → Giden posta) tanımlarsınız
+if [[ "${WITH_LOCAL_POSTFIX:-1}" == "1" ]] || [[ "${WITH_LOCAL_POSTFIX:-1}" == "yes" ]]; then
+  _MAIL_FROM="noreply@$(hostname -f 2>/dev/null || hostname)"
+  update_env "MAIL_MAILER" "sendmail"
+  update_env "MAIL_FROM_ADDRESS" "\"${_MAIL_FROM}\""
+  update_env "MAIL_FROM_NAME" "\"Panelsar\""
+fi
+
 # phpMyAdmin (kuruluysa panelde otomatik link)
 if [[ -d /usr/share/phpmyadmin ]]; then
   _APP_URL_VAL="$(grep '^APP_URL=' "$ENV_FILE" 2>/dev/null | cut -d= -f2- | tr -d '\r' | tr -d ' ')"
@@ -338,6 +355,7 @@ if [[ -f "$FRONTEND_ROOT/package.json" ]]; then
 fi
 
 sudo -u www-data php "$PANEL_ROOT/artisan" migrate --force
+sudo -u www-data php "$PANEL_ROOT/artisan" panelsar:init-outbound-mail --no-interaction 2>/dev/null || true
 
 if [[ "${SKIP_DB_SEED:-}" != "1" ]]; then
   ADMIN_EMAIL="${PANELSAR_ADMIN_EMAIL:-admin@panelsar.com}"

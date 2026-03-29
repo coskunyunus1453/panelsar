@@ -7,6 +7,7 @@ use App\Models\Domain;
 use App\Policies\DatabasePolicy;
 use App\Policies\DomainPolicy;
 use App\Services\HostingQuotaService;
+use App\Services\OutboundMailConfigurator;
 use App\Services\UserHostingPackageSync;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
@@ -45,6 +46,8 @@ class AppServiceProvider extends ServiceProvider
 
         Gate::policy(Domain::class, DomainPolicy::class);
         Gate::policy(Database::class, DatabasePolicy::class);
+
+        OutboundMailConfigurator::apply();
 
         if ($this->app->environment('production')) {
             if (config('app.debug')) {

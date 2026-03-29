@@ -14,7 +14,7 @@ import (
 )
 
 const tplHTTP = `# Panelsar — {{.Domain}} (Apache HTTP)
-<VirtualHost *:80>
+<VirtualHost *:{{.HTTPPort}}>
     ServerName {{.Domain}}
     ServerAlias www.{{.Domain}}
     DocumentRoot {{.DocRoot}}
@@ -35,7 +35,7 @@ const tplHTTP = `# Panelsar — {{.Domain}} (Apache HTTP)
 `
 
 const tplHTTPS = `# Panelsar — {{.Domain}} (Apache HTTPS)
-<VirtualHost *:80>
+<VirtualHost *:{{.HTTPPort}}>
     ServerName {{.Domain}}
     ServerAlias www.{{.Domain}}
     Redirect permanent / https://%{HTTP_HOST}%{REQUEST_URI}
@@ -68,6 +68,7 @@ const tplHTTPS = `# Panelsar — {{.Domain}} (Apache HTTPS)
 `
 
 type vhostVars struct {
+	HTTPPort     int
 	Domain       string
 	DocRoot      string
 	PHPSocket    string
@@ -134,7 +135,12 @@ func ApplyVhost(cfg *config.Config, domain, docRoot, phpSocket, sslFullchain, ss
 	if err != nil {
 		return err
 	}
+	httpPort := cfg.Hosting.ApacheHTTPPort
+	if httpPort <= 0 {
+		httpPort = 80
+	}
 	vars := vhostVars{
+		HTTPPort:     httpPort,
 		Domain:       domain,
 		DocRoot:      docRoot,
 		PHPSocket:    sock,

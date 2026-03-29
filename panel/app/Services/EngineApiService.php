@@ -118,6 +118,21 @@ class EngineApiService
         return $this->get('/api/v1/files?'.$q)['entries'] ?? [];
     }
 
+    /**
+     * @return list<array{path: string, line: int, preview: string}>
+     */
+    public function searchFiles(string $domain, string $path, string $query): array
+    {
+        $q = http_build_query([
+            'domain' => $domain,
+            'path' => $path,
+            'q' => $query,
+        ]);
+        $json = $this->get('/api/v1/files/search?'.$q);
+
+        return $json['hits'] ?? [];
+    }
+
     public function mkdirFile(string $domain, string $path): array
     {
         return $this->post('/api/v1/files/mkdir', ['domain' => $domain, 'path' => $path]);
@@ -302,6 +317,26 @@ class EngineApiService
         return $this->delete('/api/v1/cron/'.$id);
     }
 
+    public function engineCronUpdate(string $id, array $payload): array
+    {
+        return $this->patchJson('/api/v1/cron/'.rawurlencode($id), $payload);
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    public function getStackModules(): array
+    {
+        return $this->get('/api/v1/stack/modules')['modules'] ?? [];
+    }
+
+    public function installStackBundle(string $bundleId): array
+    {
+        return $this->postLongChecked('/api/v1/stack/install', [
+            'bundle_id' => $bundleId,
+        ], 900);
+    }
+
     private function postChecked(string $path, array $data = []): array
     {
         return $this->postLongChecked($path, $data, 45);
@@ -381,6 +416,29 @@ class EngineApiService
             Log::error("Engine API DELETE {$path} failed: {$e->getMessage()}");
 
             return [];
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    private function patchJson(string $path, array $data): array
+    {
+        try {
+            $response = $this->client()->patch($this->baseUrl.$path, $data);
+            $json = $response->json() ?? [];
+            if (! $response->successful()) {
+                $msg = is_string($json['error'] ?? null) ? $json['error'] : ($response->body() ?: 'HTTP '.$response->status());
+
+                return ['error' => $msg];
+            }
+
+            return $json;
+        } catch (\Exception $e) {
+            Log::error("Engine API PATCH {$path} failed: {$e->getMessage()}");
+
+            return ['error' => $e->getMessage()];
         }
     }
 

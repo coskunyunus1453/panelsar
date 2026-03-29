@@ -36,6 +36,7 @@ fi
 
 echo "==> migrate"
 sudo -u "$RUN_USER" php artisan migrate --force
+sudo -u "$RUN_USER" php artisan panelsar:init-outbound-mail --no-interaction 2>/dev/null || true
 
 echo "==> optimize"
 sudo -u "$RUN_USER" php artisan config:cache

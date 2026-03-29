@@ -93,6 +93,22 @@ class HostingQuotaService
         }
     }
 
+    /**
+     * @return array{used: int, max: int|null, unlimited: bool}
+     */
+    public function cronQuotaSummary(User $user): array
+    {
+        $pkg = $this->packageFor($user);
+        $max = $this->cap($pkg, 'max_cron_jobs');
+        $used = $user->cronJobs()->count();
+
+        return [
+            'used' => $used,
+            'max' => $max,
+            'unlimited' => $max === null,
+        ];
+    }
+
     public function ensureCanQueueBackup(User $user): void
     {
         $pkg = $this->packageFor($user);

@@ -3,12 +3,14 @@
 # Ubuntu varsayılan php-fpm çoğu zaman 8.1 — Laravel 11 + kilit dosyası 8.2+ (çoğu paket 8.3/8.4) ister.
 #
 # Ortam:
-#   PANELSAR_PHP_VERSION=8.4   # varsayılan (composer.lock içindeki Symfony 8 vb. için)
+#   PANELSAR_PHP_VERSION=8.4   # panel + varsayılan FPM (composer.lock / Symfony 8)
+#   PANELSAR_EXTRA_PHP_FPM_VERSIONS="8.3 8.2"   # ek FPM havuzları (boş string = yalnız ana sürüm)
 
 ensure_php_fpm_packages() {
   [[ "${SKIP_APT:-}" == "1" ]] && return 0
 
   local pv="${PANELSAR_PHP_VERSION:-8.4}"
+  local extra="${PANELSAR_EXTRA_PHP_FPM_VERSIONS:-8.3 8.2}"
   if [[ ! -r /etc/os-release ]]; then
     echo "Hata: /etc/os-release bulunamadı." >&2
     exit 1
@@ -51,6 +53,28 @@ ensure_php_fpm_packages() {
     "php${pv}-mysql" \
     "php${pv}-pgsql"
 
+  # Ek PHP-FPM sürümleri (alan adı PHP sürüm seçimi için)
+  local ev ver
+  for ev in $extra; do
+    ver="${ev//[^0-9.]/}"
+    [[ -z "$ver" ]] && continue
+    [[ "$ver" == "$pv" ]] && continue
+    apt-get install -y -qq \
+      "php${ver}-fpm" \
+      "php${ver}-cli" \
+      "php${ver}-common" \
+      "php${ver}-curl" \
+      "php${ver}-mbstring" \
+      "php${ver}-xml" \
+      "php${ver}-zip" \
+      "php${ver}-mysql" \
+      "php${ver}-sqlite3" || true
+    if systemctl list-unit-files "php${ver}-fpm.service" &>/dev/null || [[ -f "/lib/systemd/system/php${ver}-fpm.service" ]]; then
+      systemctl enable "php${ver}-fpm" 2>/dev/null || true
+      systemctl restart "php${ver}-fpm" 2>/dev/null || true
+    fi
+  done
+
   if [[ -x "/usr/bin/php${pv}" ]]; then
     update-alternatives --install /usr/bin/php php "/usr/bin/php${pv}" 100 || true
     update-alternatives --set php "/usr/bin/php${pv}" || true
@@ -59,9 +83,17 @@ ensure_php_fpm_packages() {
   systemctl enable "php${pv}-fpm"
   systemctl restart "php${pv}-fpm"
 
-  # Eski sürüm FPM'ler (ör. distro 8.1) nginx ile karışmasın
-  for old in 8.0 8.1 8.2 8.3; do
-    if [[ "$old" != "$pv" ]] && systemctl is-active --quiet "php${old}-fpm" 2>/dev/null; then
+  # Tutulmayan eski FPM'leri durdur (panel + extra listesi dışı)
+  local keep=" $pv "
+  for ev in $extra; do
+    ver="${ev//[^0-9.]/}"
+    [[ -n "$ver" ]] && keep+=" ${ver} "
+  done
+  for old in 7.4 8.0 8.1 8.2 8.3 8.4; do
+    if [[ "$keep" == *" $old "* ]]; then
+      continue
+    fi
+    if systemctl is-active --quiet "php${old}-fpm" 2>/dev/null; then
       systemctl stop "php${old}-fpm" 2>/dev/null || true
     fi
   done

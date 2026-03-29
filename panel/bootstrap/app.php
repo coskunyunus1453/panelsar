@@ -20,6 +20,8 @@ return Application::configure(basePath: dirname(__DIR__))
         $schedule->command('sanctum:prune-expired --hours=24')->daily();
     })
     ->withMiddleware(function (Middleware $middleware) {
+        // Nginx / TLS sonlandırma arkasında doğru şema (wss, secure() vb.)
+        $middleware->trustProxies(at: '*');
         $middleware->throttleApi();
         $middleware->alias([
             'abilities' => CheckAbilities::class,

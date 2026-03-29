@@ -26,6 +26,26 @@ class FileManagerController extends Controller
 
         return response()->json([
             'entries' => $this->engine->listFiles($domain->name, $path),
+            'document_root_hint' => $domain->document_root,
+        ]);
+    }
+
+    public function search(Request $request, Domain $domain): JsonResponse
+    {
+        if (! $this->userOwnsDomain($request, $domain)) {
+            abort(403);
+        }
+        $validated = $request->validate([
+            'path' => 'nullable|string|max:2048',
+            'q' => 'required|string|min:2|max:256',
+        ]);
+
+        return response()->json([
+            'hits' => $this->engine->searchFiles(
+                $domain->name,
+                (string) ($validated['path'] ?? ''),
+                $validated['q']
+            ),
         ]);
     }
 

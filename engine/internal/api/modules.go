@@ -1,6 +1,7 @@
 package api
 
 import (
+	"errors"
 	"net/http"
 	"os"
 	"os/exec"
@@ -14,29 +15,40 @@ import (
 	"github.com/panelsar/engine/internal/installer"
 	"github.com/panelsar/engine/internal/monitoring"
 	"github.com/panelsar/engine/internal/panelmirror"
+	"github.com/panelsar/engine/internal/stack"
 	"github.com/panelsar/engine/internal/tools"
 	"github.com/sirupsen/logrus"
 )
 
 func registerModuleRoutes(cfg *config.Config, d *daemon.Daemon, api *gin.RouterGroup, log *logrus.Logger) {
 	api.GET("/system/stats", func(c *gin.Context) {
-		snap := monitoring.Collect(cfg.Paths.WebRoot)
+		ext := monitoring.CollectExtended(cfg.Paths.WebRoot)
 		c.JSON(http.StatusOK, gin.H{
 			"data": gin.H{
-				"cpu_usage":     snap.CPUUsagePercent,
-				"memory_total":  snap.MemoryTotal,
-				"memory_used":   snap.MemoryUsed,
-				"memory_percent": snap.MemoryPercent,
-				"disk_total":    snap.DiskTotal,
-				"disk_used":     snap.DiskUsed,
-				"disk_percent":  snap.DiskPercent,
-				"uptime":        snap.Uptime,
-				"hostname":      snap.Hostname,
-				"os":            snap.OS,
+				"cpu_usage":      ext.CPUUsagePercent,
+				"memory_total":   ext.MemoryTotal,
+				"memory_used":    ext.MemoryUsed,
+				"memory_percent": ext.MemoryPercent,
+				"disk_total":     ext.DiskTotal,
+				"disk_used":      ext.DiskUsed,
+				"disk_percent":   ext.DiskPercent,
+				"uptime":         ext.Uptime,
+				"hostname":       ext.Hostname,
+				"os":             ext.OS,
+				"cpu_model":      ext.CPUModel,
+				"cpu_cores_logical": ext.CPUCoresLogical,
+				"memory_available":  ext.MemoryAvailable,
+				"swap_total":        ext.SwapTotal,
+				"swap_used":         ext.SwapUsed,
+				"swap_percent":      ext.SwapPercent,
+				"top_cpu_processes":     ext.TopCPUProcesses,
+				"top_memory_processes":  ext.TopMemoryProcesses,
+				"top_disk_mounts":       ext.TopDiskMounts,
 			},
 		})
 	})
 
+	api.GET("/files/search", handleFileSearch(cfg))
 	api.GET("/files", handleFileList(cfg))
 	api.POST("/files/mkdir", handleFileMkdir(cfg))
 	api.DELETE("/files", handleFileDelete(cfg))
@@ -212,6 +224,22 @@ func registerModuleRoutes(cfg *config.Config, d *daemon.Daemon, api *gin.RouterG
 		}
 		c.JSON(http.StatusCreated, gin.H{"message": "cron job registered", "id": id})
 	})
+	api.PATCH("/cron/:id", func(c *gin.Context) {
+		var req struct {
+			Schedule    string `json:"schedule" binding:"required"`
+			Command     string `json:"command" binding:"required"`
+			Description string `json:"description"`
+		}
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		if err := panelmirror.CronUpdate(cfg, c.Param("id"), req.Schedule, req.Command, req.Description); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"message": "cron job updated"})
+	})
 	api.DELETE("/cron/:id", func(c *gin.Context) {
 		if err := panelmirror.CronDelete(cfg, c.Param("id")); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -253,6 +281,32 @@ func registerModuleRoutes(cfg *config.Config, d *daemon.Daemon, api *gin.RouterG
 
 	api.GET("/system/processes", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"processes": []gin.H{}})
+	})
+
+	api.GET("/stack/modules", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"modules": stack.ModulesWithStatus()})
+	})
+	api.POST("/stack/install", func(c *gin.Context) {
+		var req struct {
+			BundleID string `json:"bundle_id" binding:"required"`
+		}
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		out, err := stack.InstallBundle(req.BundleID)
+		if err != nil {
+			if errors.Is(err, stack.ErrUnknownBundle) {
+				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+				return
+			}
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error":  err.Error(),
+				"output": out,
+			})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"message": "ok", "output": out, "modules": stack.ModulesWithStatus()})
 	})
 
 	_ = d
@@ -311,6 +365,25 @@ func handleSiteTools(cfg *config.Config) gin.HandlerFunc {
 			return
 		}
 		c.JSON(http.StatusOK, gin.H{"message": "ok", "output": out})
+	}
+}
+
+func handleFileSearch(cfg *config.Config) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		domain := c.Query("domain")
+		path := c.Query("path")
+		q := c.Query("q")
+		if domain == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "domain required"})
+			return
+		}
+		root := cfg.Paths.WebRoot + "/" + domain
+		hits, err := files.SearchText(root, path, q, 200, 14, 2<<20)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"hits": hits})
 	}
 }
 
@@ -377,7 +450,7 @@ func handleFileRead(cfg *config.Config) gin.HandlerFunc {
 			return
 		}
 		root := cfg.Paths.WebRoot + "/" + domain
-		b, err := files.ReadFile(root, path)
+		b, err := files.ReadFileForEditor(root, path)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return

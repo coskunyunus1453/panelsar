@@ -2,6 +2,8 @@
 
 use App\Http\Controllers\Admin\PackageController;
 use App\Http\Controllers\Admin\ServerSetupController;
+use App\Http\Controllers\Admin\OutboundMailSettingsController;
+use App\Http\Controllers\Admin\StackController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BackupController;
@@ -51,6 +53,7 @@ Route::middleware(['auth:sanctum', 'abilities:access:customer-panel'])->group(fu
 
     Route::prefix('domains/{domain}/files')->group(function () {
         Route::get('/', [FileManagerController::class, 'index']);
+        Route::get('search', [FileManagerController::class, 'search']);
         Route::post('mkdir', [FileManagerController::class, 'mkdir']);
         Route::delete('/', [FileManagerController::class, 'destroy']);
         Route::get('read', [FileManagerController::class, 'read']);
@@ -82,8 +85,10 @@ Route::middleware(['auth:sanctum', 'abilities:access:customer-panel'])->group(fu
     Route::post('domains/{domain}/ssl/renew', [SslController::class, 'renew']);
     Route::post('domains/{domain}/ssl/revoke', [SslController::class, 'revoke']);
 
+    Route::get('cron/summary', [CronJobController::class, 'summary']);
     Route::get('cron', [CronJobController::class, 'index']);
     Route::post('cron', [CronJobController::class, 'store']);
+    Route::patch('cron/{cronJob}', [CronJobController::class, 'update']);
     Route::delete('cron/{cronJob}', [CronJobController::class, 'destroy']);
 
     Route::get('monitoring/summary', [MonitoringController::class, 'userSummary']);
@@ -116,6 +121,11 @@ Route::middleware(['auth:sanctum', 'abilities:access:customer-panel'])->group(fu
 
     Route::middleware('role:admin')->prefix('admin')->group(function () {
         Route::get('server/capabilities', [ServerSetupController::class, 'capabilities']);
+        Route::get('stack/modules', [StackController::class, 'modules']);
+        Route::post('stack/install', [StackController::class, 'install']);
+        Route::get('settings/mail', [OutboundMailSettingsController::class, 'show']);
+        Route::put('settings/mail', [OutboundMailSettingsController::class, 'update']);
+        Route::post('settings/mail/test', [OutboundMailSettingsController::class, 'test']);
         Route::apiResource('users', UserController::class);
         Route::post('users/{user}/suspend', [UserController::class, 'suspend']);
         Route::post('users/{user}/activate', [UserController::class, 'activate']);

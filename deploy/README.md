@@ -96,7 +96,7 @@ Yeni VPS veya formatlanmış makinede tipik sıra:
 
    Sonra `panel/.env` içinde `APP_URL=https://panel.ornek.com` ve gerekirse `MAIL_*` (aşağıda “E-posta”).
 
-5. **Admin → Sunucu paketleri** (`/admin/stack`): ek PHP-FPM sürümleri veya **Postfix (SMTP gönderim)** demetini buradan kurabilirsiniz; kurulum için `install-production.sh` zaten `sudoers` satırını yazar.
+5. **Admin → Giden posta** (`/admin/mail-settings`): SMTP / sendmail / log; test postası. **Admin → Sunucu paketleri** (`/admin/stack`): ek PHP-FPM, Dovecot, OpenDKIM vb. Kurulum betiği `sudoers` ve `panelsar-stack-install` dosyasını zaten yükler.
 
 ## Hızlı başlangıç (Debian 12 / Ubuntu 22.04+) — özet
 
@@ -117,6 +117,9 @@ Yeni VPS veya formatlanmış makinede tipik sıra:
 | `WITH_MARIADB=0` | MariaDB kurma / panel DB oluşturma |
 | `WITH_POSTGRES=1` | Engine için PostgreSQL kur ve kullanıcı oluştur |
 | `WITH_NODE_REPO=0` | NodeSource eklemeden dağıtım `nodejs` paketini kullan |
+| `WITH_LOCAL_POSTFIX=0` | Varsayılan yerel Postfix + `sendmail` kurulumunu kapatır |
+
+Barındırma **müşterisi** Git veya SSH görmez; tek adres panel arayüzüdür. Sunucu işleten siz bir kez `install-production.sh` (veya `remote-install.sh`) çalıştırırsınız.
 
 ## Güvenlik özeti
 
@@ -161,17 +164,15 @@ SKIP_APT=1 sudo -E bash deploy/bootstrap/install-production.sh
 
 `SKIP_APT=1` apt adımını atlar; yine de engine derlemesi ve dosya kopyaları çalışır (makinenizde zaten paketler kurulu varsayılır).
 
-## E-posta: neden “tek tıkla her şey” değil?
+## E-posta (Plesk benzeri “hazır altyapı”)
 
-İki ayrı konu vardır; karışıklık genelde buradan gelir:
+1. **Panel bildirimleri (şifre sıfırlama vb.)**  
+   Kurulum betiği varsayılan olarak **Postfix + mailutils** kurar ve `sendmail` yolunu kullanır. Ayarlar veritabanında tutulur; **Admin → Giden posta** ekranından SSH’sız **SMTP’ye geçiş**, test postası ve gönderen adresi yönetilir (şifre Laravel ile şifrelenir).
 
-1. **Panelin kendi bildirimleri (Laravel mail)**  
-   Şifre sıfırlama, sistem e-postası vb. için `panel/.env` içinde **`MAIL_MAILER`**, **`MAIL_HOST`**, port, kullanıcı/şifre tanımlanır. Bu, Gmail / SendGrid / kurumsal SMTP veya sunucudaki Postfix’e bağlanabilir. Panel kodu burayı okur; DNS/MX kaydı bu adımın **zorunlu** parçası değildir (SMTP sağlayıcı kullanıyorsanız).
+2. **Müşteri alan adı posta kutuları (MX, IMAP, tam DKIM)**  
+   Hâlâ **DNS kayıtları** ve (isteğe bağlı) **Dovecot / OpenDKIM** ince ayarı gerekir; **Admin → Sunucu paketleri** ile paket kurulumu panelden tetiklenir. Tam otomatik “sihirbaz” roadmap maddesidir; giden panel postasından farklıdır.
 
-2. **Sunucuda “posta sunucusu” (müşteri alan adı için kutu, IMAP, DKIM)**  
-   Bunun için **Postfix**, istenirse **Dovecot**, **OpenDKIM**, doğru **DNS (MX, SPF, DKIM TXT)** ve güvenlik duvarı (25, 587, 993…) gerekir. Panelsar’da **Admin → Sunucu paketleri** ile bu paketlerin **kurulumu** başlatılabilir; ama **hangi domain için relay**, **kimlik doğrulama**, **DNS metinleri** gibi işler barındırma standartları gereği ya elle ya da ileride ayrı sihirbazlarla tamamlanır.
-
-Özet: **“Mail çalışsın”** = önce `panel/.env` ile **giden posta** (SMTP) ayarlayın; müşteri alan adından **profesyonel gelen/giden posta** istiyorsanız paket kurulumuna ek olarak DNS ve Postfix/Dovecot yapılandırması şarttır. Sorun çözülemez değil; sadece tek bir düğme ile tüm internet postası otomatik olmaz.
+Özet: Tek sunucuda **panel e-postası** kurulum + **Giden posta** sayfasıyla uçtan uca yönetilir; **barındırma müşterisi** `.env` veya Git ile uğraşmaz.
 
 ## Dosyalar
 

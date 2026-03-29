@@ -102,6 +102,21 @@ export interface Subscription {
   ends_at: string | null
 }
 
+export interface ProcessTopRow {
+  pid: number
+  name: string
+  cpu_percent: number
+  rss_bytes: number
+}
+
+export interface MountTopRow {
+  path: string
+  fstype?: string
+  used_percent: number
+  used_bytes: number
+  total_bytes: number
+}
+
 export interface SystemStats {
   cpu_usage?: number
   memory_total?: number
@@ -113,6 +128,15 @@ export interface SystemStats {
   uptime?: number
   hostname?: string
   os?: string
+  cpu_model?: string
+  cpu_cores_logical?: number
+  memory_available?: number
+  swap_total?: number
+  swap_used?: number
+  swap_percent?: number
+  top_cpu_processes?: ProcessTopRow[]
+  top_memory_processes?: ProcessTopRow[]
+  top_disk_mounts?: MountTopRow[]
 }
 
 export interface ServiceInfo {

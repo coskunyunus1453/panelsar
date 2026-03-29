@@ -5,6 +5,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 )
 
@@ -55,6 +56,12 @@ func List(root, rel string) ([]ListEntry, error) {
 			Mode:  info.Mode().String(),
 		})
 	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].IsDir != out[j].IsDir {
+			return out[i].IsDir
+		}
+		return strings.ToLower(out[i].Name) < strings.ToLower(out[j].Name)
+	})
 	return out, nil
 }
 
@@ -89,6 +96,28 @@ func ReadFile(root, rel string) ([]byte, error) {
 	base, err := ResolveUnderRoot(root, rel)
 	if err != nil {
 		return nil, err
+	}
+	return os.ReadFile(base)
+}
+
+// MaxEditorFileSize panel düzenleyicisi için üst boyut.
+const MaxEditorFileSize int64 = 6 << 20
+
+// ReadFileForEditor büyük dosyaları reddeder.
+func ReadFileForEditor(root, rel string) ([]byte, error) {
+	base, err := ResolveUnderRoot(root, rel)
+	if err != nil {
+		return nil, err
+	}
+	st, err := os.Stat(base)
+	if err != nil {
+		return nil, err
+	}
+	if st.IsDir() {
+		return nil, fmt.Errorf("is a directory")
+	}
+	if st.Size() > MaxEditorFileSize {
+		return nil, fmt.Errorf("file too large for editor (max %d MiB)", MaxEditorFileSize>>20)
 	}
 	return os.ReadFile(base)
 }
