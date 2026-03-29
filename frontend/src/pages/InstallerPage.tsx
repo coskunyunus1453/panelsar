@@ -25,7 +25,7 @@ export default function InstallerPage() {
   const [tablePrefix, setTablePrefix] = useState('wp_')
 
   const databasesQ = useQuery({
-    queryKey: ['databases'],
+    queryKey: ['databases', 'paginated'],
     queryFn: async () => (await api.get('/databases')).data as { data?: { id: number; name: string; type: string }[] },
   })
 

@@ -36,7 +36,7 @@ export default function DatabasesPage() {
   const [editAccessDb, setEditAccessDb] = useState<DbRow | null>(null)
 
   const databasesQ = useQuery({
-    queryKey: ['databases'],
+    queryKey: ['databases', 'paginated'],
     queryFn: async () => (await api.get('/databases')).data,
   })
 
@@ -50,7 +50,7 @@ export default function DatabasesPage() {
   })
 
   const domainsQ = useQuery({
-    queryKey: ['domains'],
+    queryKey: ['domains', 'paginated'],
     queryFn: async () => (await api.get('/domains')).data,
   })
 

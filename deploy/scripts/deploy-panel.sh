@@ -36,7 +36,11 @@ sudo -u "$RUN_USER" php artisan config:cache
 sudo -u "$RUN_USER" php artisan route:cache
 sudo -u "$RUN_USER" php artisan view:cache
 
-if [[ -d "$FRONTEND_ROOT" ]] && [[ -f "$FRONTEND_ROOT/package.json" ]] && command -v npm >/dev/null 2>&1; then
+if [[ -d "$FRONTEND_ROOT" ]] && [[ -f "$FRONTEND_ROOT/package.json" ]]; then
+  if ! command -v npm >/dev/null 2>&1; then
+    echo "Hata: npm yok; frontend derlenemiyor." >&2
+    exit 1
+  fi
   echo "==> frontend build ($FRONTEND_ROOT)"
   if [[ -f "$FRONTEND_ROOT/package-lock.json" ]]; then
     (cd "$FRONTEND_ROOT" && npm ci && npm run build)

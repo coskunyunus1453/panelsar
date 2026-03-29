@@ -94,10 +94,14 @@ if [[ "${SKIP_APT:-}" != "1" ]]; then
   if [[ "${WITH_NODE_REPO}" == "1" ]] || [[ "${WITH_NODE_REPO}" == "yes" ]]; then
     if [[ ! -f /etc/apt/sources.list.d/nodesource.list ]]; then
       curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
-      apt-get install -y -qq nodejs
     fi
+    apt-get install -y -qq nodejs
   else
     apt-get install -y -qq nodejs npm || true
+  fi
+  if ! command -v npm >/dev/null 2>&1; then
+    echo "Hata: npm bulunamadı (frontend derlemesi zorunlu). WITH_NODE_REPO=1 ile NodeSource kurun veya nodejs/npm kurun." >&2
+    exit 1
   fi
 
   if ! command -v composer >/dev/null 2>&1; then
@@ -252,9 +256,13 @@ if grep -q '^DB_CONNECTION=sqlite' "$ENV_FILE" 2>/dev/null; then
   fi
 fi
 
-# Frontend → public/
+# Frontend → public/ (sessiz atlama yok: panel arayüzü dist olmadan çalışmaz)
 FRONTEND_ROOT="$REPO_ROOT/frontend"
-if [[ -f "$FRONTEND_ROOT/package.json" ]] && command -v npm >/dev/null 2>&1; then
+if [[ -f "$FRONTEND_ROOT/package.json" ]]; then
+  if ! command -v npm >/dev/null 2>&1; then
+    echo "Hata: frontend/ için npm gerekli. SKIP_APT=1 kullandıysanız önce Node.js + npm kurun." >&2
+    exit 1
+  fi
   if [[ -f "$FRONTEND_ROOT/package-lock.json" ]]; then
     (cd "$FRONTEND_ROOT" && npm ci && npm run build)
   else

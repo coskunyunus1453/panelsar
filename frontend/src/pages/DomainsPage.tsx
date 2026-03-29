@@ -29,7 +29,7 @@ export default function DomainsPage() {
   const [showAdd, setShowAdd] = useState(false)
 
   const domainsQ = useQuery({
-    queryKey: ['domains'],
+    queryKey: ['domains', 'paginated'],
     queryFn: async () => (await api.get('/domains')).data,
   })
 

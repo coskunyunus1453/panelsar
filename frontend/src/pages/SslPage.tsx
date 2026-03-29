@@ -25,7 +25,7 @@ export default function SslPage() {
   })
 
   const domainsQ = useQuery({
-    queryKey: ['domains'],
+    queryKey: ['domains', 'paginated'],
     queryFn: async () => (await api.get('/domains')).data,
   })
 
