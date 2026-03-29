@@ -213,6 +213,7 @@ update_env "APP_DEBUG" "false"
 update_env "APP_URL" "http://$(hostname -I 2>/dev/null | awk '{print $1}' || echo localhost)"
 update_env "ENGINE_API_URL" "http://127.0.0.1:9090"
 update_env "ENGINE_INTERNAL_KEY" "$INTERNAL_KEY"
+update_env "ENGINE_API_SECRET" "$ENGINE_JWT"
 update_env "LOG_LEVEL" "error"
 
 # MariaDB panel DB

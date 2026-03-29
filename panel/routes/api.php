@@ -21,6 +21,7 @@ use App\Http\Controllers\Api\SecurityController;
 use App\Http\Controllers\Api\SiteToolsController;
 use App\Http\Controllers\Api\SslController;
 use App\Http\Controllers\Api\SystemController;
+use App\Http\Controllers\Api\TerminalController;
 use App\Http\Controllers\Api\UiLinksController;
 use App\Services\EngineApiService;
 use Illuminate\Support\Facades\Route;
@@ -101,6 +102,8 @@ Route::middleware(['auth:sanctum', 'abilities:access:customer-panel'])->group(fu
     Route::get('billing/packages', [BillingController::class, 'packages']);
     Route::get('billing/subscriptions', [BillingController::class, 'subscriptions']);
     Route::post('billing/checkout', [BillingController::class, 'checkout']);
+
+    Route::post('terminal/session', [TerminalController::class, 'session'])->middleware('role:admin');
 
     Route::middleware('role:admin')->prefix('system')->group(function () {
         Route::get('stats', [SystemController::class, 'stats']);

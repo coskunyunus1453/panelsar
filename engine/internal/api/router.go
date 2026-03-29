@@ -13,6 +13,7 @@ import (
 	"github.com/panelsar/engine/internal/phpfpm"
 	"github.com/panelsar/engine/internal/sites"
 	"github.com/panelsar/engine/internal/ssl"
+	"github.com/panelsar/engine/internal/terminal"
 	"github.com/sirupsen/logrus"
 )
 
@@ -34,6 +35,8 @@ func NewRouter(cfg *config.Config, d *daemon.Daemon, log *logrus.Logger) *gin.En
 			"running": d.IsRunning(),
 		})
 	})
+
+	r.GET("/ws/terminal", terminal.HandleWS(cfg, log))
 
 	api := r.Group("/api/v1")
 	api.Use(middleware.AuthRequired(cfg))

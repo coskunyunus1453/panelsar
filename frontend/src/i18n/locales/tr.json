@@ -28,7 +28,19 @@
     "server_setup": "Sunucu & kurulum",
     "open_menu": "Menüyü aç",
     "close_menu": "Menüyü kapat",
-    "toggle_sidebar": "Kenar çubuğunu daralt"
+    "toggle_sidebar": "Kenar çubuğunu daralt",
+    "terminal": "SSH terminal"
+  },
+  "terminal": {
+    "title": "SSH terminal",
+    "subtitle": "Sunucuda engine ile aynı kullanıcı (www-data) kabuğu. Nginx’in /engine-ws/ proxy’si ve ENGINE_API_SECRET gerekir.",
+    "warning": "Tam sunucu kökü değildir; yine de dikkatli kullanın. Müşteri hesapları için ayrı kısıtlı kabuk ileride eklenebilir.",
+    "status_online": "Bağlı",
+    "status_connecting": "Bağlanıyor…",
+    "status_offline": "Kapalı",
+    "reconnect": "Yeniden bağlan",
+    "ws_error": "WebSocket hatası",
+    "disconnected": "Bağlantı kapandı."
   },
   "server_setup": {
     "subtitle": "Hangi özelliklerin canlıda hazır olduğunu ve neyin .env / sunucu tarafında açılması gerektiğini özetler.",

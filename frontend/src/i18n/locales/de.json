@@ -22,7 +22,19 @@
     "installer": "App-Installer",
     "open_menu": "Menü öffnen",
     "close_menu": "Menü schließen",
-    "toggle_sidebar": "Seitenleiste einklappen"
+    "toggle_sidebar": "Seitenleiste einklappen",
+    "terminal": "SSH-Terminal"
+  },
+  "terminal": {
+    "title": "SSH-Terminal",
+    "subtitle": "Shell as the same user as the engine (www-data). Requires Nginx /engine-ws/ proxy and ENGINE_API_SECRET matching engine jwt_secret.",
+    "warning": "This is not full root access; use carefully. Per-customer jailed shells may be added later.",
+    "status_online": "Connected",
+    "status_connecting": "Connecting…",
+    "status_offline": "Offline",
+    "reconnect": "Reconnect",
+    "ws_error": "WebSocket error",
+    "disconnected": "Connection closed."
   },
   "auth": {
     "login": "Anmelden",

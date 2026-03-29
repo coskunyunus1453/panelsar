@@ -28,7 +28,19 @@
     "server_setup": "Server & setup",
     "open_menu": "Open menu",
     "close_menu": "Close menu",
-    "toggle_sidebar": "Collapse sidebar"
+    "toggle_sidebar": "Collapse sidebar",
+    "terminal": "SSH terminal"
+  },
+  "terminal": {
+    "title": "SSH terminal",
+    "subtitle": "Shell as the same user as the engine (www-data). Requires Nginx /engine-ws/ proxy and ENGINE_API_SECRET matching engine jwt_secret.",
+    "warning": "This is not full root access; use carefully. Per-customer jailed shells may be added later.",
+    "status_online": "Connected",
+    "status_connecting": "Connecting…",
+    "status_offline": "Offline",
+    "reconnect": "Reconnect",
+    "ws_error": "WebSocket error",
+    "disconnected": "Connection closed."
   },
   "server_setup": {
     "subtitle": "What is ready in production and what must be enabled via .env or the OS.",

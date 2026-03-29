@@ -28,6 +28,7 @@ import {
   KeyRound,
   Wrench,
   X,
+  TerminalSquare,
 } from 'lucide-react'
 
 const navItems = [
@@ -52,6 +53,7 @@ const navItems = [
 
 const adminItems = [
   { path: '/admin/server-setup', icon: Wrench, label: 'nav.server_setup' },
+  { path: '/admin/terminal', icon: TerminalSquare, label: 'nav.terminal' },
   { path: '/admin/system', icon: Gauge, label: 'nav.system' },
   { path: '/admin/users', icon: Users, label: 'nav.users' },
   { path: '/admin/packages', icon: Package, label: 'nav.packages' },

@@ -24,6 +24,7 @@ import AdminUsersPage from './pages/AdminUsersPage'
 import AdminPackagesPage from './pages/AdminPackagesPage'
 import AdminSystemPage from './pages/AdminSystemPage'
 import AdminLicensePage from './pages/AdminLicensePage'
+import TerminalPage from './pages/TerminalPage'
 import AdminServerSetupPage from './pages/AdminServerSetupPage'
 import ResellerPage from './pages/ResellerPage'
 
@@ -76,6 +77,7 @@ export default function App() {
         <Route path="admin/packages" element={<AdminPackagesPage />} />
         <Route path="admin/system" element={<AdminSystemPage />} />
         <Route path="admin/license" element={<AdminLicensePage />} />
+        <Route path="admin/terminal" element={<TerminalPage />} />
         <Route path="admin/server-setup" element={<AdminServerSetupPage />} />
         <Route path="settings" element={<SettingsPage />} />
       </Route>
