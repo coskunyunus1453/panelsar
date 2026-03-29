@@ -65,42 +65,45 @@ sudo PANELSAR_REPO_URL=https://TOKEN@github.com/SIRKET/panelsar.git bash -s <<< 
 
 Daha güvenlisi: sunucuya **SSH deploy key** ekletmek ve normal `git@github.com:SIRKET/panelsar.git` URL kullanmak.
 
-## Hızlı başlangıç (Debian 12 / Ubuntu 22.04+)
+## Sıfırdan sunucu (temiz Debian/Ubuntu)
 
-1. Sunucuya repoyu klonlayın (örnek):
+Yeni VPS veya formatlanmış makinede tipik sıra:
+
+1. **SSH ile root veya sudo** kullanıcısı; saat dilimi / hostname isteğe bağlı.
+2. Repoyu **tek kök dizinde** tutun (panel ve engine aynı repo içinde):
 
    ```bash
-   sudo mkdir -p /var/www && sudo chown "$USER":"$USER" /var/www
-   git clone <repo-url> /var/www/panelsar
+   sudo mkdir -p /var/www
+   sudo chown "$USER":"$USER" /var/www
+   git clone <SIZIN_REPO_URL> /var/www/panelsar
    cd /var/www/panelsar
+   git checkout main   # veya kullandığınız dal
    ```
 
-2. **Go** kurulu olmalı (engine derlemek için): `apt install golang-go` veya resmi Go paketi.
-
-3. Kurulum betiğini çalıştırın:
+3. **Tam kurulum** (Go, PHP, Nginx, MariaDB, engine derlemesi, `panelsar-stack-install` + sudoers, frontend build dahil):
 
    ```bash
    sudo bash deploy/bootstrap/install-production.sh
    ```
 
-   Varsayılanlar:
+   İlk kurulumda `SKIP_APT=0` (varsayılan) bırakın; sadece kod güncellediğinizde aşağıdaki “Güncelleme” bölümüne bakın.
 
-   - **MariaDB** kurulur ve panel veritabanı oluşturulur (`WITH_MARIADB=1`).
-   - **Node.js 20** için NodeSource eklenir (`WITH_NODE_REPO=1`).
-   - **Engine** yalnızca **127.0.0.1:9090** üzerinde dinler; dış ağa açmayın.
-   - **Nginx** SPA + `/api` için yapılandırılır; React derlemesi `panel/public/` içine alınır.
-
-4. Tarayıcıdan sunucu IP veya alan adı ile açın. **HTTPS** için:
+4. Tarayıcıdan paneli açın. **HTTPS**:
 
    ```bash
    sudo certbot --nginx -d panel.ornek.com
    ```
 
-   Ardından `panel/.env` içinde `APP_URL` değerini güncelleyin ve:
+   Sonra `panel/.env` içinde `APP_URL=https://panel.ornek.com` ve gerekirse `MAIL_*` (aşağıda “E-posta”).
 
-   ```bash
-   cd /var/www/panelsar/panel && sudo -u www-data php artisan config:cache
-   ```
+5. **Admin → Sunucu paketleri** (`/admin/stack`): ek PHP-FPM sürümleri veya **Postfix (SMTP gönderim)** demetini buradan kurabilirsiniz; kurulum için `install-production.sh` zaten `sudoers` satırını yazar.
+
+## Hızlı başlangıç (Debian 12 / Ubuntu 22.04+) — özet
+
+1. `git clone` → `cd /var/www/panelsar`
+2. `sudo bash deploy/bootstrap/install-production.sh` (Go betik içinde kurulabilir; ayrıca `apt install golang-go` da yeterli olabilir)
+3. Varsayılanlar: **MariaDB**, **Node 20 kaynağı**, engine **127.0.0.1:9090**, Nginx + SPA
+4. HTTPS ve `APP_URL` + `config:cache` (yukarıdaki gibi)
 
 ## Ortam değişkenleri (kurulum betiği)
 
@@ -121,14 +124,54 @@ Daha güvenlisi: sunucuya **SSH deploy key** ekletmek ve normal `git@github.com:
 - Nginx’te temel başlıklar (`X-Frame-Options`, `nosniff`, …) ve gzip.
 - Panel şifreleri `/root/panelsar-panel-mysql.secret` (MariaDB kurulduysa).
 
-## Güncelleme
+## Güncelleme (Git’ten kod çekme)
+
+Repoyu **kök dizinden** güncelleyin (`panel/` altında `.git` olmayabilir):
 
 ```bash
+cd /var/www/panelsar
+git fetch origin
+git checkout main    # veya master / kullandığınız dal
+git pull --ff-only origin main
+```
+
+**Panel + ön yüz + migrate** (deploy betiği artık üst dizinde `.git` varsa otomatik `git pull` da yapar; yine de kökten çekmek net kalır):
+
+```bash
+cd /var/www/panelsar
 export PANEL_ROOT=/var/www/panelsar/panel
 export FRONTEND_ROOT=/var/www/panelsar/frontend
 sudo -E bash deploy/scripts/deploy-panel.sh
+```
+
+**Engine ikilisini** yeniden derleyip servisi yenilemek (Go kodu değiştiyse):
+
+```bash
+cd /var/www/panelsar/engine
+sudo go build -buildvcs=false -o /usr/local/bin/panelsar-engine ./cmd/panelsar-engine
 sudo systemctl restart panelsar-engine
 ```
+
+Nginx şablonu, systemd birimi veya `panelsar-stack-install` / sudoers değiştiyse, kökten tekrar:
+
+```bash
+cd /var/www/panelsar
+SKIP_APT=1 sudo -E bash deploy/bootstrap/install-production.sh
+```
+
+`SKIP_APT=1` apt adımını atlar; yine de engine derlemesi ve dosya kopyaları çalışır (makinenizde zaten paketler kurulu varsayılır).
+
+## E-posta: neden “tek tıkla her şey” değil?
+
+İki ayrı konu vardır; karışıklık genelde buradan gelir:
+
+1. **Panelin kendi bildirimleri (Laravel mail)**  
+   Şifre sıfırlama, sistem e-postası vb. için `panel/.env` içinde **`MAIL_MAILER`**, **`MAIL_HOST`**, port, kullanıcı/şifre tanımlanır. Bu, Gmail / SendGrid / kurumsal SMTP veya sunucudaki Postfix’e bağlanabilir. Panel kodu burayı okur; DNS/MX kaydı bu adımın **zorunlu** parçası değildir (SMTP sağlayıcı kullanıyorsanız).
+
+2. **Sunucuda “posta sunucusu” (müşteri alan adı için kutu, IMAP, DKIM)**  
+   Bunun için **Postfix**, istenirse **Dovecot**, **OpenDKIM**, doğru **DNS (MX, SPF, DKIM TXT)** ve güvenlik duvarı (25, 587, 993…) gerekir. Panelsar’da **Admin → Sunucu paketleri** ile bu paketlerin **kurulumu** başlatılabilir; ama **hangi domain için relay**, **kimlik doğrulama**, **DNS metinleri** gibi işler barındırma standartları gereği ya elle ya da ileride ayrı sihirbazlarla tamamlanır.
+
+Özet: **“Mail çalışsın”** = önce `panel/.env` ile **giden posta** (SMTP) ayarlayın; müşteri alan adından **profesyonel gelen/giden posta** istiyorsanız paket kurulumuna ek olarak DNS ve Postfix/Dovecot yapılandırması şarttır. Sorun çözülemez değil; sadece tek bir düğme ile tüm internet postası otomatik olmaz.
 
 ## Dosyalar
 
@@ -137,6 +180,8 @@ sudo systemctl restart panelsar-engine
 | `host/install.sh` | **kodsar.com/panel’e yükleyeceğiniz tek dosya** (repo URL üstte düzenlenir) |
 | `bootstrap/remote-install.sh` | Aynı mantık; GitHub raw veya başka CDN’den de verilebilir |
 | `bootstrap/install-production.sh` | Ana kurulum |
+| `host/panelsar-stack-install` | Admin “Sunucu paketleri” için apt demetleri (→ `/usr/local/sbin/`) |
+| `scripts/deploy-panel.sh` | `git pull` (repo kökü), composer, migrate, frontend build |
 | `nginx/panelsar.conf` | Site şablonu |
 | `systemd/panelsar-engine.service` | Engine servisi |
 | `configs/engine.production.yaml` | `/etc/panelsar/engine.yaml` şablonu |

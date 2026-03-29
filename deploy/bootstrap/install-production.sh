@@ -4,10 +4,13 @@
 #
 # Hedef: güvenlik (engine yalnızca loopback), hız (gzip, static cache), kolaylık (tek komut iskeleti)
 #
-# Kullanım (root):
-#   git clone https://github.com/.../panelsar.git /var/www/panelsar
-#   cd /var/www/panelsar
+# Kullanım (root) — sıfır sunucu:
+#   git clone <repo> /var/www/panelsar && cd /var/www/panelsar
 #   sudo bash deploy/bootstrap/install-production.sh
+#
+# Sadece kod/config güncellemesi (paket kurulumu atlanır):
+#   cd /var/www/panelsar && git pull --ff-only
+#   SKIP_APT=1 sudo -E bash deploy/bootstrap/install-production.sh
 #
 # Ortam değişkenleri (isteğe bağlı):
 #   PANELSAR_HOME=/var/www/panelsar
@@ -20,6 +23,10 @@
 #   WITH_NODE_REPO=1       # NodeSource 20.x ekle (frontend build için önerilir)
 #   PANELSAR_GO_VERSION=1.22.3  # engine/go.mod ile uyumlu (varsayılan; go.dev'den kurulur)
 #   PANELSAR_PHP_VERSION=8.4    # panel/composer.lock (Ondrej/Sury); Symfony 8 için 8.4 önerilir
+#   PANELSAR_EXTRA_PHP_FPM_VERSIONS="8.3 8.2"  # ek FPM (boş = yalnız ana sürüm)
+#   WITH_PHPMYADMIN=1           # apt phpMyAdmin + Nginx /phpmyadmin + PHPMYADMIN_URL
+#   WITH_CERTBOT=1              # certbot + python3-certbot-nginx (Let's Encrypt)
+#   WITH_APACHE=1               # apache2; Nginx 80 ile çakışmaz — Apache :8080 + engine apache_http_port: 8080
 #   SKIP_DB_SEED=1              # migrate sonrası db:seed atla
 #   PANELSAR_ADMIN_EMAIL=...    # ilk admin e-posta (varsayılan admin@panelsar.com)
 #   PANELSAR_ADMIN_PASSWORD=... # sabit şifre; verilmezse kurulumda rastgele üretilir
@@ -54,14 +61,15 @@ fi
 export DEBIAN_FRONTEND=noninteractive
 
 detect_php_fpm_sock() {
+  local pv="${PANELSAR_PHP_VERSION:-8.4}"
   local s
-  for s in /run/php/php8.4-fpm.sock /run/php/php8.3-fpm.sock /run/php/php8.2-fpm.sock /run/php/php-fpm.sock; do
+  for s in "/run/php/php${pv}-fpm.sock" /run/php/php8.4-fpm.sock /run/php/php8.3-fpm.sock /run/php/php8.2-fpm.sock /run/php/php-fpm.sock; do
     if [[ -S "$s" ]]; then
       echo "$s"
       return 0
     fi
   done
-  echo "/run/php/php8.4-fpm.sock"
+  echo "/run/php/php${pv}-fpm.sock"
 }
 
 panelsar_git_safe_directory() {
@@ -70,6 +78,32 @@ panelsar_git_safe_directory() {
   if ! git config --system --get-all safe.directory 2>/dev/null | grep -qxF "$d"; then
     git config --system --add safe.directory "$d"
   fi
+}
+
+# Nginx panel 80/443 kullanır; Apache yalnızca HTTP 8080 (engine hosting.apache_http_port ile uyumlu)
+panelsar_apache_bind_8080() {
+  local pc=/etc/apache2/ports.conf
+  [[ -f "$pc" ]] || return 1
+  sed -i \
+    -e 's/^Listen 80$/Listen 8080/' \
+    -e 's/^Listen \[::\]:80$/Listen [::]:8080/' \
+    "$pc"
+  # Varsayılan SSL sitesi + 443 dinleyicisi Nginx ile çakışır
+  sed -i \
+    -e 's/^Listen 443$/#Listen 443/' \
+    -e 's/^Listen \[::\]:443$/#Listen [::]:443/' \
+    "$pc" 2>/dev/null || true
+  a2dissite default-ssl 2>/dev/null || true
+  a2dissite default-ssl.conf 2>/dev/null || true
+  local f
+  for f in /etc/apache2/sites-available/*.conf; do
+    [[ -f "$f" ]] || continue
+    sed -i \
+      -e 's/<VirtualHost \*:80>/<VirtualHost *:8080>/g' \
+      -e 's/<VirtualHost \*:80 >/<VirtualHost *:8080>/g' \
+      "$f"
+  done
+  apache2ctl configtest
 }
 
 # apt kurulumu
@@ -113,6 +147,24 @@ if [[ "${SKIP_APT:-}" != "1" ]]; then
   if [[ "${WITH_MARIADB}" == "1" ]] || [[ "${WITH_MARIADB}" == "yes" ]]; then
     apt-get install -y -qq mariadb-server mariadb-client
     systemctl enable --now mariadb
+  fi
+
+  if [[ "${WITH_CERTBOT:-1}" == "1" ]] || [[ "${WITH_CERTBOT:-1}" == "yes" ]]; then
+    apt-get install -y -qq certbot python3-certbot-nginx
+  fi
+
+  if [[ "${WITH_APACHE:-1}" == "1" ]] || [[ "${WITH_APACHE:-1}" == "yes" ]]; then
+    apt-get install -y -qq apache2
+    panelsar_apache_bind_8080
+    systemctl enable apache2
+    systemctl restart apache2
+    echo "==> Apache etkin: HTTP :8080 (Nginx panel :80). Engine apache_http_port=8080 ile uyumlu."
+  fi
+
+  if [[ "${WITH_PHPMYADMIN:-1}" == "1" ]] || [[ "${WITH_PHPMYADMIN:-1}" == "yes" ]]; then
+    echo "phpmyadmin phpmyadmin/reconfigure-webserver multiselect none" | debconf-set-selections
+    echo "phpmyadmin phpmyadmin/dbconfig-install boolean false" | debconf-set-selections
+    apt-get install -y -qq phpmyadmin
   fi
 
   if [[ "${WITH_POSTGRES:-}" == "1" ]] || [[ "${WITH_POSTGRES:-}" == "yes" ]]; then
@@ -174,12 +226,16 @@ if [[ -x /usr/local/bin/panelsar-engine ]]; then
   systemctl restart panelsar-engine || true
 fi
 
-# Engine www-data iken nginx sites-enabled'a yazamaz; sudo ile tek izinli betik
+# Engine www-data iken nginx sites-enabled'a yazamaz; sudo ile izinli betikler
 if [[ -f "$REPO_ROOT/deploy/host/panelsar-nginx-vhost" ]]; then
   install -m 755 "$REPO_ROOT/deploy/host/panelsar-nginx-vhost" /usr/local/sbin/panelsar-nginx-vhost
 fi
+if [[ -f "$REPO_ROOT/deploy/host/panelsar-stack-install" ]]; then
+  install -m 755 "$REPO_ROOT/deploy/host/panelsar-stack-install" /usr/local/sbin/panelsar-stack-install
+fi
 cat > /etc/sudoers.d/panelsar-engine <<'SUDOERS'
 www-data ALL=(root) NOPASSWD: /usr/local/sbin/panelsar-nginx-vhost
+www-data ALL=(root) NOPASSWD: /usr/local/sbin/panelsar-stack-install
 SUDOERS
 chmod 440 /etc/sudoers.d/panelsar-engine
 visudo -cf /etc/sudoers.d/panelsar-engine
@@ -215,6 +271,12 @@ update_env "ENGINE_API_URL" "http://127.0.0.1:9090"
 update_env "ENGINE_INTERNAL_KEY" "$INTERNAL_KEY"
 update_env "ENGINE_API_SECRET" "$ENGINE_JWT"
 update_env "LOG_LEVEL" "error"
+
+# phpMyAdmin (kuruluysa panelde otomatik link)
+if [[ -d /usr/share/phpmyadmin ]]; then
+  _APP_URL_VAL="$(grep '^APP_URL=' "$ENV_FILE" 2>/dev/null | cut -d= -f2- | tr -d '\r' | tr -d ' ')"
+  [[ -n "$_APP_URL_VAL" ]] && update_env "PHPMYADMIN_URL" "${_APP_URL_VAL%/}/phpmyadmin"
+fi
 
 # MariaDB panel DB
 if [[ "${WITH_MARIADB}" == "1" ]] || [[ "${WITH_MARIADB}" == "yes" ]]; then
@@ -356,6 +418,9 @@ systemctl enable nginx
 if [[ "${SKIP_UFW:-}" != "1" ]] && command -v ufw >/dev/null 2>&1; then
   ufw allow OpenSSH >/dev/null 2>&1 || ufw allow 22/tcp
   ufw allow 'Nginx Full' >/dev/null 2>&1 || { ufw allow 80/tcp; ufw allow 443/tcp; }
+  if [[ "${WITH_APACHE:-1}" == "1" ]] || [[ "${WITH_APACHE:-1}" == "yes" ]]; then
+    ufw allow 8080/tcp >/dev/null 2>&1 || true
+  fi
   ufw --force enable || true
 fi
 
@@ -365,6 +430,9 @@ echo "  Panel kökü:     $PANELSAR_HOME"
 echo "  Engine API:     http://127.0.0.1:9090 (yalnızca sunucu içi — dışarıya açmayın)"
 echo "  ENGINE_INTERNAL_KEY panel .env ile eşleşiyor."
 echo "  Nginx site:     $NGX_DST"
+if [[ "${WITH_APACHE:-1}" == "1" ]] || [[ "${WITH_APACHE:-1}" == "yes" ]]; then
+  echo "  Apache HTTP:    :8080 (alan adı Apache seçiliyse http://alan:8080 — SSL için Nginx veya ayrı plan)"
+fi
 echo ""
 if [[ "${SKIP_DB_SEED:-}" != "1" ]]; then
   echo "################################################################"
@@ -390,7 +458,7 @@ if [[ "${SKIP_DB_SEED:-}" != "1" ]]; then
   echo ""
 fi
 echo "Sonraki adımlar:"
-echo "  1) DNS ile alan adını bu sunucuya yönlendirin; SSL: certbot --nginx -d ornek.com"
-echo "  2) APP_URL değerini .env içinde gerçek URL ile güncelleyin: nano $ENV_FILE"
-echo "  3) php artisan panelsar:install-check"
+echo "  1) DNS ile alan adını bu sunucuya yönlendirin; ücretsiz SSL: sudo certbot --nginx -d ornek.com --email $LETS_ENCRYPT_EMAIL --agree-tos --non-interactive"
+echo "  2) APP_URL ve PHPMYADMIN_URL değerlerini .env içinde gerçek HTTPS URL ile güncelleyin: nano $ENV_FILE"
+echo "  3) sudo -u www-data php $PANEL_ROOT/artisan config:cache && php artisan panelsar:install-check"
 echo ""

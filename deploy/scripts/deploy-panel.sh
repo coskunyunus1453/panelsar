@@ -5,6 +5,7 @@ set -euo pipefail
 
 PANEL_ROOT="${PANEL_ROOT:?PANEL_ROOT tanımlayın (örn. /var/www/panelsar/panel)}"
 FRONTEND_ROOT="${FRONTEND_ROOT:-$(dirname "$PANEL_ROOT")/frontend}"
+REPO_ROOT="$(cd "$(dirname "$PANEL_ROOT")" && pwd)"
 RUN_USER="${RUN_USER:-www-data}"
 
 echo "==> Panel: $PANEL_ROOT"
@@ -14,12 +15,17 @@ if [[ ! -f "$PANEL_ROOT/.env" ]]; then
   exit 1
 fi
 
-cd "$PANEL_ROOT"
-
-if command -v git >/dev/null 2>&1 && [[ -d .git ]]; then
-  echo "==> git pull"
-  git pull --ff-only
+if command -v git >/dev/null 2>&1; then
+  if [[ -d "$REPO_ROOT/.git" ]]; then
+    echo "==> git pull ($REPO_ROOT)"
+    git -C "$REPO_ROOT" pull --ff-only
+  elif [[ -d "$PANEL_ROOT/.git" ]]; then
+    echo "==> git pull ($PANEL_ROOT)"
+    git -C "$PANEL_ROOT" pull --ff-only
+  fi
 fi
+
+cd "$PANEL_ROOT"
 
 echo "==> composer install"
 if [[ "$(id -un)" == "$RUN_USER" ]]; then
