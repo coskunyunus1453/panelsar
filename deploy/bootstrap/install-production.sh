@@ -199,11 +199,17 @@ update_env "LOG_LEVEL" "error"
 
 # MariaDB panel DB
 if [[ "${WITH_MARIADB}" == "1" ]] || [[ "${WITH_MARIADB}" == "yes" ]]; then
-  PANEL_DB_PASS="$(openssl rand -hex 16)"
+  # Yeniden kurulumda her seferinde yeni şifre üretmek, CREATE USER IF NOT EXISTS ile uyumsuzluk (1045) yaratır
+  if [[ -s /root/panelsar-panel-mysql.secret ]]; then
+    PANEL_DB_PASS="$(cat /root/panelsar-panel-mysql.secret)"
+  else
+    PANEL_DB_PASS="$(openssl rand -hex 16)"
+  fi
   MARIADB_CMD=(mariadb)
   command -v mariadb >/dev/null 2>&1 || MARIADB_CMD=(mysql)
   "${MARIADB_CMD[@]}" -e "CREATE DATABASE IF NOT EXISTS panelsar CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;" || true
   "${MARIADB_CMD[@]}" -e "CREATE USER IF NOT EXISTS 'panelsar'@'localhost' IDENTIFIED BY '$PANEL_DB_PASS';" || true
+  "${MARIADB_CMD[@]}" -e "ALTER USER 'panelsar'@'localhost' IDENTIFIED BY '$PANEL_DB_PASS';" || true
   "${MARIADB_CMD[@]}" -e "GRANT ALL PRIVILEGES ON panelsar.* TO 'panelsar'@'localhost'; FLUSH PRIVILEGES;" || true
   update_env "DB_CONNECTION" "mysql"
   update_env "DB_HOST" "127.0.0.1"
