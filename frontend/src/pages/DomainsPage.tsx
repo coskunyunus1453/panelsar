@@ -2,31 +2,29 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import api from '../services/api'
+import DomainQuickSettingsModal, {
+  type DomainQuickRow,
+} from '../components/domains/DomainQuickSettingsModal'
 import {
   Globe,
   Plus,
   Search,
   Shield,
   ShieldCheck,
-  Trash2,
   ExternalLink,
+  Settings2,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
+import clsx from 'clsx'
 
-type DomainRow = {
-  id: number
-  name: string
-  php_version: string
-  server_type: string
-  status: string
-  ssl_enabled?: boolean
-}
+const PHP_OPTIONS = ['7.4', '8.0', '8.1', '8.2', '8.3', '8.4'] as const
 
 export default function DomainsPage() {
   const { t } = useTranslation()
   const qc = useQueryClient()
   const [search, setSearch] = useState('')
   const [showAdd, setShowAdd] = useState(false)
+  const [quickDomain, setQuickDomain] = useState<DomainQuickRow | null>(null)
 
   const domainsQ = useQuery({
     queryKey: ['domains', 'paginated'],
@@ -48,19 +46,7 @@ export default function DomainsPage() {
     },
   })
 
-  const deleteM = useMutation({
-    mutationFn: async (id: number) => api.delete(`/domains/${id}`),
-    onSuccess: () => {
-      toast.success(t('domains.deleted'))
-      qc.invalidateQueries({ queryKey: ['domains'] })
-    },
-    onError: (err: unknown) => {
-      const ax = err as { response?: { data?: { message?: string } } }
-      toast.error(ax.response?.data?.message ?? String(err))
-    },
-  })
-
-  const list: DomainRow[] = domainsQ.data?.data ?? []
+  const list: DomainQuickRow[] = domainsQ.data?.data ?? []
   const total = (domainsQ.data?.total as number | undefined) ?? list.length
   const filtered = list.filter((d) => d.name.toLowerCase().includes(search.toLowerCase()))
 
@@ -84,6 +70,12 @@ export default function DomainsPage() {
           {t('domains.add')}
         </button>
       </div>
+
+      <DomainQuickSettingsModal
+        domain={quickDomain}
+        open={quickDomain !== null}
+        onClose={() => setQuickDomain(null)}
+      />
 
       {showAdd && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
@@ -110,7 +102,7 @@ export default function DomainsPage() {
               <div>
                 <label className="label">{t('domains.php_version')}</label>
                 <select name="php_version" className="input w-full" defaultValue="8.2">
-                  {['7.4', '8.0', '8.1', '8.2', '8.3'].map((v) => (
+                  {PHP_OPTIONS.map((v) => (
                     <option key={v} value={v}>
                       PHP {v}
                     </option>
@@ -121,7 +113,7 @@ export default function DomainsPage() {
                 <label className="label">{t('domains.server_type')}</label>
                 <select name="server_type" className="input w-full" defaultValue="nginx">
                   <option value="nginx">nginx</option>
-                  <option value="apache">apache</option>
+                  <option value="apache">Apache</option>
                 </select>
               </div>
               <div className="flex gap-2 justify-end pt-2">
@@ -210,12 +202,12 @@ export default function DomainsPage() {
                       {domain.ssl_enabled ? (
                         <div className="flex items-center gap-1.5 text-green-600 dark:text-green-400">
                           <ShieldCheck className="h-4 w-4" />
-                          <span className="text-sm">Active</span>
+                          <span className="text-sm">{t('domains.ssl_active')}</span>
                         </div>
                       ) : (
                         <div className="flex items-center gap-1.5 text-gray-400">
                           <Shield className="h-4 w-4" />
-                          <span className="text-sm">None</span>
+                          <span className="text-sm">{t('domains.ssl_none')}</span>
                         </div>
                       )}
                     </td>
@@ -226,21 +218,35 @@ export default function DomainsPage() {
                     </td>
                     <td className="px-6 py-4">
                       <span
-                        className={`px-2.5 py-1 text-xs font-medium rounded-full ${
-                          domain.status === 'active'
-                            ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400'
-                            : 'bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-400'
-                        }`}
+                        className={clsx(
+                          'px-2.5 py-1 text-xs font-medium rounded-full',
+                          domain.status === 'active' &&
+                            'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400',
+                          domain.status === 'suspended' &&
+                            'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300',
+                          domain.status === 'pending' &&
+                            'bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-400',
+                        )}
                       >
                         {domain.status === 'active'
                           ? t('common.active')
-                          : domain.status === 'pending'
-                            ? t('common.pending')
-                            : domain.status}
+                          : domain.status === 'suspended'
+                            ? t('domains.suspended')
+                            : domain.status === 'pending'
+                              ? t('common.pending')
+                              : domain.status}
                       </span>
                     </td>
                     <td className="px-6 py-4 text-right">
-                      <div className="flex items-center justify-end gap-2">
+                      <div className="flex items-center justify-end gap-1">
+                        <button
+                          type="button"
+                          title={t('domains.quick_settings')}
+                          className="p-1.5 rounded-lg hover:bg-primary-50 dark:hover:bg-primary-900/20 text-primary-600 dark:text-primary-400"
+                          onClick={() => setQuickDomain(domain)}
+                        >
+                          <Settings2 className="h-4 w-4" />
+                        </button>
                         <button
                           type="button"
                           title={t('domains.open_site')}
@@ -248,19 +254,6 @@ export default function DomainsPage() {
                           onClick={() => window.open(`http://${domain.name}`, '_blank')}
                         >
                           <ExternalLink className="h-4 w-4" />
-                        </button>
-                        <button
-                          type="button"
-                          className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 text-gray-500 hover:text-red-600"
-                          title={t('common.delete')}
-                          onClick={() => {
-                            if (window.confirm(t('common.confirm_delete'))) {
-                              deleteM.mutate(domain.id)
-                            }
-                          }}
-                          disabled={deleteM.isPending}
-                        >
-                          <Trash2 className="h-4 w-4" />
                         </button>
                       </div>
                     </td>

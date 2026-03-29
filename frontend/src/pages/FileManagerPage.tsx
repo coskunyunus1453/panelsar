@@ -1,5 +1,6 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useDropzone } from 'react-dropzone'
 import api from '../services/api'
@@ -88,7 +89,12 @@ function formatSize(n: number): string {
 export default function FileManagerPage() {
   const { t } = useTranslation()
   const qc = useQueryClient()
-  const [domainId, setDomainId] = useState<number | ''>('')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const domainParam = searchParams.get('domain')
+  const [domainId, setDomainId] = useState<number | ''>(() => {
+    const n = domainParam ? Number(domainParam) : NaN
+    return Number.isFinite(n) && n > 0 ? n : ''
+  })
   const [path, setPath] = useState('')
   const [selected, setSelected] = useState<string | null>(null)
   const [editorOpen, setEditorOpen] = useState(false)
@@ -101,6 +107,29 @@ export default function FileManagerPage() {
     queryKey: ['domains', 'paginated'],
     queryFn: async () => (await api.get('/domains')).data,
   })
+
+  useEffect(() => {
+    if (!domainParam) return
+    const n = Number(domainParam)
+    if (Number.isFinite(n) && n > 0) {
+      setDomainId(n)
+    }
+  }, [domainParam])
+
+  const onDomainSelectChange = (value: string) => {
+    const next = new URLSearchParams(searchParams)
+    if (!value) {
+      setDomainId('')
+      next.delete('domain')
+      setSearchParams(next, { replace: true })
+      return
+    }
+    const n = Number(value)
+    if (!Number.isFinite(n) || n <= 0) return
+    setDomainId(n)
+    next.set('domain', String(n))
+    setSearchParams(next, { replace: true })
+  }
 
   const filesQ = useQuery({
     queryKey: ['files', domainId, path],
@@ -333,7 +362,7 @@ export default function FileManagerPage() {
             className="input min-w-[200px]"
             value={domainId}
             onChange={(e) => {
-              setDomainId(e.target.value ? Number(e.target.value) : '')
+              onDomainSelectChange(e.target.value)
               setPath('')
               setSelected(null)
               setSearchHits([])

@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Navigate } from 'react-router-dom'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '../store/authStore'
 import api from '../services/api'
 import { TerminalSquare, AlertCircle } from 'lucide-react'
@@ -10,16 +11,43 @@ import '@xterm/xterm/css/xterm.css'
 import toast from 'react-hot-toast'
 
 type SessionRes = { url: string; expires_in: number }
+type TerminalSettings = { use_root: boolean }
 
 export default function TerminalPage() {
   const { t } = useTranslation()
+  const qc = useQueryClient()
   const user = useAuthStore((s) => s.user)
   const isAdmin = user?.roles?.some((r) => r.name === 'admin')
   const containerRef = useRef<HTMLDivElement>(null)
   const [status, setStatus] = useState<'idle' | 'connecting' | 'open' | 'closed'>('idle')
   const cleanupRef = useRef<() => void>(() => {})
+  const tRef = useRef(t)
+  tRef.current = t
 
-  const connect = () => {
+  const settingsQ = useQuery({
+    queryKey: ['admin', 'settings', 'terminal'],
+    enabled: isAdmin === true,
+    queryFn: async () => (await api.get<TerminalSettings>('/admin/settings/terminal')).data,
+  })
+
+  const saveRootM = useMutation({
+    mutationFn: async (use_root: boolean) => {
+      await api.put('/admin/settings/terminal', { use_root })
+    },
+    onSuccess: () => {
+      toast.success(t('terminal.settings_saved_reconnect'))
+      void qc.invalidateQueries({ queryKey: ['admin', 'settings', 'terminal'] })
+      cleanupRef.current()
+      setStatus('closed')
+    },
+    onError: (err: unknown) => {
+      const ax = err as { response?: { data?: { message?: string } } }
+      toast.error(ax.response?.data?.message ?? String(err))
+      void qc.invalidateQueries({ queryKey: ['admin', 'settings', 'terminal'] })
+    },
+  })
+
+  const connect = useCallback(() => {
     cleanupRef.current()
     cleanupRef.current = () => {}
 
@@ -85,14 +113,14 @@ export default function TerminalPage() {
         }
 
         ws.onerror = () => {
-          toast.error(t('terminal.ws_error'))
+          toast.error(tRef.current('terminal.ws_error'))
         }
 
         ws.onclose = () => {
           ro?.disconnect()
           setStatus('closed')
           term.writeln('')
-          term.writeln(`\r\n\x1b[33m${t('terminal.disconnected')}\x1b[0m`)
+          term.writeln(`\r\n\x1b[33m${tRef.current('terminal.disconnected')}\x1b[0m`)
         }
 
         cleanupRef.current = () => {
@@ -111,14 +139,13 @@ export default function TerminalPage() {
         toast.error(ax.response?.data?.message ?? String(err))
       }
     })()
-  }
+  }, [isAdmin])
 
   useEffect(() => {
     if (!isAdmin) return
     connect()
     return () => cleanupRef.current()
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- ilk mount’ta tek bağlantı
-  }, [isAdmin])
+  }, [isAdmin, connect])
 
   if (!isAdmin) {
     return <Navigate to="/dashboard" replace />
@@ -160,9 +187,27 @@ export default function TerminalPage() {
         </div>
       </div>
 
+      <div className="card p-4">
+        <label className="flex cursor-pointer items-start gap-3">
+          <input
+            type="checkbox"
+            className="mt-1 h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-gray-600"
+            checked={settingsQ.data?.use_root ?? true}
+            disabled={settingsQ.isLoading || saveRootM.isPending}
+            onChange={(e) => saveRootM.mutate(e.target.checked)}
+          />
+          <span>
+            <span className="font-medium text-gray-900 dark:text-white">{t('terminal.use_root_label')}</span>
+            <span className="mt-1 block text-sm text-gray-500 dark:text-gray-400">
+              {t('terminal.use_root_hint')}
+            </span>
+          </span>
+        </label>
+      </div>
+
       <div className="flex gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-100">
         <AlertCircle className="h-5 w-5 shrink-0" />
-        <p>{t('terminal.warning')}</p>
+        <p>{settingsQ.data?.use_root ?? true ? t('terminal.warning') : t('terminal.warning_limited')}</p>
       </div>
 
       <div

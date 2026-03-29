@@ -68,6 +68,8 @@ func HandleWS(cfg *config.Config, log *logrus.Logger) gin.HandlerFunc {
 			return
 		}
 
+		jwtUseRoot := jwtClaimUseRoot(claims)
+
 		conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
 		if err != nil {
 			log.WithError(err).Warn("terminal websocket upgrade")
@@ -80,7 +82,8 @@ func HandleWS(cfg *config.Config, log *logrus.Logger) gin.HandlerFunc {
 		}
 
 		var cmd *exec.Cmd
-		if os.Getenv("PANELSAR_TERMINAL_NO_ROOT") == "1" {
+		wantRoot := jwtUseRoot && os.Getenv("PANELSAR_TERMINAL_NO_ROOT") != "1"
+		if !wantRoot {
 			cmd = exec.Command(shell, "-i")
 		} else if fi, err := os.Stat(terminalRootLauncher); err == nil && !fi.IsDir() && fi.Mode()&0o111 != 0 {
 			cmd = exec.Command("sudo", "-n", terminalRootLauncher)
@@ -153,6 +156,24 @@ func HandleWS(cfg *config.Config, log *logrus.Logger) gin.HandlerFunc {
 				}
 			}
 		}
+	}
+}
+
+// jwtClaimUseRoot — panel JWT içindeki use_root; yoksa veya tanınmazsa true (geriye uyum).
+func jwtClaimUseRoot(claims jwt.MapClaims) bool {
+	v, ok := claims["use_root"]
+	if !ok {
+		return true
+	}
+	switch x := v.(type) {
+	case bool:
+		return x
+	case float64:
+		return x != 0
+	case string:
+		return x == "1" || x == "true" || x == "TRUE" || x == "True"
+	default:
+		return true
 	}
 }
 

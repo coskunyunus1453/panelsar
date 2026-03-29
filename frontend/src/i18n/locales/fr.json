@@ -34,7 +34,11 @@
     "status_offline": "Offline",
     "reconnect": "Reconnect",
     "ws_error": "WebSocket error",
-    "disconnected": "Connection closed."
+    "disconnected": "Connection closed.",
+    "use_root_label": "Root shell (sudo)",
+    "use_root_hint": "If off: shell as engine user (www-data). Click Reconnect after changing.",
+    "settings_saved_reconnect": "Saved. Click Reconnect.",
+    "warning_limited": "Limited (www-data) shell."
   },
   "auth": {
     "login": "Connexion",

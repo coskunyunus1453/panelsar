@@ -3,8 +3,10 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\PanelSetting;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 
 class TerminalController extends Controller
 {
@@ -31,6 +33,7 @@ class TerminalController extends Controller
             'user_id' => $request->user()->id,
             'role' => 'admin',
             'typ' => 'terminal_ws',
+            'use_root' => $this->terminalJwtUseRoot(),
             'iat' => $now,
             'exp' => $now + 120,
         ];
@@ -88,5 +91,19 @@ class TerminalController extends Controller
     private function base64UrlEncode(string $data): string
     {
         return rtrim(strtr(base64_encode($data), '+/', '-_'), '=');
+    }
+
+    /** Panel ayarı: root kabuğu (JWT’de taşınır; engine imzayı doğrular). */
+    private function terminalJwtUseRoot(): bool
+    {
+        if (! Schema::hasTable('panel_settings')) {
+            return true;
+        }
+        $v = PanelSetting::query()->where('key', 'security.terminal_root')->value('value');
+        if ($v === null) {
+            return true;
+        }
+
+        return filter_var($v, FILTER_VALIDATE_BOOLEAN);
     }
 }

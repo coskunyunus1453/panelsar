@@ -3,6 +3,7 @@
 use App\Http\Controllers\Admin\PackageController;
 use App\Http\Controllers\Admin\ServerSetupController;
 use App\Http\Controllers\Admin\OutboundMailSettingsController;
+use App\Http\Controllers\Admin\TerminalSettingsController;
 use App\Http\Controllers\Admin\StackController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Api\AuthController;
@@ -47,6 +48,8 @@ Route::middleware(['auth:sanctum', 'abilities:access:customer-panel'])->group(fu
 
     Route::apiResource('domains', DomainController::class)->except(['update']);
     Route::post('domains/{domain}/php', [DomainController::class, 'switchPhp']);
+    Route::post('domains/{domain}/status', [DomainController::class, 'setStatus']);
+    Route::post('domains/{domain}/server', [DomainController::class, 'switchServer']);
 
     Route::apiResource('databases', DatabaseController::class)->only(['index', 'store', 'update', 'destroy']);
     Route::post('databases/{database}/rotate-password', [DatabaseController::class, 'rotatePassword']);
@@ -126,6 +129,8 @@ Route::middleware(['auth:sanctum', 'abilities:access:customer-panel'])->group(fu
         Route::get('settings/mail', [OutboundMailSettingsController::class, 'show']);
         Route::put('settings/mail', [OutboundMailSettingsController::class, 'update']);
         Route::post('settings/mail/test', [OutboundMailSettingsController::class, 'test']);
+        Route::get('settings/terminal', [TerminalSettingsController::class, 'show']);
+        Route::put('settings/terminal', [TerminalSettingsController::class, 'update']);
         Route::apiResource('users', UserController::class);
         Route::post('users/{user}/suspend', [UserController::class, 'suspend']);
         Route::post('users/{user}/activate', [UserController::class, 'activate']);

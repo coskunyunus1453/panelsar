@@ -86,6 +86,16 @@ class EngineApiService
         return $this->deleteChecked($path);
     }
 
+    public function suspendSite(string $domain): array
+    {
+        return $this->postChecked('/api/v1/sites/'.rawurlencode($domain).'/suspend', []);
+    }
+
+    public function activateSite(string $domain): array
+    {
+        return $this->postChecked('/api/v1/sites/'.rawurlencode($domain).'/activate', []);
+    }
+
     public function issueSSL(string $domain, ?string $email = null): array
     {
         $data = ['domain' => $domain];

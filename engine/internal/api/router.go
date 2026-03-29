@@ -53,6 +53,8 @@ func NewRouter(cfg *config.Config, d *daemon.Daemon, log *logrus.Logger) *gin.En
 		site := api.Group("/sites")
 		{
 			site.POST("", handleCreateSite(cfg, d))
+			site.POST("/:domain/suspend", handleSuspendSite(cfg, d))
+			site.POST("/:domain/activate", handleActivateSite(cfg, d))
 			site.DELETE("/:domain", handleDeleteSite(cfg, d))
 			site.GET("", handleListSites(cfg, d))
 		}
@@ -202,6 +204,45 @@ func phpfpmSettings(cfg *config.Config) phpfpm.HostingPoolSettings {
 		SocketListenDir:  cfg.Hosting.PHPFPMlistenDir,
 		FPMUser:          cfg.Hosting.PHPFPMpoolUser,
 		FPMGroup:         cfg.Hosting.PHPFPMpoolGroup,
+	}
+}
+
+func handleSuspendSite(cfg *config.Config, d *daemon.Daemon) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		domain := c.Param("domain")
+		meta, err := sites.ReadSiteMeta(cfg.Paths.WebRoot, domain)
+		if err != nil || meta == nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "site not found"})
+			return
+		}
+		if err := hosting.RemoveWebServer(cfg, domain, meta); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"message": "site suspended", "domain": domain})
+	}
+}
+
+func handleActivateSite(cfg *config.Config, d *daemon.Daemon) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		domain := c.Param("domain")
+		meta, err := sites.ReadSiteMeta(cfg.Paths.WebRoot, domain)
+		if err != nil || meta == nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "site not found"})
+			return
+		}
+		ps := phpfpmSettings(cfg)
+		phpSocket := ""
+		if cfg.Hosting.PHPFPMmanagePools {
+			phpSocket = ps.SocketForDomain(domain)
+		} else {
+			phpSocket = nginx.PHPSocketPath(meta.PHPVersion, cfg.Hosting.PHPFPMsocket)
+		}
+		if err := hosting.ApplyWebServer(cfg, domain, meta.DocumentRoot, meta, phpSocket); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"message": "site activated", "domain": domain})
 	}
 }
 

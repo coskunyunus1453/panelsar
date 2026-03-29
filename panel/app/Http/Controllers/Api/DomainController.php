@@ -30,7 +30,7 @@ class DomainController extends Controller
     {
         $validated = $request->validate([
             'name' => 'required|string|unique:domains,name|max:255',
-            'php_version' => 'nullable|string|in:7.4,8.0,8.1,8.2,8.3',
+            'php_version' => 'nullable|string|in:7.4,8.0,8.1,8.2,8.3,8.4',
             'server_type' => 'nullable|string|in:nginx,apache',
         ]);
 
@@ -65,9 +65,60 @@ class DomainController extends Controller
     {
         $this->authorize('delete', $domain);
 
+        $got = trim((string) $request->input('confirmation', ''));
+        $candidates = array_values(array_unique(array_filter(array_map('trim', [
+            (string) __('domains.delete_confirm_expected'),
+            'SILMEKİSTİYORUM',
+            'DELETEALLDATA',
+        ]))));
+        $ok = false;
+        foreach ($candidates as $c) {
+            if ($c !== '' && hash_equals($c, $got)) {
+                $ok = true;
+                break;
+            }
+        }
+        if (! $ok) {
+            return response()->json([
+                'message' => __('domains.delete_confirm_mismatch'),
+            ], 422);
+        }
+
         $this->domainService->delete($domain);
 
         return response()->json(['message' => __('domains.deleted')]);
+    }
+
+    public function setStatus(Request $request, Domain $domain): JsonResponse
+    {
+        $this->authorize('update', $domain);
+
+        $validated = $request->validate([
+            'status' => 'required|string|in:active,suspended',
+        ]);
+
+        $this->domainService->setPanelStatus($domain, $validated['status']);
+
+        return response()->json([
+            'message' => __('domains.status_updated'),
+            'domain' => $domain->fresh(),
+        ]);
+    }
+
+    public function switchServer(Request $request, Domain $domain): JsonResponse
+    {
+        $this->authorize('update', $domain);
+
+        $validated = $request->validate([
+            'server_type' => 'required|string|in:nginx,apache',
+        ]);
+
+        $this->domainService->switchServerType($domain, $validated['server_type']);
+
+        return response()->json([
+            'message' => __('domains.server_switched'),
+            'domain' => $domain->fresh(),
+        ]);
     }
 
     public function switchPhp(Request $request, Domain $domain): JsonResponse
@@ -75,7 +126,7 @@ class DomainController extends Controller
         $this->authorize('update', $domain);
 
         $validated = $request->validate([
-            'php_version' => 'required|string|in:7.4,8.0,8.1,8.2,8.3',
+            'php_version' => 'required|string|in:7.4,8.0,8.1,8.2,8.3,8.4',
         ]);
 
         $this->domainService->switchPhpVersion($domain, $validated['php_version']);

@@ -43,12 +43,22 @@ class DomainService
     public function delete(Domain $domain): void
     {
         DB::transaction(function () use ($domain) {
+            $domain->loadMissing(['databases', 'ftpAccounts']);
+
+            foreach ($domain->ftpAccounts as $ftp) {
+                try {
+                    $this->engineApi->ftpDeleteAccount($domain->name, $ftp->username);
+                } catch (\Throwable $e) {
+                    report($e);
+                }
+                $ftp->delete();
+            }
+
             $del = $this->engineApi->deleteSite($domain->name);
             if (! empty($del['error'])) {
                 abort(503, (string) $del['error']);
             }
 
-            $domain->loadMissing('databases');
             $dbService = app(DatabaseService::class);
             foreach ($domain->databases as $db) {
                 $dbService->delete($db);
@@ -56,6 +66,7 @@ class DomainService
             $domain->emailAccounts()->delete();
             $domain->dnsRecords()->delete();
             $domain->sslCertificate()?->delete();
+            $domain->backups()->delete();
             $domain->delete();
         });
     }
@@ -67,5 +78,45 @@ class DomainService
             abort(503, (string) $resp['error']);
         }
         $domain->update(['php_version' => $version]);
+    }
+
+    public function switchServerType(Domain $domain, string $serverType): void
+    {
+        $serverType = in_array($serverType, ['nginx', 'apache'], true) ? $serverType : 'nginx';
+        $resp = $this->engineApi->createSite(
+            $domain->name,
+            (int) $domain->user_id,
+            (string) ($domain->php_version ?? '8.2'),
+            $serverType
+        );
+        if (! empty($resp['error'])) {
+            abort(503, (string) $resp['error']);
+        }
+        $domain->update(['server_type' => $serverType]);
+    }
+
+    public function setPanelStatus(Domain $domain, string $status): void
+    {
+        $status = $status === 'suspended' ? 'suspended' : 'active';
+
+        if ($status === 'suspended') {
+            if ($domain->status !== 'suspended') {
+                $resp = $this->engineApi->suspendSite($domain->name);
+                if (! empty($resp['error'])) {
+                    abort(503, (string) $resp['error']);
+                }
+            }
+            $domain->update(['status' => 'suspended']);
+
+            return;
+        }
+
+        if ($domain->status === 'suspended') {
+            $resp = $this->engineApi->activateSite($domain->name);
+            if (! empty($resp['error'])) {
+                abort(503, (string) $resp['error']);
+            }
+        }
+        $domain->update(['status' => 'active']);
     }
 }

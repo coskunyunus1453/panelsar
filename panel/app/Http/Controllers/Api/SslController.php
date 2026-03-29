@@ -57,6 +57,7 @@ class SslController extends Controller
         $engine = $this->engine->issueSSL($domain->name, is_string($email) ? $email : null);
         if (! empty($engine['error'])) {
             $cert->update(['status' => 'failed']);
+            $domain->update(['ssl_enabled' => false, 'ssl_expiry' => null]);
 
             return response()->json([
                 'message' => $engine['error'],
@@ -65,6 +66,10 @@ class SslController extends Controller
         }
 
         $cert->update(['status' => 'active', 'issued_at' => now(), 'expires_at' => now()->addDays(90)]);
+        $domain->update([
+            'ssl_enabled' => true,
+            'ssl_expiry' => $cert->expires_at,
+        ]);
 
         return response()->json([
             'message' => __('ssl.issued'),
@@ -112,6 +117,10 @@ class SslController extends Controller
         }
 
         $domain->sslCertificate?->delete();
+        $domain->update([
+            'ssl_enabled' => false,
+            'ssl_expiry' => null,
+        ]);
 
         return response()->json([
             'message' => __('ssl.revoked'),
