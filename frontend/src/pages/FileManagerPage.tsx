@@ -15,6 +15,7 @@ import {
   Search,
   Trash2,
   Upload,
+  FilePlus,
   X,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
@@ -32,10 +33,24 @@ type EditorTab = {
 const EDIT_NAME = /^(\.htaccess|\.env(\..+)?)$/i
 const EDIT_EXT =
   /\.(html?|php|phtml|js|mjs|cjs|ts|tsx|jsx|css|scss|sass|less|json|xml|txt|md|yml|yaml|ini|sql|sh|vue|svelte|twig|neon|toml|csv|log|gitignore|gitattributes)$/i
+/** Düzenleyicide anlamsız / riskli: ikili ve medya */
+const BINARY_EXT =
+  /\.(jpg|jpeg|png|gif|webp|ico|bmp|svgz|pdf|zip|tar|gz|tgz|7z|rar|bz2|xz|exe|dll|so|dylib|woff2?|ttf|eot|mp4|mp3|wav|avi|mov|webm|bin|iso|sqlite|db|dmg)$/i
 
 function isEditableFile(name: string): boolean {
   if (EDIT_NAME.test(name)) return true
-  return EDIT_EXT.test(name)
+  if (EDIT_EXT.test(name)) return true
+  if (BINARY_EXT.test(name)) return false
+  // örn. custom.ext — uzantı yazıp oluşturulan dosyalar
+  return /^[^/\\]+\.[a-zA-Z0-9]{1,20}$/.test(name)
+}
+
+function isSafeNewFileName(name: string): boolean {
+  const t = name.trim()
+  if (!t || t.length > 200) return false
+  if (t.includes('/') || t.includes('\\')) return false
+  if (t === '.' || t === '..') return false
+  return /^[\w.\-]+$/.test(t)
 }
 
 function joinRel(dir: string, name: string): string {
@@ -165,6 +180,26 @@ export default function FileManagerPage() {
     },
   })
 
+  const createFileM = useMutation({
+    mutationFn: async (fileName: string) => {
+      const target = path ? joinRel(path, fileName) : fileName
+      await api.post(`/domains/${domainId}/files/write`, { path: target, content: '' })
+      return target
+    },
+    onSuccess: async (relPath) => {
+      toast.success(t('files.file_created'))
+      await qc.invalidateQueries({ queryKey: ['files', domainId, path] })
+      const base = relPath.split('/').pop() || relPath
+      if (isEditableFile(base)) {
+        void openFileWrapped(relPath)
+      }
+    },
+    onError: (err: unknown) => {
+      const ax = err as { response?: { data?: { message?: string } } }
+      toast.error(ax.response?.data?.message ?? t('files.create_file_err'))
+    },
+  })
+
   const uploadM = useMutation({
     mutationFn: async (file: File) => {
       const fd = new FormData()
@@ -177,8 +212,12 @@ export default function FileManagerPage() {
       qc.invalidateQueries({ queryKey: ['files', domainId, path] })
     },
     onError: (err: unknown) => {
-      const ax = err as { response?: { data?: { error?: string; message?: string } } }
-      toast.error(ax.response?.data?.error ?? ax.response?.data?.message ?? t('files.upload_err'))
+      const ax = err as {
+        response?: { data?: { error?: string; message?: string; errors?: { file?: string[] } } }
+      }
+      const d = ax.response?.data
+      const v = d?.errors?.file?.[0]
+      toast.error(v ?? d?.error ?? d?.message ?? t('files.upload_err'))
     },
   })
 
@@ -264,10 +303,11 @@ export default function FileManagerPage() {
     [uploadM],
   )
 
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+  const { getRootProps, getInputProps, isDragActive, open } = useDropzone({
     onDrop,
-    disabled: !domainId || uploadM.isPending,
+    disabled: domainId === '' || uploadM.isPending,
     noClick: true,
+    multiple: true,
   })
 
   const entries = filesQ.data?.entries ?? []
@@ -318,20 +358,15 @@ export default function FileManagerPage() {
           <RefreshCw className="h-4 w-4" />
           {t('common.refresh')}
         </button>
-        <label className="btn-primary flex items-center gap-2 cursor-pointer">
+        <button
+          type="button"
+          className="btn-primary flex items-center gap-2"
+          disabled={domainId === '' || uploadM.isPending}
+          onClick={() => open()}
+        >
           <Upload className="h-4 w-4" />
           {t('files.upload')}
-          <input
-            type="file"
-            className="hidden"
-            disabled={!domainId || uploadM.isPending}
-            onChange={(e) => {
-              const f = e.target.files?.[0]
-              e.target.value = ''
-              if (f && domainId) uploadM.mutate(f)
-            }}
-          />
-        </label>
+        </button>
       </div>
 
       {domainId !== '' && (
@@ -430,13 +465,22 @@ export default function FileManagerPage() {
         {...getRootProps()}
         className={clsx(
           'card overflow-hidden transition-colors',
-          isDragActive && 'ring-2 ring-primary-500 bg-primary-50/30 dark:bg-primary-900/10',
+          domainId !== '' &&
+            'border-2 border-dashed border-gray-200 dark:border-gray-600',
+          isDragActive && 'ring-2 ring-primary-500 border-primary-400 bg-primary-50/30 dark:bg-primary-900/10',
         )}
       >
         <input {...getInputProps()} />
-        {isDragActive && (
-          <p className="bg-primary-100 px-4 py-2 text-center text-sm text-primary-800 dark:bg-primary-900/40 dark:text-primary-200">
-            {t('files.drop_here')}
+        {domainId !== '' && (
+          <p
+            className={clsx(
+              'border-b border-gray-100 px-4 py-2 text-center text-sm dark:border-gray-800',
+              isDragActive
+                ? 'bg-primary-100 text-primary-900 dark:bg-primary-900/40 dark:text-primary-100'
+                : 'bg-gray-50/80 text-gray-600 dark:bg-gray-800/50 dark:text-gray-300',
+            )}
+          >
+            {isDragActive ? t('files.drop_here') : t('files.drop_zone_hint')}
           </p>
         )}
         <div className="overflow-x-auto">
@@ -546,23 +590,66 @@ export default function FileManagerPage() {
         )}
       </div>
 
-      <div className="card p-4">
-        <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">{t('files.quick_mkdir')}</p>
-        <form
-          className="flex gap-2"
-          onSubmit={(ev) => {
-            ev.preventDefault()
-            const fd = new FormData(ev.currentTarget)
-            const name = String(fd.get('folder') || '').trim()
-            if (name && domainId) mkdirM.mutate(name)
-            ev.currentTarget.reset()
-          }}
-        >
-          <input name="folder" className="input flex-1" placeholder="new-folder" />
-          <button type="submit" className="btn-primary" disabled={!domainId || mkdirM.isPending}>
-            {t('files.mkdir')}
-          </button>
-        </form>
+      <div className="card p-4 space-y-4">
+        <div>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">{t('files.quick_mkdir')}</p>
+          <form
+            className="flex flex-wrap gap-2"
+            onSubmit={(ev) => {
+              ev.preventDefault()
+              const fd = new FormData(ev.currentTarget)
+              const name = String(fd.get('folder') || '').trim()
+              if (name && domainId !== '') mkdirM.mutate(name)
+              ev.currentTarget.reset()
+            }}
+          >
+            <input name="folder" className="input flex-1 min-w-[160px]" placeholder="new-folder" />
+            <button
+              type="submit"
+              className="btn-primary"
+              disabled={domainId === '' || mkdirM.isPending}
+            >
+              {t('files.mkdir')}
+            </button>
+          </form>
+        </div>
+        <div>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">{t('files.quick_new_file')}</p>
+          <form
+            className="flex flex-wrap gap-2"
+            onSubmit={(ev) => {
+              ev.preventDefault()
+              const fd = new FormData(ev.currentTarget)
+              const name = String(fd.get('newfile') || '').trim()
+              if (domainId === '') return
+              if (!isSafeNewFileName(name)) {
+                toast.error(t('files.invalid_filename'))
+                return
+              }
+              const list = filesQ.data?.entries ?? []
+              if (list.some((e) => e.name === name && !e.is_dir)) {
+                toast.error(t('files.file_exists'))
+                return
+              }
+              createFileM.mutate(name)
+              ev.currentTarget.reset()
+            }}
+          >
+            <input
+              name="newfile"
+              className="input flex-1 min-w-[180px] font-mono text-sm"
+              placeholder="ornek.php, style.css, not.txt"
+            />
+            <button
+              type="submit"
+              className="btn-secondary inline-flex items-center gap-2"
+              disabled={domainId === '' || createFileM.isPending}
+            >
+              <FilePlus className="h-4 w-4" />
+              {t('files.create_file')}
+            </button>
+          </form>
+        </div>
       </div>
 
       {editorOpen && tabs.length > 0 && (

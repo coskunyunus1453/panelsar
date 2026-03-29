@@ -14,6 +14,10 @@ api.interceptors.request.use((config) => {
   if (token) {
     config.headers.Authorization = `Bearer ${token}`
   }
+  // FormData: Content-Type'ı kaldır; tarayıcı multipart boundary ile ayarlar (aksi halde Laravel 422)
+  if (config.data instanceof FormData) {
+    config.headers.delete('Content-Type')
+  }
   return config
 })
 
