@@ -20,6 +20,9 @@
 #   WITH_NODE_REPO=1       # NodeSource 20.x ekle (frontend build için önerilir)
 #   PANELSAR_GO_VERSION=1.22.3  # engine/go.mod ile uyumlu (varsayılan; go.dev'den kurulur)
 #   PANELSAR_PHP_VERSION=8.4    # panel/composer.lock (Ondrej/Sury); Symfony 8 için 8.4 önerilir
+#   SKIP_DB_SEED=1              # migrate sonrası db:seed atla
+#   PANELSAR_ADMIN_EMAIL=...    # ilk admin e-posta (varsayılan admin@panelsar.com)
+#   PANELSAR_ADMIN_PASSWORD=... # sabit şifre; verilmezse kurulumda rastgele üretilir
 #
 set -euo pipefail
 
@@ -253,6 +256,59 @@ if [[ -f "$FRONTEND_ROOT/package.json" ]] && command -v npm >/dev/null 2>&1; the
 fi
 
 sudo -u www-data php "$PANEL_ROOT/artisan" migrate --force
+
+if [[ "${SKIP_DB_SEED:-}" != "1" ]]; then
+  ADMIN_EMAIL="${PANELSAR_ADMIN_EMAIL:-admin@panelsar.com}"
+  USER_COUNT=""
+  if [[ "${WITH_MARIADB}" == "1" ]] || [[ "${WITH_MARIADB}" == "yes" ]]; then
+    DB_PW=$(grep '^DB_PASSWORD=' "$ENV_FILE" | cut -d= -f2- | tr -d '\r')
+    MARIADB_CMD=(mariadb)
+    command -v mariadb >/dev/null 2>&1 || MARIADB_CMD=(mysql)
+    if [[ -n "$DB_PW" ]]; then
+      USER_COUNT=$(MYSQL_PWD="$DB_PW" "${MARIADB_CMD[@]}" -u panelsar -h 127.0.0.1 panelsar -Nse "SELECT COUNT(*)" 2>/dev/null || echo "")
+    fi
+  elif grep -q '^DB_CONNECTION=sqlite' "$ENV_FILE" 2>/dev/null && [[ -f "$PANEL_ROOT/database/database.sqlite" ]]; then
+    USER_COUNT=$(sqlite3 "$PANEL_ROOT/database/database.sqlite" "SELECT COUNT(*) FROM users;" 2>/dev/null || echo "")
+  fi
+  [[ -n "$USER_COUNT" ]] || USER_COUNT=0
+
+  WRITE_LOGIN=0
+  ADMIN_PASSWORD=""
+  if [[ -n "${PANELSAR_ADMIN_PASSWORD:-}" ]]; then
+    ADMIN_PASSWORD="$PANELSAR_ADMIN_PASSWORD"
+    WRITE_LOGIN=1
+  elif [[ "$USER_COUNT" == "0" ]]; then
+    ADMIN_PASSWORD="$(openssl rand -hex 12)"
+    WRITE_LOGIN=1
+  fi
+
+  LOGIN_FILE="/root/panelsar-admin-login.txt"
+  PANEL_URL_HINT="$(grep -E '^APP_URL=' "$ENV_FILE" 2>/dev/null | cut -d= -f2- | tr -d '\r' || true)"
+  [[ -n "$PANEL_URL_HINT" ]] || PANEL_URL_HINT="http://$(hostname -I 2>/dev/null | awk '{print $1}' || echo localhost)"
+
+  if [[ "$WRITE_LOGIN" == "1" ]]; then
+    {
+      echo "Panelsar — ilk admin girişi"
+      echo "Panel URL: ${PANEL_URL_HINT}"
+      echo "E-posta:   ${ADMIN_EMAIL}"
+      echo "Şifre:     ${ADMIN_PASSWORD}"
+      echo "İlk girişten sonra şifreyi değiştirin."
+    } > "$LOGIN_FILE"
+    chmod 600 "$LOGIN_FILE"
+  fi
+
+  if [[ -n "$ADMIN_PASSWORD" ]]; then
+    sudo -u www-data env \
+      PANELSAR_ADMIN_EMAIL="$ADMIN_EMAIL" \
+      PANELSAR_ADMIN_PASSWORD="$ADMIN_PASSWORD" \
+      php "$PANEL_ROOT/artisan" db:seed --force
+  else
+    sudo -u www-data env \
+      PANELSAR_ADMIN_EMAIL="$ADMIN_EMAIL" \
+      php "$PANEL_ROOT/artisan" db:seed --force
+  fi
+fi
+
 sudo -u www-data php "$PANEL_ROOT/artisan" config:cache
 sudo -u www-data php "$PANEL_ROOT/artisan" route:cache
 sudo -u www-data php "$PANEL_ROOT/artisan" view:cache
@@ -289,10 +345,19 @@ echo "  Panel kökü:     $PANELSAR_HOME"
 echo "  Engine API:     http://127.0.0.1:9090 (yalnızca sunucu içi — dışarıya açmayın)"
 echo "  ENGINE_INTERNAL_KEY panel .env ile eşleşiyor."
 echo "  Nginx site:     $NGX_DST"
+if [[ "${SKIP_DB_SEED:-}" != "1" ]]; then
+  if [[ -f /root/panelsar-admin-login.txt ]]; then
+    echo ""
+    echo "  İlk admin girişi (aynısı /root/panelsar-admin-login.txt dosyasında):"
+    sed 's/^/    /' /root/panelsar-admin-login.txt
+  else
+    echo ""
+    echo "  Veritabanında kullanıcı zaten vardı; yeni şifre dosyası yazılmadı. Giriş bilgisi bilinen admin ile veya şifre sıfırlama ile."
+  fi
+fi
 echo ""
 echo "Sonraki adımlar:"
 echo "  1) DNS ile alan adını bu sunucuya yönlendirin; SSL: certbot --nginx -d ornek.com"
 echo "  2) APP_URL değerini .env içinde gerçek URL ile güncelleyin: nano $ENV_FILE"
 echo "  3) php artisan panelsar:install-check"
-echo "  4) İlk admin: php artisan db:seed veya mevcut dokümantasyon"
 echo ""

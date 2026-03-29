@@ -8,6 +8,7 @@
 # Müşteri komutu (Linux VPS — SSL doğrulaması AÇIK):
 #   • Root SSH ile (aaPanel gibi ekstra şifre yok): ssh root@SUNUCU_IP → curl -fsSL "URL" | bash
 #   • sudo kullanıcı: aynı komut; betik bir kez sudo parolası sorup kendini root ile yeniden çalıştırır.
+#   • İlk admin URL/e-posta/şifre: /root/panelsar-admin-login.txt (kurulum özeti çıktısında da yazılır)
 #   • İkinci seçenek (klasik): curl -fsSL "URL" | sudo bash
 #   macOS/Windows’ta çalıştırmayın; boş Debian/Ubuntu sunucuda çalışır.
 #
