@@ -5,8 +5,11 @@
 # SİZ (Kodsar): Bu dosyayı HTTPS ile yayınlayın, aşağıdaki varsayılan repo URL’ini kendi Git adresinizle değiştirin.
 # Örnek konum: https://kodsar.com/panel/install.sh
 #
-# Müşteri komutu (aaPanel tarzı — SSL doğrulaması AÇIK, -k yok):
-#   URL="https://kodsar.com/panel/install.sh" && if command -v curl >/dev/null 2>&1; then curl -fsSL "$URL" | sudo bash; else wget -qO- "$URL" | sudo bash; fi
+# Müşteri komutu (Linux VPS — SSL doğrulaması AÇIK):
+#   • Root SSH ile (aaPanel gibi ekstra şifre yok): ssh root@SUNUCU_IP → curl -fsSL "URL" | bash
+#   • sudo kullanıcı: aynı komut; betik bir kez sudo parolası sorup kendini root ile yeniden çalıştırır.
+#   • İkinci seçenek (klasik): curl -fsSL "URL" | sudo bash
+#   macOS/Windows’ta çalıştırmayın; boş Debian/Ubuntu sunucuda çalışır.
 #
 # Ortam ile (ör. özel branch):
 #   sudo PANELSAR_BRANCH=release PANELSAR_REPO_URL=https://github.com/kodsar/panelsar.git bash -s <<< "$(curl -fsSL https://kodsar.com/panel/install.sh)"
@@ -17,12 +20,45 @@
 #
 set -euo pipefail
 
-# ─── Dağıtımcı: burayı kendi Git reponuzla değiştirin ───
+# ─── Dağıtımcı: repo URL + bu betiğin ham (raw) HTTPS adresi aynı depoyu göstermeli (sudo yeniden çalıştırma için) ───
+: "${PANELSAR_INSTALL_SCRIPT_URL:=https://raw.githubusercontent.com/coskunyunus1453/panelsar/main/deploy/host/install.sh}"
 : "${PANELSAR_REPO_URL:=https://github.com/coskunyunus1453/panelsar.git}"
 : "${PANELSAR_BRANCH:=main}"
 : "${PANELSAR_HOME:=/var/www/panelsar}"
 
-[[ "$(id -u)" -eq 0 ]] || { echo "Root gerekli. Örnek: curl ... | sudo bash" >&2; exit 1; }
+if [[ "$(uname -s)" != "Linux" ]]; then
+  echo "Panelsar kurulumu yalnızca Linux (Debian/Ubuntu) sunucu içindir." >&2
+  echo "macOS veya yerel bilgisayarınızda değil; boş VPS'e SSH ile bağlanıp orada çalıştırın." >&2
+  echo "Örnek: ssh root@SUNUCU_IP  ardından: curl -fsSL \"$PANELSAR_INSTALL_SCRIPT_URL\" | bash" >&2
+  exit 1
+fi
+
+if [[ "$(id -u)" -ne 0 ]]; then
+  if command -v sudo >/dev/null 2>&1; then
+    TMP="$(mktemp)"
+    trap 'rm -f "$TMP"' EXIT
+    if command -v curl >/dev/null 2>&1; then
+      if [[ "${PANELSAR_INSECURE_DOWNLOAD:-0}" == "1" ]]; then
+        curl -fsSLk "$PANELSAR_INSTALL_SCRIPT_URL" -o "$TMP"
+      else
+        curl -fsSL "$PANELSAR_INSTALL_SCRIPT_URL" -o "$TMP"
+      fi
+    elif command -v wget >/dev/null 2>&1; then
+      if [[ "${PANELSAR_INSECURE_DOWNLOAD:-0}" == "1" ]]; then
+        wget -qO "$TMP" "$PANELSAR_INSTALL_SCRIPT_URL" --no-check-certificate
+      else
+        wget -qO "$TMP" "$PANELSAR_INSTALL_SCRIPT_URL"
+      fi
+    else
+      echo "Root gerekli veya curl/wget ile betik indirilemiyor. Örnek: curl -fsSL ... | sudo bash" >&2
+      exit 1
+    fi
+    echo "Yönetici yetkisi gerekli; sudo bir kez parola sorabilir (root SSH kullanırsanız sorulmaz)." >&2
+    exec sudo -E bash "$TMP"
+  fi
+  echo "Root veya sudo ile çalıştırın. Örnek: curl -fsSL \"$PANELSAR_INSTALL_SCRIPT_URL\" | sudo bash" >&2
+  exit 1
+fi
 
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq
