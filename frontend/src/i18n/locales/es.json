@@ -1,0 +1,57 @@
+{
+  "app": {
+    "name": "Panelsar",
+    "tagline": "Panel de control de hosting moderno"
+  },
+  "nav": {
+    "dashboard": "Panel",
+    "domains": "Dominios",
+    "databases": "Bases de datos",
+    "email": "Correo",
+    "ftp": "FTP",
+    "files": "Gestor de archivos",
+    "ssl": "SSL",
+    "backups": "Copias de seguridad",
+    "cron": "Tareas Cron",
+    "monitoring": "Monitoreo",
+    "security": "Seguridad",
+    "settings": "Configuración",
+    "users": "Usuarios",
+    "packages": "Paquetes",
+    "reseller": "Revendedor",
+    "installer": "Instalador de apps",
+    "open_menu": "Abrir menú",
+    "close_menu": "Cerrar menú",
+    "toggle_sidebar": "Contraer barra lateral"
+  },
+  "auth": {
+    "login": "Iniciar sesión",
+    "logout": "Cerrar sesión",
+    "email": "Correo electrónico",
+    "password": "Contraseña",
+    "remember": "Recordarme",
+    "forgot": "¿Olvidaste tu contraseña?",
+    "login_title": "Inicia sesión en Panelsar",
+    "login_subtitle": "Administra tu entorno de hosting"
+  },
+  "common": {
+    "create": "Crear",
+    "edit": "Editar",
+    "delete": "Eliminar",
+    "save": "Guardar",
+    "cancel": "Cancelar",
+    "confirm": "Confirmar",
+    "search": "Buscar...",
+    "loading": "Cargando...",
+    "no_data": "No se encontraron datos",
+    "actions": "Acciones",
+    "status": "Estado",
+    "active": "Activo",
+    "inactive": "Inactivo",
+    "suspended": "Suspendido",
+    "pending": "Pendiente",
+    "confirm_delete": "¿Estás seguro de que quieres eliminar esto?",
+    "yes": "Sí",
+    "no": "No"
+  }
+}

@@ -1,0 +1,36 @@
+---
+# Örnek: repoyu çek + .env şablonu + deploy script.
+# Sırlar: ansible-vault → group_vars/all/vault.yml
+
+- name: Panelsar panel deploy
+  hosts: panelsar_panel
+  become: true
+  vars:
+    code_root: /var/www/panelsar
+    panel_root: "{{ code_root }}/panel"
+    panel_user: www-data
+    repo_url: git@github.com:ORG/panelsar.git
+  tasks:
+    - name: Kod deposu (clone / pull)
+      ansible.builtin.git:
+        repo: "{{ repo_url }}"
+        dest: "{{ code_root }}"
+        version: main
+        update: true
+
+    - name: .env şablonu
+      ansible.builtin.template:
+        src: templates/env.j2
+        dest: "{{ panel_root }}/.env"
+        owner: "{{ panel_user }}"
+        group: "{{ panel_user }}"
+        mode: "0600"
+
+    - name: Deploy script
+      ansible.builtin.shell: |
+        set -euo pipefail
+        export PANEL_ROOT="{{ panel_root }}"
+        export FRONTEND_ROOT="{{ code_root }}/frontend"
+        bash "{{ code_root }}/deploy/scripts/deploy-panel.sh"
+      args:
+        executable: /bin/bash

@@ -1,0 +1,57 @@
+{
+  "app": {
+    "name": "Panelsar",
+    "tagline": "Panneau de contrôle d'hébergement moderne"
+  },
+  "nav": {
+    "dashboard": "Tableau de bord",
+    "domains": "Domaines",
+    "databases": "Bases de données",
+    "email": "E-mail",
+    "ftp": "FTP",
+    "files": "Gestionnaire de fichiers",
+    "ssl": "SSL",
+    "backups": "Sauvegardes",
+    "cron": "Tâches Cron",
+    "monitoring": "Surveillance",
+    "security": "Sécurité",
+    "settings": "Paramètres",
+    "users": "Utilisateurs",
+    "packages": "Forfaits",
+    "reseller": "Revendeur",
+    "installer": "Installateur d'apps",
+    "open_menu": "Ouvrir le menu",
+    "close_menu": "Fermer le menu",
+    "toggle_sidebar": "Réduire le panneau"
+  },
+  "auth": {
+    "login": "Connexion",
+    "logout": "Déconnexion",
+    "email": "Adresse e-mail",
+    "password": "Mot de passe",
+    "remember": "Se souvenir de moi",
+    "forgot": "Mot de passe oublié ?",
+    "login_title": "Connectez-vous à Panelsar",
+    "login_subtitle": "Gérez votre environnement d'hébergement"
+  },
+  "common": {
+    "create": "Créer",
+    "edit": "Modifier",
+    "delete": "Supprimer",
+    "save": "Enregistrer",
+    "cancel": "Annuler",
+    "confirm": "Confirmer",
+    "search": "Rechercher...",
+    "loading": "Chargement...",
+    "no_data": "Aucune donnée trouvée",
+    "actions": "Actions",
+    "status": "Statut",
+    "active": "Actif",
+    "inactive": "Inactif",
+    "suspended": "Suspendu",
+    "pending": "En attente",
+    "confirm_delete": "Êtes-vous sûr de vouloir supprimer ceci ?",
+    "yes": "Oui",
+    "no": "Non"
+  }
+}

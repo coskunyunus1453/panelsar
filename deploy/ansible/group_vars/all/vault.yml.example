@@ -1,0 +1,12 @@
+# Bu dosyayı vault.yml olarak kopyalayıp şifreleyin:
+#   cp vault.yml.example vault.yml
+#   ansible-vault encrypt group_vars/all/vault.yml
+#
+# vault.yml içinde örnek anahtarlar:
+# vault_app_key: "base64:..."
+# vault_db_database: panelsar
+# vault_db_username: panelsar
+# vault_db_password: "..."
+# vault_engine_internal_key: "..."
+# vault_mysql_provision_user: root
+# vault_mysql_provision_password: "..."

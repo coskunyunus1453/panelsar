@@ -1,0 +1,58 @@
+<?php
+
+namespace App\Providers;
+
+use App\Models\Database;
+use App\Models\Domain;
+use App\Policies\DatabasePolicy;
+use App\Policies\DomainPolicy;
+use App\Services\HostingQuotaService;
+use App\Services\UserHostingPackageSync;
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\ServiceProvider;
+
+class AppServiceProvider extends ServiceProvider
+{
+    /**
+     * Register any application services.
+     */
+    public function register(): void
+    {
+        $this->app->singleton(HostingQuotaService::class);
+        $this->app->singleton(UserHostingPackageSync::class);
+    }
+
+    /**
+     * Bootstrap any application services.
+     */
+    public function boot(): void
+    {
+        RateLimiter::for('api', function (Request $request) {
+            return Limit::perMinute(120)->by($request->user()?->id ?: $request->ip());
+        });
+
+        RateLimiter::for('login', function (Request $request) {
+            return Limit::perMinute(5)->by($request->ip());
+        });
+
+        RateLimiter::for('webhooks', function (Request $request) {
+            return Limit::perMinute(600)->by($request->ip());
+        });
+
+        Gate::policy(Domain::class, DomainPolicy::class);
+        Gate::policy(Database::class, DatabasePolicy::class);
+
+        if ($this->app->environment('production')) {
+            if (config('app.debug')) {
+                Log::warning('Panelsar: APP_DEBUG is enabled in production.');
+            }
+            if ((string) config('panelsar.engine_internal_key', '') === '') {
+                Log::warning('Panelsar: ENGINE_INTERNAL_KEY is empty; engine integration will fail.');
+            }
+        }
+    }
+}

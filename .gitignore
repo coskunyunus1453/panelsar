@@ -1,0 +1,65 @@
+# Dependencies
+node_modules/
+vendor/
+go/pkg/
+
+# Environment
+.env
+.env.local
+.env.*.local
+*.env
+
+# Build outputs
+frontend/dist/
+frontend/build/
+engine/bin/
+engine/panelsar-engine
+*.exe
+*.dll
+*.so
+*.dylib
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+storage/logs/
+logs/
+
+# Cache
+.cache/
+*.cache
+storage/framework/cache/
+
+# Testing
+coverage/
+.nyc_output/
+.phpunit.result.cache
+
+# Yerel hosting kökü (engine ile paylaşılan site dosyaları)
+data/
+
+# Docker volumes
+docker/data/
+docker/mysql/data/
+docker/redis/data/
+
+# Compiled
+*.o
+*.a
+*.out
+
+# Secrets
+*.pem
+*.key
+*.crt
+!docker/nginx/ssl/.gitkeep

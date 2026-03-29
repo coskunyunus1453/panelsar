@@ -1,0 +1,81 @@
+server:
+  port: 9090
+  host: "0.0.0.0"
+  debug: true
+  secret_key: "change-me-in-production"
+
+database:
+  host: "localhost"
+  port: 5432
+  name: "panelsar"
+  user: "panelsar"
+  password: "secret"
+
+docker:
+  enabled: true
+  socket_path: "/var/run/docker.sock"
+  network: "panelsar_net"
+
+services:
+  nginx:
+    enabled: true
+    config_path: "/etc/nginx"
+    binary_path: "/usr/sbin/nginx"
+  php_fpm:
+    enabled: true
+    config_path: "/etc/php"
+    binary_path: "/usr/sbin/php-fpm"
+  mysql:
+    enabled: true
+    config_path: "/etc/mysql"
+    binary_path: "/usr/sbin/mysqld"
+  redis:
+    enabled: true
+    config_path: "/etc/redis"
+    binary_path: "/usr/bin/redis-server"
+
+security:
+  jwt_secret: "change-this-jwt-secret-in-production"
+  internal_api_key: "panelsar-engine-internal-dev"
+  token_expiry: 3600
+  max_login_attempts: 5
+  fail2ban_enabled: true
+
+# web_root boş bırakılırsa PANELSAR_HOME/data/www kullanılır (geliştirme)
+paths:
+  web_root: ""
+  vhosts_dir: "/etc/nginx/sites-available"
+  ssl_dir: "/etc/panelsar/ssl"
+  backup_dir: "/var/backups/panelsar"
+  log_dir: "/var/log/panelsar"
+  temp_dir: ""
+
+# Faz 1.1 — Linux prod: nginx_manage_vhosts: true (engine root veya yazma yetkisi gerekir)
+hosting:
+  nginx_manage_vhosts: false
+  nginx_sites_enabled: "/etc/nginx/sites-enabled"
+  php_fpm_socket: ""
+  nginx_reload_after_vhost: false
+  # Alan adı başına pool + open_basedir (nginx ile aynı socket)
+  php_fpm_manage_pools: false
+  php_fpm_listen_dir: "/run/php"
+  php_fpm_pool_dir_template: "/etc/php/{{version}}/fpm/pool.d"
+  php_fpm_reload_after_pool: false
+  php_fpm_pool_user: "www-data"
+  php_fpm_pool_group: "www-data"
+  # Apache (server_type: apache); prod’da true + yazma yetkisi
+  apache_manage_vhosts: false
+  apache_sites_available: "/etc/apache2/sites-available"
+  apache_sites_enabled: "/etc/apache2/sites-enabled"
+  apache_reload_after_vhost: false
+  # Let’s Encrypt (certbot webroot); Linux prod: manage_ssl true + certbot kurulu
+  manage_ssl: false
+  certbot_path: ""
+  lets_encrypt_email: ""
+  lets_encrypt_staging: false
+  # Faz 2.4 — site belge kökünde composer / npm (prod: true + güvenilir PATH)
+  manage_site_tools: false
+  composer_path: "composer"
+  npm_path: "npm"
+  tools_max_seconds: 300
+  wordpress_zip_url: "https://wordpress.org/latest.zip"

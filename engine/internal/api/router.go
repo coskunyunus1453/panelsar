@@ -1,0 +1,344 @@
+package api
+
+import (
+	"net/http"
+	"strings"
+
+	"github.com/gin-gonic/gin"
+	"github.com/panelsar/engine/internal/config"
+	"github.com/panelsar/engine/internal/daemon"
+	"github.com/panelsar/engine/internal/hosting"
+	"github.com/panelsar/engine/internal/middleware"
+	"github.com/panelsar/engine/internal/nginx"
+	"github.com/panelsar/engine/internal/phpfpm"
+	"github.com/panelsar/engine/internal/sites"
+	"github.com/panelsar/engine/internal/ssl"
+	"github.com/sirupsen/logrus"
+)
+
+func NewRouter(cfg *config.Config, d *daemon.Daemon, log *logrus.Logger) *gin.Engine {
+	if !cfg.Server.Debug {
+		gin.SetMode(gin.ReleaseMode)
+	}
+
+	r := gin.New()
+	r.Use(gin.Recovery())
+	r.Use(middleware.Logger(log))
+	r.Use(middleware.CORS())
+
+	r.GET("/health", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{
+			"status":  "healthy",
+			"engine":  "panelsar",
+			"version": "0.1.0",
+			"running": d.IsRunning(),
+		})
+	})
+
+	api := r.Group("/api/v1")
+	api.Use(middleware.AuthRequired(cfg))
+	{
+		svc := api.Group("/services")
+		{
+			svc.GET("", handleListServices(d))
+			svc.GET("/:name", handleGetService(d))
+			svc.POST("/:name/start", handleStartService(d))
+			svc.POST("/:name/stop", handleStopService(d))
+			svc.POST("/:name/restart", handleRestartService(d))
+		}
+
+		site := api.Group("/sites")
+		{
+			site.POST("", handleCreateSite(cfg, d))
+			site.DELETE("/:domain", handleDeleteSite(cfg, d))
+			site.GET("", handleListSites(cfg, d))
+		}
+
+		ssl := api.Group("/ssl")
+		{
+			ssl.POST("/issue", handleIssueSSL(cfg))
+			ssl.POST("/renew", handleRenewSSL(cfg))
+			ssl.POST("/revoke", handleRevokeSSL(cfg))
+		}
+
+		registerModuleRoutes(cfg, d, api, log)
+	}
+
+	return r
+}
+
+func handleListServices(d *daemon.Daemon) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		services := d.ServiceManager().GetAllServices()
+		c.JSON(http.StatusOK, gin.H{"services": services})
+	}
+}
+
+func handleGetService(d *daemon.Daemon) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		name := c.Param("name")
+		svc, err := d.ServiceManager().GetService(name)
+		if err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, svc)
+	}
+}
+
+func handleStartService(d *daemon.Daemon) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		name := c.Param("name")
+		if err := d.ServiceManager().StartService(name); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"message": "Service started"})
+	}
+}
+
+func handleStopService(d *daemon.Daemon) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		name := c.Param("name")
+		if err := d.ServiceManager().StopService(name); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"message": "Service stopped"})
+	}
+}
+
+func handleRestartService(d *daemon.Daemon) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		name := c.Param("name")
+		if err := d.ServiceManager().RestartService(name); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"message": "Service restarted"})
+	}
+}
+
+func handleCreateSite(cfg *config.Config, d *daemon.Daemon) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var req struct {
+			Domain     string `json:"domain" binding:"required"`
+			UserID     uint   `json:"user_id" binding:"required"`
+			PHP        string `json:"php_version"`
+			ServerType string `json:"server_type"`
+		}
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		phpV := strings.TrimSpace(req.PHP)
+		if phpV == "" {
+			phpV = "8.2"
+		}
+
+		oldMeta, _ := sites.ReadSiteMeta(cfg.Paths.WebRoot, req.Domain)
+		docRoot, err := sites.Provision(cfg.Paths.WebRoot, req.Domain, phpV, req.ServerType)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		ps := phpfpmSettings(cfg)
+		phpSocket := nginx.PHPSocketPath(phpV, cfg.Hosting.PHPFPMsocket)
+		if cfg.Hosting.PHPFPMmanagePools {
+			sock, perr := phpfpm.WritePool(ps, req.Domain, phpV, docRoot)
+			if perr != nil {
+				_ = sites.Remove(cfg.Paths.WebRoot, req.Domain)
+				c.JSON(http.StatusInternalServerError, gin.H{"error": perr.Error()})
+				return
+			}
+			phpSocket = sock
+			if cfg.Hosting.PHPFPMreloadAfterPool {
+				_ = phpfpm.Reload(phpV)
+			}
+			if oldMeta != nil && phpfpm.NormalizeVersion(oldMeta.PHPVersion) != phpfpm.NormalizeVersion(phpV) {
+				_ = phpfpm.RemovePool(ps, req.Domain, oldMeta.PHPVersion)
+				if cfg.Hosting.PHPFPMreloadAfterPool {
+					_ = phpfpm.Reload(oldMeta.PHPVersion)
+				}
+			}
+		}
+
+		metaNow, _ := sites.ReadSiteMeta(cfg.Paths.WebRoot, req.Domain)
+		if err := hosting.ApplyWebServer(cfg, req.Domain, docRoot, metaNow, phpSocket); err != nil {
+			if cfg.Hosting.PHPFPMmanagePools {
+				_ = phpfpm.RemovePool(ps, req.Domain, phpV)
+			}
+			_ = sites.Remove(cfg.Paths.WebRoot, req.Domain)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		st := "nginx"
+		if metaNow != nil && metaNow.ServerType != "" {
+			st = metaNow.ServerType
+		}
+
+		c.JSON(http.StatusCreated, gin.H{
+			"message":              "Site created",
+			"domain":               req.Domain,
+			"document_root":        docRoot,
+			"web_root":             cfg.Paths.WebRoot,
+			"server_type":          st,
+			"nginx_vhost":          cfg.Hosting.NginxManageVhosts,
+			"apache_vhost":         cfg.Hosting.ApacheManageVhosts,
+			"php_fpm_manage_pools": cfg.Hosting.PHPFPMmanagePools,
+			"php_fpm_socket":       phpSocket,
+		})
+	}
+}
+
+func phpfpmSettings(cfg *config.Config) phpfpm.HostingPoolSettings {
+	return phpfpm.HostingPoolSettings{
+		PoolDirTemplate:  cfg.Hosting.PHPFPMpoolDirTemplate,
+		SocketListenDir:  cfg.Hosting.PHPFPMlistenDir,
+		FPMUser:          cfg.Hosting.PHPFPMpoolUser,
+		FPMGroup:         cfg.Hosting.PHPFPMpoolGroup,
+	}
+}
+
+func handleDeleteSite(cfg *config.Config, d *daemon.Daemon) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		domain := c.Param("domain")
+		meta, _ := sites.ReadSiteMeta(cfg.Paths.WebRoot, domain)
+		ps := phpfpmSettings(cfg)
+
+		_ = ssl.Delete(cfg, domain)
+		if err := hosting.RemoveWebServer(cfg, domain, meta); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		if cfg.Hosting.PHPFPMmanagePools && meta != nil {
+			_ = phpfpm.RemovePool(ps, domain, meta.PHPVersion)
+			if cfg.Hosting.PHPFPMreloadAfterPool {
+				_ = phpfpm.Reload(meta.PHPVersion)
+			}
+		}
+		if err := sites.Remove(cfg.Paths.WebRoot, domain); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"message": "Site deleted", "domain": domain})
+	}
+}
+
+func handleListSites(cfg *config.Config, d *daemon.Daemon) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		names, err := sites.ListDomains(cfg.Paths.WebRoot)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		list := make([]gin.H, 0, len(names))
+		for _, n := range names {
+			list = append(list, gin.H{"domain": n})
+		}
+		c.JSON(http.StatusOK, gin.H{"sites": list})
+	}
+}
+
+func handleIssueSSL(cfg *config.Config) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var req struct {
+			Domain string `json:"domain" binding:"required"`
+			Email  string `json:"email"`
+		}
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		meta, err := sites.ReadSiteMeta(cfg.Paths.WebRoot, req.Domain)
+		if err != nil || meta == nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "site not found"})
+			return
+		}
+		if err := ssl.Issue(cfg, req.Domain, meta.DocumentRoot, req.Email); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		meta.SSLEnabled = true
+		phpSock := ""
+		if cfg.Hosting.PHPFPMmanagePools {
+			phpSock = phpfpmSettings(cfg).SocketForDomain(req.Domain)
+		} else {
+			phpSock = nginx.PHPSocketPath(meta.PHPVersion, cfg.Hosting.PHPFPMsocket)
+		}
+		if err := hosting.ApplyWebServer(cfg, req.Domain, meta.DocumentRoot, meta, phpSock); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		if err := sites.WriteSiteMeta(cfg.Paths.WebRoot, req.Domain, meta); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"message": "SSL certificate issued", "domain": req.Domain, "ssl_enabled": true})
+	}
+}
+
+func handleRenewSSL(cfg *config.Config) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var req struct {
+			Domain string `json:"domain" binding:"required"`
+		}
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		if err := ssl.Renew(cfg, req.Domain); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		meta, err := sites.ReadSiteMeta(cfg.Paths.WebRoot, req.Domain)
+		if err != nil || meta == nil {
+			c.JSON(http.StatusOK, gin.H{"message": "SSL certificate renewed", "domain": req.Domain})
+			return
+		}
+		phpSock := ""
+		if cfg.Hosting.PHPFPMmanagePools {
+			phpSock = phpfpmSettings(cfg).SocketForDomain(req.Domain)
+		} else {
+			phpSock = nginx.PHPSocketPath(meta.PHPVersion, cfg.Hosting.PHPFPMsocket)
+		}
+		if err := hosting.ApplyWebServer(cfg, req.Domain, meta.DocumentRoot, meta, phpSock); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"message": "SSL certificate renewed", "domain": req.Domain})
+	}
+}
+
+func handleRevokeSSL(cfg *config.Config) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var req struct {
+			Domain string `json:"domain" binding:"required"`
+		}
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		_ = ssl.Delete(cfg, req.Domain)
+		meta, err := sites.ReadSiteMeta(cfg.Paths.WebRoot, req.Domain)
+		if err == nil && meta != nil {
+			meta.SSLEnabled = false
+			_ = sites.WriteSiteMeta(cfg.Paths.WebRoot, req.Domain, meta)
+		}
+		if meta != nil {
+			phpSock := ""
+			if cfg.Hosting.PHPFPMmanagePools {
+				phpSock = phpfpmSettings(cfg).SocketForDomain(req.Domain)
+			} else {
+				phpSock = nginx.PHPSocketPath(meta.PHPVersion, cfg.Hosting.PHPFPMsocket)
+			}
+			if err := hosting.ApplyWebServer(cfg, req.Domain, meta.DocumentRoot, meta, phpSock); err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				return
+			}
+		}
+		c.JSON(http.StatusOK, gin.H{"message": "SSL removed", "domain": req.Domain})
+	}
+}

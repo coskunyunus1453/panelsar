@@ -1,0 +1,7 @@
+{
+  "exclude": [
+    "bootstrap/cache",
+    "storage",
+    "vendor"
+  ]
+}

@@ -1,0 +1,78 @@
+# Panelsar Engine — üretim şablonu (/etc/panelsar/engine.yaml olarak kopyalanır)
+# Kurulum: install-production.sh otomatik doldurur (__INTERNAL_KEY__, __PANELSAR_HOME__)
+
+server:
+  port: 9090
+  host: "127.0.0.1"
+  debug: false
+  secret_key: "__ENGINE_SECRET_KEY__"
+
+database:
+  host: "127.0.0.1"
+  port: 5432
+  name: "panelsar"
+  user: "panelsar"
+  password: "__ENGINE_DB_PASSWORD__"
+
+docker:
+  enabled: false
+  socket_path: "/var/run/docker.sock"
+  network: "panelsar_net"
+
+services:
+  nginx:
+    enabled: true
+    config_path: "/etc/nginx"
+    binary_path: "/usr/sbin/nginx"
+  php_fpm:
+    enabled: true
+    config_path: "/etc/php"
+    binary_path: "/usr/sbin/php-fpm8.2"
+  mysql:
+    enabled: true
+    config_path: "/etc/mysql"
+    binary_path: "/usr/sbin/mysqld"
+  postfix:
+    enabled: false
+    config_path: "/etc/postfix"
+    binary_path: "/usr/sbin/postfix"
+  dovecot:
+    enabled: false
+    config_path: "/etc/dovecot"
+    binary_path: "/usr/sbin/dovecot"
+  redis:
+    enabled: false
+    config_path: "/etc/redis"
+    binary_path: "/usr/bin/redis-server"
+
+security:
+  jwt_secret: "__ENGINE_JWT_SECRET__"
+  internal_api_key: "__INTERNAL_KEY__"
+  token_expiry: 3600
+  max_login_attempts: 5
+  fail2ban_enabled: false
+
+paths:
+  web_root: "__PANELSAR_HOME__/data/www"
+  vhosts_dir: "__PANELSAR_HOME__/data/vhosts"
+  ssl_dir: "__PANELSAR_HOME__/data/ssl"
+  backup_dir: "__PANELSAR_HOME__/data/backups"
+  log_dir: "__PANELSAR_HOME__/data/logs"
+  temp_dir: "__PANELSAR_HOME__/data/tmp"
+
+hosting:
+  nginx_manage_vhosts: true
+  nginx_sites_enabled: "/etc/nginx/sites-enabled"
+  php_fpm_socket: "__PHP_FPM_SOCKET__"
+  nginx_reload_after_vhost: true
+  php_fpm_manage_pools: false
+  apache_manage_vhosts: false
+  manage_ssl: true
+  certbot_path: "/usr/bin/certbot"
+  lets_encrypt_email: "__LETS_ENCRYPT_EMAIL__"
+  lets_encrypt_staging: false
+  manage_site_tools: true
+  composer_path: "/usr/bin/composer"
+  npm_path: "/usr/bin/npm"
+  tools_max_seconds: 600
+  wordpress_zip_url: "https://wordpress.org/latest.zip"

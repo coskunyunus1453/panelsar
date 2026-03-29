@@ -1,0 +1,218 @@
+package nginx
+
+import (
+	"bytes"
+	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"regexp"
+	"strings"
+	"text/template"
+
+	"github.com/panelsar/engine/internal/config"
+)
+
+var domainSafe = regexp.MustCompile(`^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?)*$`)
+
+// DomainSafe alan adı nginx/apache vhost için güvenli mi.
+func DomainSafe(domain string) bool {
+	return domainSafe.MatchString(domain)
+}
+
+const vhostTemplateSSL = `# Panelsar — {{.Domain}} (HTTPS)
+server {
+    listen 80;
+    listen [::]:80;
+    server_name {{.Domain}} www.{{.Domain}};
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    server_name {{.Domain}} www.{{.Domain}};
+
+    ssl_certificate {{.SSLFullChain}};
+    ssl_certificate_key {{.SSLPrivKey}};
+    ssl_session_timeout 1d;
+    ssl_session_cache shared:PanelsarSSL:10m;
+
+    add_header Strict-Transport-Security "max-age=31536000" always;
+
+    root {{.DocRoot}};
+    index index.php index.html;
+
+    access_log {{.AccessLog}};
+    error_log {{.ErrorLog}};
+
+    location / {
+        try_files $uri $uri/ /index.php?$query_string;
+    }
+
+    location ~ \.php$ {
+        include fastcgi_params;
+        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+        fastcgi_pass unix:{{.PHPSocket}};
+    }
+
+    location ~ /\. {
+        deny all;
+    }
+}
+`
+
+const vhostTemplateHTTP = `# Panelsar — {{.Domain}}
+server {
+    listen 80;
+    listen [::]:80;
+    server_name {{.Domain}} www.{{.Domain}};
+    root {{.DocRoot}};
+    index index.php index.html;
+
+    access_log {{.AccessLog}};
+    error_log {{.ErrorLog}};
+
+    location / {
+        try_files $uri $uri/ /index.php?$query_string;
+    }
+
+    location ~ \.php$ {
+        include fastcgi_params;
+        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+        fastcgi_pass unix:{{.PHPSocket}};
+    }
+
+    location ~ /\. {
+        deny all;
+    }
+}
+`
+
+type vhostVars struct {
+	Domain        string
+	DocRoot       string
+	AccessLog     string
+	ErrorLog      string
+	PHPSocket     string
+	SSLFullChain  string
+	SSLPrivKey    string
+}
+
+// PHPSocketPath üretir: override doluysa onu; değilse /run/php/php{version}-fpm.sock (örn. 8.2).
+func PHPSocketPath(phpVersion, override string) string {
+	if strings.TrimSpace(override) != "" {
+		return strings.TrimSpace(override)
+	}
+	v := strings.TrimSpace(phpVersion)
+	if v == "" {
+		v = "8.2"
+	}
+	return fmt.Sprintf("/run/php/php%s-fpm.sock", v)
+}
+
+func confBaseName(domain string) string {
+	return "panelsar-" + strings.ToLower(domain) + ".conf"
+}
+
+// ApplyVhost sites-available altına conf yazar ve istenirse sites-enabled’a sembolik bağ oluşturur.
+// sslFullchain ve sslPrivkey doluysa 443 + 80’de HTTPS yönlendirmesi üretilir.
+func ApplyVhost(cfg *config.Config, domain, docRoot, phpSocket, sslFullchain, sslPrivkey string) error {
+	if !cfg.Hosting.NginxManageVhosts {
+		return nil
+	}
+	if !domainSafe.MatchString(domain) {
+		return fmt.Errorf("invalid domain for vhost")
+	}
+	if strings.Contains(docRoot, "..") {
+		return fmt.Errorf("invalid document root")
+	}
+	docRoot = filepath.Clean(docRoot)
+
+	if err := os.MkdirAll(cfg.Paths.LogDir, 0o755); err != nil {
+		return fmt.Errorf("log dir: %w", err)
+	}
+	if err := os.MkdirAll(cfg.Paths.VhostsDir, 0o755); err != nil {
+		return fmt.Errorf("vhosts dir: %w", err)
+	}
+	if err := os.MkdirAll(cfg.Hosting.NginxSitesEnabled, 0o755); err != nil {
+		return fmt.Errorf("sites-enabled dir: %w", err)
+	}
+
+	sock := strings.TrimSpace(phpSocket)
+	if sock == "" {
+		sock = "/run/php/php8.2-fpm.sock"
+	}
+
+	chain := strings.TrimSpace(sslFullchain)
+	key := strings.TrimSpace(sslPrivkey)
+	useSSL := chain != "" && key != ""
+
+	tplStr := vhostTemplateHTTP
+	if useSSL {
+		tplStr = vhostTemplateSSL
+	}
+	tpl, err := template.New("vhost").Parse(tplStr)
+	if err != nil {
+		return err
+	}
+
+	vars := vhostVars{
+		Domain:       domain,
+		DocRoot:      docRoot,
+		AccessLog:    filepath.Join(cfg.Paths.LogDir, domain+"_access.log"),
+		ErrorLog:     filepath.Join(cfg.Paths.LogDir, domain+"_error.log"),
+		PHPSocket:    sock,
+		SSLFullChain: chain,
+		SSLPrivKey:   key,
+	}
+
+	var buf bytes.Buffer
+	if err := tpl.Execute(&buf, vars); err != nil {
+		return err
+	}
+
+	base := confBaseName(domain)
+	avail := filepath.Join(cfg.Paths.VhostsDir, base)
+	enabled := filepath.Join(cfg.Hosting.NginxSitesEnabled, base)
+
+	if err := os.WriteFile(avail, buf.Bytes(), 0o644); err != nil {
+		return fmt.Errorf("write vhost: %w", err)
+	}
+
+	_ = os.Remove(enabled)
+	if err := os.Symlink(avail, enabled); err != nil {
+		return fmt.Errorf("symlink sites-enabled: %w", err)
+	}
+
+	if cfg.Hosting.NginxReloadAfterVhost {
+		if out, err := exec.Command("nginx", "-t").CombinedOutput(); err != nil {
+			return fmt.Errorf("nginx -t: %w: %s", err, strings.TrimSpace(string(out)))
+		}
+		_ = exec.Command("nginx", "-s", "reload").Run()
+	}
+
+	return nil
+}
+
+// RemoveVhost conf ve sembolik bağları kaldırır.
+func RemoveVhost(cfg *config.Config, domain string) error {
+	if !cfg.Hosting.NginxManageVhosts {
+		return nil
+	}
+	if domain == "" || strings.Contains(domain, "..") {
+		return fmt.Errorf("invalid domain")
+	}
+	base := confBaseName(domain)
+	enabled := filepath.Join(cfg.Hosting.NginxSitesEnabled, base)
+	avail := filepath.Join(cfg.Paths.VhostsDir, base)
+
+	_ = os.Remove(enabled)
+	_ = os.Remove(avail)
+
+	if cfg.Hosting.NginxReloadAfterVhost {
+		_ = exec.Command("nginx", "-t").Run()
+		_ = exec.Command("nginx", "-s", "reload").Run()
+	}
+	return nil
+}
