@@ -63,7 +63,7 @@ fi
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq
 apt-get install -y -qq git ca-certificates curl
-command -v go >/dev/null 2>&1 || apt-get install -y -qq golang-go || true
+# Go: deploy/bootstrap/install-production.sh içinde engine/go.mod ile uyumlu sürüm (go.dev) kurulur; apt golang-go kullanılmaz.
 
 PARENT="$(dirname "$PANELSAR_HOME")"
 mkdir -p "$PARENT"

@@ -18,6 +18,7 @@
 #   WITH_MARIADB=1         # MariaDB kur ve panel veritabanını oluştur (önerilir)
 #   WITH_POSTGRES=1        # Engine için PostgreSQL (isteğe bağlı)
 #   WITH_NODE_REPO=1       # NodeSource 20.x ekle (frontend build için önerilir)
+#   PANELSAR_GO_VERSION=1.22.3  # engine/go.mod ile uyumlu (varsayılan; go.dev'den kurulur)
 #
 set -euo pipefail
 
@@ -144,14 +145,10 @@ if [[ "${WITH_POSTGRES:-}" == "1" ]] || [[ "${WITH_POSTGRES:-}" == "yes" ]]; the
     sudo -u postgres psql -c "CREATE DATABASE panelsar OWNER panelsar;"
 fi
 
-# Go engine derle
-if command -v go >/dev/null 2>&1; then
-  (cd "$REPO_ROOT/engine" && go build -buildvcs=false -o /usr/local/bin/panelsar-engine ./cmd/panelsar-engine)
-  chmod 755 /usr/local/bin/panelsar-engine
-else
-  echo "Uyarı: 'go' yok; engine derlenmedi. Go kurup şunu çalıştırın:" >&2
-  echo "  (cd $REPO_ROOT/engine && go build -o /usr/local/bin/panelsar-engine ./cmd/panelsar-engine)" >&2
-fi
+# Go engine derle (apt'teki golang-go genelde esiktir; ensure-go-toolchain.sh go.dev sürümünü kurar)
+ensure_go_toolchain
+(cd "$REPO_ROOT/engine" && go build -buildvcs=false -o /usr/local/bin/panelsar-engine ./cmd/panelsar-engine)
+chmod 755 /usr/local/bin/panelsar-engine
 
 # systemd
 sed \
