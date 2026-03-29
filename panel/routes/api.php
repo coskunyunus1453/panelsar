@@ -1,7 +1,6 @@
 <?php
 
 use App\Http\Controllers\Admin\PackageController;
-use App\Http\Controllers\Admin\ServerSetupController;
 use App\Http\Controllers\Admin\OutboundMailSettingsController;
 use App\Http\Controllers\Admin\TerminalSettingsController;
 use App\Http\Controllers\Admin\StackController;
@@ -123,7 +122,6 @@ Route::middleware(['auth:sanctum', 'abilities:access:customer-panel'])->group(fu
     });
 
     Route::middleware('role:admin')->prefix('admin')->group(function () {
-        Route::get('server/capabilities', [ServerSetupController::class, 'capabilities']);
         Route::get('stack/modules', [StackController::class, 'modules']);
         Route::post('stack/install', [StackController::class, 'install']);
         Route::get('settings/mail', [OutboundMailSettingsController::class, 'show']);

@@ -174,6 +174,33 @@ func registerModuleRoutes(cfg *config.Config, d *daemon.Daemon, api *gin.RouterG
 		}
 		c.JSON(http.StatusOK, gin.H{"message": "mailbox removed"})
 	})
+	api.PATCH("/mail/:domain/mailbox", func(c *gin.Context) {
+		var body struct {
+			Email    string  `json:"email" binding:"required"`
+			Password *string `json:"password"`
+			QuotaMb  *int    `json:"quota_mb"`
+		}
+		if err := c.ShouldBindJSON(&body); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		patch := make(map[string]interface{})
+		if body.Password != nil {
+			patch["password"] = *body.Password
+		}
+		if body.QuotaMb != nil {
+			patch["quota_mb"] = *body.QuotaMb
+		}
+		if len(patch) == 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "password or quota_mb required"})
+			return
+		}
+		if err := panelmirror.MailPatchMailbox(cfg, c.Param("domain"), body.Email, patch); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"message": "mailbox updated"})
+	})
 
 	api.GET("/security/overview", func(c *gin.Context) {
 		rules, _ := panelmirror.FirewallRulesList(cfg)

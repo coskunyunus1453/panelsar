@@ -10,6 +10,8 @@ use App\Services\EngineApiService;
 use App\Services\HostingQuotaService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 class EmailAccountController extends Controller
@@ -76,13 +78,62 @@ class EmailAccountController extends Controller
         }
         $validated = $request->validate([
             'forwarding_address' => 'nullable|email',
-            'autoresponder_enabled' => 'boolean',
+            'autoresponder_enabled' => 'sometimes|boolean',
             'autoresponder_message' => 'nullable|string',
             'quota_mb' => 'nullable|integer|min:1',
+            'password' => 'nullable|string|min:8|max:128',
+            'regenerate_password' => 'sometimes|boolean',
         ]);
-        $emailAccount->update($validated);
 
-        return response()->json(['message' => __('email.updated'), 'account' => $emailAccount->fresh()]);
+        $emailAccount->loadMissing('domain');
+        $domainName = $emailAccount->domain?->name;
+
+        $plainPassword = null;
+        if ($request->boolean('regenerate_password')) {
+            $plainPassword = Str::random(16);
+        } elseif (! empty($validated['password'])) {
+            $plainPassword = $validated['password'];
+        }
+
+        $fill = Arr::except($validated, ['password', 'regenerate_password']);
+        $emailAccount->fill($fill);
+
+        if ($plainPassword !== null) {
+            $emailAccount->password = $plainPassword;
+        }
+
+        $emailAccount->save();
+
+        $enginePatch = ['email' => $emailAccount->email];
+        if ($plainPassword !== null) {
+            $enginePatch['password'] = $plainPassword;
+        }
+        if (array_key_exists('quota_mb', $validated) && $validated['quota_mb'] !== null) {
+            $enginePatch['quota_mb'] = (int) $validated['quota_mb'];
+        }
+
+        if ($domainName !== null && (count($enginePatch) > 1)) {
+            $res = $this->engine->mailPatchMailbox($domainName, $enginePatch);
+            if (isset($res['error']) && is_string($res['error']) && $res['error'] !== '') {
+                Log::warning('Engine mailPatchMailbox failed', [
+                    'domain' => $domainName,
+                    'email' => $emailAccount->email,
+                    'error' => $res['error'],
+                ]);
+            }
+        }
+
+        $payload = [
+            'message' => $plainPassword !== null
+                ? __('email.password_changed')
+                : __('email.updated'),
+            'account' => $emailAccount->fresh(),
+        ];
+        if ($plainPassword !== null) {
+            $payload['password_plain'] = $plainPassword;
+        }
+
+        return response()->json($payload);
     }
 
     public function destroy(Request $request, EmailAccount $emailAccount): JsonResponse

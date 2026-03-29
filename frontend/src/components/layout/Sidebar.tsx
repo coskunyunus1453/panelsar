@@ -26,7 +26,6 @@ import {
   Network,
   Gauge,
   KeyRound,
-  Wrench,
   X,
   TerminalSquare,
   Layers,
@@ -54,7 +53,6 @@ const navItems = [
 ]
 
 const adminItems = [
-  { path: '/admin/server-setup', icon: Wrench, label: 'nav.server_setup' },
   { path: '/admin/stack', icon: Layers, label: 'nav.stack' },
   { path: '/admin/mail-settings', icon: Send, label: 'nav.outbound_mail' },
   { path: '/admin/terminal', icon: TerminalSquare, label: 'nav.terminal' },

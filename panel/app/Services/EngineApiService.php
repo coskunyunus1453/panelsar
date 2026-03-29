@@ -271,6 +271,15 @@ class EngineApiService
         return $this->delete('/api/v1/mail/'.rawurlencode($domain).'/mailbox?'.$q);
     }
 
+    /**
+     * @param  array{email: string, password?: string, quota_mb?: int}  $data
+     * @return array<string, mixed>
+     */
+    public function mailPatchMailbox(string $domain, array $data): array
+    {
+        return $this->patchJson('/api/v1/mail/'.rawurlencode($domain).'/mailbox', $data);
+    }
+
     public function securityOverview(): array
     {
         return $this->get('/api/v1/security/overview');

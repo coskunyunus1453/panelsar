@@ -9,6 +9,7 @@ import toast from 'react-hot-toast'
 import clsx from 'clsx'
 
 type MailSettings = {
+  outbound_mail_persisted: boolean
   driver: string
   smtp_host: string
   smtp_port: number
@@ -119,6 +120,12 @@ export default function AdminMailSettingsPage() {
       <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700 dark:border-gray-700 dark:bg-gray-800/50 dark:text-gray-300">
         {t('mail_settings.hint')}
       </div>
+
+      {q.isSuccess && q.data && !q.data.outbound_mail_persisted && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100">
+          {t('mail_settings.not_persisted_warning')}
+        </div>
+      )}
 
       {q.isLoading && <p className="text-gray-500">{t('common.loading')}</p>}
       {q.isError && (
@@ -256,7 +263,12 @@ export default function AdminMailSettingsPage() {
             <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-3">
               <button
                 type="button"
-                disabled={testM.isPending || saveM.isPending}
+                disabled={
+                  testM.isPending ||
+                  saveM.isPending ||
+                  !q.data?.outbound_mail_persisted ||
+                  q.data?.driver === 'log'
+                }
                 onClick={() => testM.mutate()}
                 className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-800 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:hover:bg-gray-700"
               >
@@ -264,7 +276,9 @@ export default function AdminMailSettingsPage() {
                 {t('mail_settings.test')}
               </button>
               <span className="text-xs text-gray-500 dark:text-gray-400">
-                {t('mail_settings.test_hint')}
+                {q.data?.driver === 'log' && q.data?.outbound_mail_persisted
+                  ? t('mail_settings.test_disabled_log')
+                  : t('mail_settings.test_hint')}
               </span>
             </div>
           </div>

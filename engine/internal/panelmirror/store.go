@@ -538,6 +538,42 @@ func MailDeleteMailbox(cfg *config.Config, domain, email string) error {
 	return writeMail(path, s)
 }
 
+// MailPatchMailbox updates fields (password, quota_mb, etc.) for one mailbox by email address.
+func MailPatchMailbox(cfg *config.Config, domain, mailboxEmail string, patch map[string]interface{}) error {
+	d := safeDomain(domain)
+	if d == "" {
+		return fmt.Errorf("invalid domain")
+	}
+	if strings.TrimSpace(mailboxEmail) == "" {
+		return fmt.Errorf("email required")
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	path := filepath.Join(dir(cfg), "mail", d+".json")
+	s, err := readMail(path)
+	if err != nil {
+		return err
+	}
+	found := false
+	for i, m := range s.Mailboxes {
+		if fmt.Sprint(m["email"]) == mailboxEmail {
+			found = true
+			for k, v := range patch {
+				if k == "email" {
+					continue
+				}
+				m[k] = v
+			}
+			s.Mailboxes[i] = m
+			break
+		}
+	}
+	if !found {
+		return fmt.Errorf("mailbox not found")
+	}
+	return writeMail(path, s)
+}
+
 // FirewallRule son kurallar (özet).
 func AppendFirewallRule(cfg *config.Config, rule gin.H) error {
 	mu.Lock()

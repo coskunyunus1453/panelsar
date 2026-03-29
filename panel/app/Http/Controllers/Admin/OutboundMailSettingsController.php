@@ -21,6 +21,7 @@ class OutboundMailSettingsController extends Controller
         $pass = $rows->get('outbound_mail.smtp_password');
 
         return response()->json([
+            'outbound_mail_persisted' => $rows->has('outbound_mail.driver'),
             'driver' => $rows->get('outbound_mail.driver', config('mail.default', 'log')),
             'smtp_host' => $rows->get('outbound_mail.smtp_host', ''),
             'smtp_port' => (int) ($rows->get('outbound_mail.smtp_port', 587) ?: 587),
@@ -79,7 +80,31 @@ class OutboundMailSettingsController extends Controller
             'to' => ['nullable', 'email', 'max:255'],
         ]);
 
+        if (! PanelSetting::query()->where('key', 'outbound_mail.driver')->exists()) {
+            return response()->json([
+                'message' => __('stack.mail_test_requires_saved_settings'),
+            ], 422);
+        }
+
         OutboundMailConfigurator::apply();
+
+        $default = (string) config('mail.default', 'log');
+        if (! in_array($default, ['smtp', 'sendmail'], true)) {
+            return response()->json([
+                'message' => __('stack.mail_test_requires_real_transport', ['driver' => $default]),
+            ], 422);
+        }
+
+        if ($default === 'smtp') {
+            $host = (string) PanelSetting::query()
+                ->where('key', 'outbound_mail.smtp_host')
+                ->value('value');
+            if (trim($host) === '') {
+                return response()->json([
+                    'message' => __('stack.mail_test_smtp_host_required'),
+                ], 422);
+            }
+        }
 
         $to = $request->input('to') ?: $request->user()->email;
 

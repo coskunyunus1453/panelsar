@@ -4,7 +4,7 @@ Yerel geliştirme doğrulamaları için bkz. [LOCAL_DEVELOPMENT.md](./LOCAL_DEVE
 
 Bu belge, **panel (Laravel)** + **engine (Go)** + **ön yüz (Vite)** ile paylaşımlı barındırmaya yakın bir kurulum için minimum gereksinimleri özetler. Plesk/cPanel ile **özellik eşliği** hedefi uzun vadelidir; motor tarafında gerçek servisler (Postfix, BIND, gerçek yedek depolama vb.) ayrıca işletim sistemi entegrasyonu gerektirir.
 
-Yönetici arayüzünde **Sunucu & kurulum** (`/admin/server-setup`) sayfası; engine sağlığı, MySQL/PostgreSQL provizyon bayrakları, WordPress kurulum önkoşulları ve e-posta modunun özeti için salt okunur API kullanır (`GET /api/admin/server/capabilities`). Sistem servisleri için **Sistem** sayfasına geçin.
+Yönetici için engine/servis özeti **Sistem** (`/admin/system`) sayfasındadır.
 
 ## Altyapı otomasyonu ve “veriyi ne zaman çekiyorum?”
 
