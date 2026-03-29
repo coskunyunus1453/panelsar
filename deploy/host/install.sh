@@ -89,5 +89,7 @@ if [[ ! -f deploy/bootstrap/install-production.sh ]]; then
   exit 1
 fi
 
+# Panel/engine özellik güncellemeleri için bu dosyayı değiştirmeniz gerekmez: aynı komut repo’yu çeker;
+# install-production.sh PHP, ön yüz, Go engine derlemesi ve systemd yeniden başlatmayı yapar.
 echo "==> Kurulum (install-production.sh) başlıyor..."
 exec bash deploy/bootstrap/install-production.sh

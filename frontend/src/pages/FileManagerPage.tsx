@@ -51,6 +51,7 @@ function isSafeNewFileName(name: string): boolean {
   if (!t || t.length > 200) return false
   if (t.includes('/') || t.includes('\\')) return false
   if (t === '.' || t === '..') return false
+  if (EDIT_NAME.test(t)) return true
   return /^[\w.\-]+$/.test(t)
 }
 
@@ -102,11 +103,22 @@ export default function FileManagerPage() {
   const [activeTab, setActiveTab] = useState(0)
   const [searchQ, setSearchQ] = useState('')
   const [searchHits, setSearchHits] = useState<{ path: string; line: number; preview: string }[]>([])
+  const [pathJump, setPathJump] = useState('')
 
   const domainsQ = useQuery({
     queryKey: ['domains', 'paginated'],
     queryFn: async () => (await api.get('/domains')).data,
   })
+
+  const domainOptions = useMemo(() => {
+    const raw = domainsQ.data
+    if (!raw) return [] as { id: number; name: string }[]
+    if (Array.isArray(raw)) return raw as { id: number; name: string }[]
+    if (raw && typeof raw === 'object' && Array.isArray((raw as { data?: unknown }).data)) {
+      return (raw as { data: { id: number; name: string }[] }).data
+    }
+    return []
+  }, [domainsQ.data])
 
   useEffect(() => {
     if (!domainParam) return
@@ -134,12 +146,28 @@ export default function FileManagerPage() {
   const filesQ = useQuery({
     queryKey: ['files', domainId, path],
     enabled: domainId !== '',
+    staleTime: 0,
     queryFn: async () =>
       (await api.get(`/domains/${domainId}/files`, { params: { path } })).data as {
         entries: ListEntry[]
         document_root_hint?: string
+        message?: string
       },
   })
+
+  useEffect(() => {
+    setPathJump(path)
+  }, [path])
+
+  const goIntoFolder = useCallback(
+    (folderName: string) => {
+      if (!folderName || filesQ.isFetching) return
+      const next = path ? joinRel(path, folderName) : folderName
+      setPath(next)
+      setSelected(null)
+    },
+    [path, filesQ.isFetching],
+  )
 
   const docHint = filesQ.data?.document_root_hint
 
@@ -203,9 +231,14 @@ export default function FileManagerPage() {
       const target = path ? joinRel(path, name) : name
       await api.post(`/domains/${domainId}/files/mkdir`, { path: target })
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       toast.success(t('files.folder_created'))
-      qc.invalidateQueries({ queryKey: ['files', domainId, path] })
+      await qc.invalidateQueries({ queryKey: ['files', domainId, path] })
+      await qc.refetchQueries({ queryKey: ['files', domainId, path] })
+    },
+    onError: (err: unknown) => {
+      const ax = err as { response?: { data?: { message?: string } } }
+      toast.error(ax.response?.data?.message ?? t('files.mkdir_err'))
     },
   })
 
@@ -218,6 +251,7 @@ export default function FileManagerPage() {
     onSuccess: async (relPath) => {
       toast.success(t('files.file_created'))
       await qc.invalidateQueries({ queryKey: ['files', domainId, path] })
+      await qc.refetchQueries({ queryKey: ['files', domainId, path] })
       const base = relPath.split('/').pop() || relPath
       if (isEditableFile(base)) {
         void openFileWrapped(relPath)
@@ -236,9 +270,10 @@ export default function FileManagerPage() {
       fd.append('path', path)
       await api.post(`/domains/${domainId}/files/upload`, fd)
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       toast.success(t('files.upload_ok'))
-      qc.invalidateQueries({ queryKey: ['files', domainId, path] })
+      await qc.invalidateQueries({ queryKey: ['files', domainId, path] })
+      await qc.refetchQueries({ queryKey: ['files', domainId, path] })
     },
     onError: (err: unknown) => {
       const ax = err as {
@@ -343,6 +378,12 @@ export default function FileManagerPage() {
   const crumbs = splitBreadcrumbs(path)
   const currentTab = tabs[activeTab]
 
+  const listErrDetail = useMemo(() => {
+    if (!filesQ.isError || !filesQ.error) return ''
+    const ax = filesQ.error as { response?: { data?: { message?: string } } }
+    return ax.response?.data?.message ?? ''
+  }, [filesQ.isError, filesQ.error])
+
   const dirtyCount = tabs.filter((x) => !x.loading && x.content !== x.original).length
 
   return (
@@ -369,7 +410,7 @@ export default function FileManagerPage() {
             }}
           >
             <option value="">{t('common.select')}</option>
-            {(domainsQ.data?.data ?? []).map((d: { id: number; name: string }) => (
+            {domainOptions.map((d) => (
               <option key={d.id} value={d.id}>
                 {d.name}
               </option>
@@ -434,6 +475,30 @@ export default function FileManagerPage() {
               </span>
             ))}
           </nav>
+          <form
+            className="mt-3 flex flex-wrap items-end gap-2"
+            onSubmit={(ev) => {
+              ev.preventDefault()
+              const next = pathJump.replace(/\\/g, '/').replace(/^\/+|\/+$/g, '')
+              setPath(next)
+              setSelected(null)
+            }}
+          >
+            <div className="min-w-[200px] flex-1">
+              <label className="label text-xs">{t('files.path_editor')}</label>
+              <input
+                className="input font-mono text-sm"
+                value={pathJump}
+                onChange={(e) => setPathJump(e.target.value)}
+                placeholder="public_html/wp-content"
+                spellCheck={false}
+              />
+            </div>
+            <button type="submit" className="btn-secondary" disabled={filesQ.isFetching}>
+              {t('files.path_go')}
+            </button>
+          </form>
+          <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">{t('files.folder_dblclick_hint')}</p>
         </div>
       )}
 
@@ -512,6 +577,12 @@ export default function FileManagerPage() {
             {isDragActive ? t('files.drop_here') : t('files.drop_zone_hint')}
           </p>
         )}
+        {filesQ.isError && (
+          <p className="border-b border-red-100 bg-red-50 px-4 py-3 text-sm text-red-800 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-200">
+            {t('files.list_error')}
+            {listErrDetail ? ` — ${listErrDetail}` : ''}
+          </p>
+        )}
         <div className="overflow-x-auto">
           <table className="w-full min-w-[640px] text-sm">
             <thead className="bg-gray-50 dark:bg-gray-800/80">
@@ -555,10 +626,14 @@ export default function FileManagerPage() {
                       {e.is_dir ? (
                         <button
                           type="button"
-                          className="inline-flex items-center gap-2 font-mono text-left text-gray-900 hover:text-primary-600 dark:text-gray-100 dark:hover:text-primary-400"
-                          onClick={() => {
-                            setPath(rel)
-                            setSelected(null)
+                          className={clsx(
+                            'inline-flex w-full max-w-md items-center gap-2 rounded-md px-1 py-0.5 text-left font-mono text-gray-900 hover:bg-gray-100 dark:text-gray-100 dark:hover:bg-gray-800',
+                            isSel && 'bg-primary-100 ring-1 ring-primary-300 dark:bg-primary-900/30 dark:ring-primary-700',
+                          )}
+                          onClick={() => setSelected(e.name)}
+                          onDoubleClick={(ev) => {
+                            ev.preventDefault()
+                            goIntoFolder(e.name)
                           }}
                         >
                           <Folder className="h-4 w-4 shrink-0 text-amber-500" />

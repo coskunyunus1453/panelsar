@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
 use Illuminate\Validation\ValidationException;
 
@@ -14,9 +15,15 @@ class ProfileController extends Controller
     public function update(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'name' => 'sometimes|string|max:255',
-            'email' => 'sometimes|email|unique:users,email,'.$request->user()->id,
-            'locale' => 'sometimes|string|max:12',
+            'name' => 'sometimes|required|string|max:255',
+            'email' => [
+                'sometimes',
+                'required',
+                'email',
+                'max:255',
+                Rule::unique('users', 'email')->ignore($request->user()->id),
+            ],
+            'locale' => 'sometimes|nullable|string|max:32',
         ]);
 
         $request->user()->update($validated);

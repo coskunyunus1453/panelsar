@@ -103,17 +103,18 @@ class EngineApiService
             $data['email'] = $email;
         }
 
-        return $this->postChecked('/api/v1/ssl/issue', $data);
+        // certbot + ACME doğrulaması 45 sn’yi aşabilir; kısa timeout yanlış 502/timeout üretir.
+        return $this->postLongChecked('/api/v1/ssl/issue', $data, 900);
     }
 
     public function renewSSL(string $domain): array
     {
-        return $this->postChecked('/api/v1/ssl/renew', ['domain' => $domain]);
+        return $this->postLongChecked('/api/v1/ssl/renew', ['domain' => $domain], 900);
     }
 
     public function revokeSSL(string $domain): array
     {
-        return $this->postChecked('/api/v1/ssl/revoke', ['domain' => $domain]);
+        return $this->postLongChecked('/api/v1/ssl/revoke', ['domain' => $domain], 120);
     }
 
     public function reloadNginx(): array
@@ -121,11 +122,27 @@ class EngineApiService
         return $this->post('/api/v1/nginx/reload');
     }
 
-    public function listFiles(string $domain, string $path = ''): array
+    /**
+     * @return array{entries: list<array<string, mixed>>, error: ?string}
+     */
+    public function listFilesResult(string $domain, string $path = ''): array
     {
         $q = http_build_query(['domain' => $domain, 'path' => $path]);
+        try {
+            $response = $this->client()->get($this->baseUrl.'/api/v1/files?'.$q);
+            $json = $response->json() ?? [];
+            if (! $response->successful()) {
+                $msg = is_string($json['error'] ?? null) ? $json['error'] : ($response->body() ?: 'HTTP '.$response->status());
 
-        return $this->get('/api/v1/files?'.$q)['entries'] ?? [];
+                return ['entries' => [], 'error' => $msg];
+            }
+
+            return ['entries' => $json['entries'] ?? [], 'error' => null];
+        } catch (\Exception $e) {
+            Log::error('Engine API GET /files failed: '.$e->getMessage());
+
+            return ['entries' => [], 'error' => $e->getMessage()];
+        }
     }
 
     /**
@@ -145,14 +162,28 @@ class EngineApiService
 
     public function mkdirFile(string $domain, string $path): array
     {
-        return $this->post('/api/v1/files/mkdir', ['domain' => $domain, 'path' => $path]);
+        return $this->postEngineJsonChecked('/api/v1/files/mkdir', ['domain' => $domain, 'path' => $path]);
     }
 
     public function deleteFile(string $domain, string $path): array
     {
         $q = http_build_query(['domain' => $domain, 'path' => $path]);
 
-        return $this->delete('/api/v1/files?'.$q);
+        try {
+            $response = $this->client()->delete($this->baseUrl.'/api/v1/files?'.$q);
+            $json = $response->json() ?? [];
+            if (! $response->successful()) {
+                $msg = is_string($json['error'] ?? null) ? $json['error'] : ($response->body() ?: 'HTTP '.$response->status());
+
+                return ['error' => $msg];
+            }
+
+            return $json;
+        } catch (\Exception $e) {
+            Log::error('Engine API DELETE /files failed: '.$e->getMessage());
+
+            return ['error' => $e->getMessage()];
+        }
     }
 
     public function readFile(string $domain, string $path): string
@@ -165,7 +196,7 @@ class EngineApiService
 
     public function writeFile(string $domain, string $path, string $content): array
     {
-        return $this->post('/api/v1/files/write', [
+        return $this->postEngineJsonChecked('/api/v1/files/write', [
             'domain' => $domain,
             'path' => $path,
             'content' => $content,
@@ -409,6 +440,29 @@ class EngineApiService
             Log::error("Engine API GET {$path} failed: {$e->getMessage()}");
 
             return [];
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    private function postEngineJsonChecked(string $path, array $data): array
+    {
+        try {
+            $response = $this->client()->post($this->baseUrl.$path, $data);
+            $json = $response->json() ?? [];
+            if (! $response->successful()) {
+                $msg = is_string($json['error'] ?? null) ? $json['error'] : ($response->body() ?: 'HTTP '.$response->status());
+
+                return ['error' => $msg];
+            }
+
+            return $json;
+        } catch (\Exception $e) {
+            Log::error("Engine API POST {$path} failed: {$e->getMessage()}");
+
+            return ['error' => $e->getMessage()];
         }
     }
 

@@ -44,7 +44,7 @@ class SiteToolsController extends Controller
                 'message' => $engine['error'],
                 'output' => $engine['output'] ?? '',
                 'engine' => $engine,
-            ], 502);
+            ], 503);
         }
 
         return response()->json([

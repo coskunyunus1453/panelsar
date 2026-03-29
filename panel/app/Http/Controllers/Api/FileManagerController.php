@@ -24,8 +24,17 @@ class FileManagerController extends Controller
         }
         $path = (string) $request->query('path', '');
 
+        $list = $this->engine->listFilesResult($domain->name, $path);
+        if ($list['error'] !== null) {
+            return response()->json([
+                'message' => $list['error'],
+                'entries' => [],
+                'document_root_hint' => $domain->document_root,
+            ], 503);
+        }
+
         return response()->json([
-            'entries' => $this->engine->listFiles($domain->name, $path),
+            'entries' => $list['entries'],
             'document_root_hint' => $domain->document_root,
         ]);
     }
@@ -56,7 +65,12 @@ class FileManagerController extends Controller
         }
         $validated = $request->validate(['path' => 'required|string']);
 
-        return response()->json($this->engine->mkdirFile($domain->name, $validated['path']));
+        $result = $this->engine->mkdirFile($domain->name, $validated['path']);
+        if (! empty($result['error'])) {
+            return response()->json(['message' => $result['error']], 422);
+        }
+
+        return response()->json($result);
     }
 
     public function destroy(Request $request, Domain $domain): JsonResponse
@@ -66,7 +80,12 @@ class FileManagerController extends Controller
         }
         $validated = $request->validate(['path' => 'required|string']);
 
-        return response()->json($this->engine->deleteFile($domain->name, $validated['path']));
+        $result = $this->engine->deleteFile($domain->name, $validated['path']);
+        if (! empty($result['error'])) {
+            return response()->json(['message' => $result['error']], 422);
+        }
+
+        return response()->json($result);
     }
 
     public function read(Request $request, Domain $domain): JsonResponse
@@ -91,9 +110,12 @@ class FileManagerController extends Controller
             'content' => 'nullable|string',
         ]);
 
-        return response()->json(
-            $this->engine->writeFile($domain->name, $validated['path'], $validated['content'] ?? '')
-        );
+        $result = $this->engine->writeFile($domain->name, $validated['path'], $validated['content'] ?? '');
+        if (! empty($result['error'])) {
+            return response()->json(['message' => $result['error']], 422);
+        }
+
+        return response()->json($result);
     }
 
     public function upload(Request $request, Domain $domain): JsonResponse

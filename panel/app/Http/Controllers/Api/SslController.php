@@ -43,6 +43,11 @@ class SslController extends Controller
         if ($email === null || $email === '') {
             $email = config('panelsar.lets_encrypt_email') ?: null;
         }
+        if ($email === null || $email === '') {
+            return response()->json([
+                'message' => __('ssl.email_required'),
+            ], 422);
+        }
 
         $cert = SslCertificate::updateOrCreate(
             ['domain_id' => $domain->id],
@@ -62,7 +67,7 @@ class SslController extends Controller
             return response()->json([
                 'message' => $engine['error'],
                 'certificate' => $cert->fresh(),
-            ], 502);
+            ], 503);
         }
 
         $cert->update(['status' => 'active', 'issued_at' => now(), 'expires_at' => now()->addDays(90)]);
@@ -96,7 +101,7 @@ class SslController extends Controller
             return response()->json([
                 'message' => $engine['error'],
                 'certificate' => $cert->fresh(),
-            ], 502);
+            ], 503);
         }
 
         return response()->json([
@@ -113,7 +118,7 @@ class SslController extends Controller
         }
         $engine = $this->engine->revokeSSL($domain->name);
         if (! empty($engine['error'])) {
-            return response()->json(['message' => $engine['error']], 502);
+            return response()->json(['message' => $engine['error']], 503);
         }
 
         $domain->sslCertificate?->delete();

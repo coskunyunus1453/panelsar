@@ -8,6 +8,7 @@ use App\Services\DatabaseService;
 use App\Services\HostingQuotaService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use PDOException;
 
 class DatabaseController extends Controller
 {
@@ -44,6 +45,16 @@ class DatabaseController extends Controller
             );
         } catch (\InvalidArgumentException $e) {
             return response()->json(['message' => $e->getMessage()], 422);
+        } catch (\PDOException $e) {
+            report($e);
+
+            return response()->json([
+                'message' => __('databases.provision_failed').': '.$e->getMessage(),
+            ], 503);
+        } catch (\Throwable $e) {
+            report($e);
+
+            return response()->json(['message' => $e->getMessage() ?: __('databases.provision_failed')], 500);
         }
 
         return response()->json([

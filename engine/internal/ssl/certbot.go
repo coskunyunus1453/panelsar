@@ -58,6 +58,7 @@ func Issue(cfg *config.Config, domain, webroot, email string) error {
 	}
 	args := []string{
 		"certonly", "--webroot", "-w", webroot,
+		"--preferred-challenges", "http",
 		"-d", domain, "-d", "www." + domain,
 		"--email", email,
 		"--agree-tos", "-n", "--non-interactive",
