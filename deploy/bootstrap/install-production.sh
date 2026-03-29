@@ -79,6 +79,7 @@ if [[ "${SKIP_APT:-}" != "1" ]]; then
     nginx \
     curl \
     ca-certificates \
+    sudo \
     git \
     rsync \
     unzip \
@@ -168,6 +169,16 @@ if [[ -x /usr/local/bin/panelsar-engine ]]; then
   systemctl enable panelsar-engine
   systemctl restart panelsar-engine || true
 fi
+
+# Engine www-data iken nginx sites-enabled'a yazamaz; sudo ile tek izinli betik
+if [[ -f "$REPO_ROOT/deploy/host/panelsar-nginx-vhost" ]]; then
+  install -m 755 "$REPO_ROOT/deploy/host/panelsar-nginx-vhost" /usr/local/sbin/panelsar-nginx-vhost
+fi
+cat > /etc/sudoers.d/panelsar-engine <<'SUDOERS'
+www-data ALL=(root) NOPASSWD: /usr/local/sbin/panelsar-nginx-vhost
+SUDOERS
+chmod 440 /etc/sudoers.d/panelsar-engine
+visudo -cf /etc/sudoers.d/panelsar-engine
 
 # Panel .env
 PANEL_ROOT="$REPO_ROOT/panel"
@@ -345,17 +356,30 @@ echo "  Panel kökü:     $PANELSAR_HOME"
 echo "  Engine API:     http://127.0.0.1:9090 (yalnızca sunucu içi — dışarıya açmayın)"
 echo "  ENGINE_INTERNAL_KEY panel .env ile eşleşiyor."
 echo "  Nginx site:     $NGX_DST"
-if [[ "${SKIP_DB_SEED:-}" != "1" ]]; then
-  if [[ -f /root/panelsar-admin-login.txt ]]; then
-    echo ""
-    echo "  İlk admin girişi (aynısı /root/panelsar-admin-login.txt dosyasında):"
-    sed 's/^/    /' /root/panelsar-admin-login.txt
-  else
-    echo ""
-    echo "  Veritabanında kullanıcı zaten vardı; yeni şifre dosyası yazılmadı. Giriş bilgisi bilinen admin ile veya şifre sıfırlama ile."
-  fi
-fi
 echo ""
+if [[ "${SKIP_DB_SEED:-}" != "1" ]]; then
+  echo "################################################################"
+  echo "#  PANEL GİRİŞİ — Tarayıcıda panele böyle girin"
+  echo "################################################################"
+  if [[ -n "${ADMIN_PASSWORD:-}" ]] && [[ "${WRITE_LOGIN:-0}" == "1" ]]; then
+    echo "#  Adres:      ${PANEL_URL_HINT}"
+    echo "#  E-posta:    ${ADMIN_EMAIL}"
+    echo "#  Şifre:      ${ADMIN_PASSWORD}"
+    echo "################################################################"
+    echo "#  (Kopya: /root/panelsar-admin-login.txt)"
+  elif [[ -f /root/panelsar-admin-login.txt ]]; then
+    echo "#  (Önceki kurulumdan kayıtlı giriş bilgisi:)"
+    while IFS= read -r line || [[ -n "$line" ]]; do
+      echo "#  $line"
+    done < /root/panelsar-admin-login.txt
+    echo "################################################################"
+  else
+    echo "#  Bu çalıştırmada yeni şifre üretilmedi (kullanıcılar zaten vardı)."
+    echo "#  Bilinen admin ile girin veya şifre sıfırlayın."
+    echo "################################################################"
+  fi
+  echo ""
+fi
 echo "Sonraki adımlar:"
 echo "  1) DNS ile alan adını bu sunucuya yönlendirin; SSL: certbot --nginx -d ornek.com"
 echo "  2) APP_URL değerini .env içinde gerçek URL ile güncelleyin: nano $ENV_FILE"

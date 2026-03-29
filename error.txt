@@ -1,13 +1,13 @@
 root@vmi2616585:~# curl -fsSL "https://raw.githubusercontent.com/coskunyunus1453/panelsar/main/deploy/host/install.sh" | bash
 ==> Güncelleniyor: /var/www/panelsar
-remote: Enumerating objects: 11, done.
-remote: Counting objects: 100% (11/11), done.
-remote: Compressing objects: 100% (2/2), done.
-remote: Total 6 (delta 4), reused 6 (delta 4), pack-reused 0 (from 0)
-Unpacking objects: 100% (6/6), 5.06 KiB | 1.69 MiB/s, done.
+remote: Enumerating objects: 21, done.
+remote: Counting objects: 100% (21/21), done.
+remote: Compressing objects: 100% (1/1), done.
+remote: Total 11 (delta 8), reused 11 (delta 8), pack-reused 0 (from 0)
+Unpacking objects: 100% (11/11), 2.48 KiB | 362.00 KiB/s, done.
 From https://github.com/coskunyunus1453/panelsar
  * branch            main       -> FETCH_HEAD
- + 4701484...cdc00b1 main       -> origin/main  (forced update)
+ + a27b19b...5747c37 main       -> origin/main  (forced update)
 M	panel/bootstrap/cache/.gitignore
 D	panel/public/favicon.ico
 D	panel/public/robots.txt
@@ -24,20 +24,20 @@ Already on 'main'
 Your branch and 'origin/main' have diverged,
 and have 1 and 1 different commits each, respectively.
   (use "git pull" to merge the remote branch into yours)
-HEAD is now at cdc00b1 Kurulum: panel www-data, composer vendor
+HEAD is now at 5747c37 Kısa açıklama
 Removing panel/public/assets/
 Removing panel/public/index.html
 ==> Kurulum (install-production.sh) başlıyor...
 Synchronizing state of php8.4-fpm.service with SysV service script with /lib/systemd/systemd-sysv-install.
 Executing: /lib/systemd/systemd-sysv-install enable php8.4-fpm
 ==> PHP hazır: PHP 8.4.18 (cli) (built: Feb 13 2026 15:59:43) (NTS)
-2026-03-29 16:57:12 - Installing pre-requisites
-Hit:1 http://security.ubuntu.com/ubuntu jammy-security InRelease
-Hit:2 http://archive.ubuntu.com/ubuntu jammy InRelease              
-Hit:3 https://deb.nodesource.com/node_20.x nodistro InRelease       
-Hit:4 http://archive.ubuntu.com/ubuntu jammy-updates InRelease      
-Hit:5 http://archive.ubuntu.com/ubuntu jammy-backports InRelease
-Hit:6 https://ppa.launchpadcontent.net/ondrej/php/ubuntu jammy InRelease
+2026-03-29 17:53:18 - Installing pre-requisites
+Hit:1 http://archive.ubuntu.com/ubuntu jammy InRelease
+Hit:2 http://archive.ubuntu.com/ubuntu jammy-updates InRelease                                                         
+Hit:3 https://deb.nodesource.com/node_20.x nodistro InRelease                                                          
+Hit:4 http://archive.ubuntu.com/ubuntu jammy-backports InRelease                                 
+Hit:5 https://ppa.launchpadcontent.net/ondrej/php/ubuntu jammy InRelease                         
+Hit:6 http://security.ubuntu.com/ubuntu jammy-security InRelease
 Reading package lists... Done
 Building dependency tree... Done
 Reading state information... Done
@@ -51,19 +51,19 @@ gnupg is already the newest version (2.2.27-3ubuntu2.5).
 apt-transport-https is already the newest version (2.4.14).
 0 upgraded, 0 newly installed, 0 to remove and 29 not upgraded.
 Hit:1 http://security.ubuntu.com/ubuntu jammy-security InRelease
-Hit:2 http://archive.ubuntu.com/ubuntu jammy InRelease              
-Hit:3 http://archive.ubuntu.com/ubuntu jammy-updates InRelease      
-Hit:4 https://deb.nodesource.com/node_20.x nodistro InRelease       
-Hit:5 http://archive.ubuntu.com/ubuntu jammy-backports InRelease    
+Hit:2 http://archive.ubuntu.com/ubuntu jammy InRelease                                                                 
+Hit:3 https://deb.nodesource.com/node_20.x nodistro InRelease                                                          
+Hit:4 http://archive.ubuntu.com/ubuntu jammy-updates InRelease
+Hit:5 http://archive.ubuntu.com/ubuntu jammy-backports InRelease
 Hit:6 https://ppa.launchpadcontent.net/ondrej/php/ubuntu jammy InRelease
 Reading package lists... Done
 Building dependency tree... Done
 Reading state information... Done
 29 packages can be upgraded. Run 'apt list --upgradable' to see them.
-2026-03-29 16:57:22 - Repository configured successfully.
-2026-03-29 16:57:22 - To install Node.js, run: apt install nodejs -y
-2026-03-29 16:57:22 - You can use N|solid Runtime as a node.js alternative
-2026-03-29 16:57:22 - To install N|solid Runtime, run: apt install nsolid -y 
+2026-03-29 17:53:29 - Repository configured successfully.
+2026-03-29 17:53:29 - To install Node.js, run: apt install nodejs -y
+2026-03-29 17:53:29 - You can use N|solid Runtime as a node.js alternative
+2026-03-29 17:53:29 - To install N|solid Runtime, run: apt install nsolid -y 
 
 Synchronizing state of mariadb.service with SysV service script with /lib/systemd/systemd-sysv-install.
 Executing: /lib/systemd/systemd-sysv-install enable mariadb
@@ -124,46 +124,38 @@ dist/assets/index-CdtgjCfw.js   501.70 kB │ gzip: 141.47 kB
 - Using dynamic import() to code-split the application
 - Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
 - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
-✓ built in 6.69s
+✓ built in 6.84s
 
-   INFO  Preparing database.  
+   INFO  Nothing to migrate.  
 
-  Creating migration table ...................................... 34.78ms DONE
 
-   INFO  Running migrations.  
+   INFO  Seeding database.  
 
-  0001_01_01_000000_create_users_table ......................... 134.70ms DONE
-  0001_01_01_000001_create_cache_table .......................... 30.52ms DONE
-  0001_01_01_000002_create_jobs_table .......................... 113.52ms DONE
-  2026_03_28_214935_create_personal_access_tokens_table ........ 179.03ms DONE
-  2026_03_28_214939_create_permission_tables ................... 480.37ms DONE
-  2026_03_28_214940_create_activity_log_table ................... 68.20ms DONE
-  2026_03_28_214941_add_event_column_to_activity_log_table ...... 16.66ms DONE
-  2026_03_28_214942_add_batch_uuid_column_to_activity_log_table . 20.01ms DONE
-  2026_03_28_215010_create_hosting_packages_table ............... 70.75ms DONE
-  2026_03_28_215020_create_domains_table ........................ 82.83ms DONE
-  2026_03_28_215030_create_databases_table ...................... 87.00ms DONE
-  2026_03_28_215040_create_ssl_certificates_table ............... 33.18ms DONE
-  2026_03_28_215050_create_email_accounts_table ................ 112.77ms DONE
-  2026_03_28_215060_create_remaining_tables .................... 396.69ms DONE
-  2026_03_29_120000_add_engine_backup_id_to_backups_table ....... 20.65ms DONE
-  2026_03_29_120000_add_grant_host_to_databases_table ........... 14.46ms DONE
-  2026_03_29_180000_add_billing_sync_fields ..................... 21.75ms DONE
-  2026_03_29_181001_subscriptions_external_subscription_id ...... 28.41ms DONE
-  2026_03_29_181002_fix_subscriptions_provider_external_index .... 2.02ms FAIL
 
-In Connection.php line 825:
-                                                                               
-  SQLSTATE[42000]: Syntax error or access violation: 1091 Can't DROP INDEX `s  
-  ubscriptions_payment_provider_external_subscription_id_unique`; check that   
-  it exists (Connection: mysql, SQL: alter table `subscriptions` drop index `  
-  subscriptions_payment_provider_external_subscription_id_unique`)             
-                                                                               
+   INFO  Configuration cached successfully.  
 
-In Connection.php line 571:
-                                                                               
-  SQLSTATE[42000]: Syntax error or access violation: 1091 Can't DROP INDEX `s  
-  ubscriptions_payment_provider_external_subscription_id_unique`; check that   
-  it exists                                                                    
-                                                                               
 
+   INFO  Routes cached successfully.  
+
+
+
+   INFO  Blade templates cached successfully.  
+
+nginx: the configuration file /etc/nginx/nginx.conf syntax is ok
+nginx: configuration file /etc/nginx/nginx.conf test is successful
+Synchronizing state of nginx.service with SysV service script with /lib/systemd/systemd-sysv-install.
+Executing: /lib/systemd/systemd-sysv-install enable nginx
+Firewall is active and enabled on system startup
+
+=== Panelsar kurulum özeti ===
+  Panel kökü:     /var/www/panelsar
+  Engine API:     http://127.0.0.1:9090 (yalnızca sunucu içi — dışarıya açmayın)
+  ENGINE_INTERNAL_KEY panel .env ile eşleşiyor.
+  Nginx site:     /etc/nginx/sites-available/panelsar.conf
+
+  Veritabanında kullanıcı zaten vardı; yeni şifre dosyası yazılmadı. Giriş bilgisi bilinen admin ile veya şifre sıfırlama ile.
+
+Sonraki adımlar:
+  1) DNS ile alan adını bu sunucuya yönlendirin; SSL: certbot --nginx -d ornek.com
+  2) APP_URL değerini .env içinde gerçek URL ile güncelleyin: nano /var/www/panelsar/panel/.env
+  3) php artisan panelsar:install-check

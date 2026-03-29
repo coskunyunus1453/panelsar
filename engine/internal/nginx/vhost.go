@@ -135,9 +135,6 @@ func ApplyVhost(cfg *config.Config, domain, docRoot, phpSocket, sslFullchain, ss
 	if err := os.MkdirAll(cfg.Paths.VhostsDir, 0o755); err != nil {
 		return fmt.Errorf("vhosts dir: %w", err)
 	}
-	if err := os.MkdirAll(cfg.Hosting.NginxSitesEnabled, 0o755); err != nil {
-		return fmt.Errorf("sites-enabled dir: %w", err)
-	}
 
 	sock := strings.TrimSpace(phpSocket)
 	if sock == "" {
@@ -174,24 +171,26 @@ func ApplyVhost(cfg *config.Config, domain, docRoot, phpSocket, sslFullchain, ss
 
 	base := confBaseName(domain)
 	avail := filepath.Join(cfg.Paths.VhostsDir, base)
-	enabled := filepath.Join(cfg.Hosting.NginxSitesEnabled, base)
 
 	if err := os.WriteFile(avail, buf.Bytes(), 0o644); err != nil {
 		return fmt.Errorf("write vhost: %w", err)
 	}
 
-	_ = os.Remove(enabled)
-	if err := os.Symlink(avail, enabled); err != nil {
-		return fmt.Errorf("symlink sites-enabled: %w", err)
+	// www-data /etc/nginx/sites-enabled altına yazamaz; sudo + deploy/host/panelsar-nginx-vhost
+	if err := runNginxVhostHelper("enable", avail); err != nil {
+		return err
 	}
 
-	if cfg.Hosting.NginxReloadAfterVhost {
-		if out, err := exec.Command("nginx", "-t").CombinedOutput(); err != nil {
-			return fmt.Errorf("nginx -t: %w: %s", err, strings.TrimSpace(string(out)))
-		}
-		_ = exec.Command("nginx", "-s", "reload").Run()
-	}
+	return nil
+}
 
+const nginxVhostHelper = "/usr/local/sbin/panelsar-nginx-vhost"
+
+func runNginxVhostHelper(action, arg string) error {
+	out, err := exec.Command("sudo", nginxVhostHelper, action, arg).CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("nginx vhost helper %s: %w: %s", action, err, strings.TrimSpace(string(out)))
+	}
 	return nil
 }
 
@@ -204,15 +203,11 @@ func RemoveVhost(cfg *config.Config, domain string) error {
 		return fmt.Errorf("invalid domain")
 	}
 	base := confBaseName(domain)
-	enabled := filepath.Join(cfg.Hosting.NginxSitesEnabled, base)
 	avail := filepath.Join(cfg.Paths.VhostsDir, base)
 
-	_ = os.Remove(enabled)
-	_ = os.Remove(avail)
-
-	if cfg.Hosting.NginxReloadAfterVhost {
-		_ = exec.Command("nginx", "-t").Run()
-		_ = exec.Command("nginx", "-s", "reload").Run()
+	if err := runNginxVhostHelper("disable", base); err != nil {
+		return err
 	}
+	_ = os.Remove(avail)
 	return nil
 }
