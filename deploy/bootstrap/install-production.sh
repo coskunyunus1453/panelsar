@@ -29,6 +29,8 @@ WITH_NODE_REPO="${WITH_NODE_REPO:-1}"
 [[ "$(id -u)" -eq 0 ]] || { echo "Root ile çalıştırın: sudo bash $0" >&2; exit 1; }
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=ensure-go-toolchain.sh
+source "$SCRIPT_DIR/ensure-go-toolchain.sh"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 PANELSAR_HOME="${PANELSAR_HOME:-/var/www/panelsar}"
 SERVER_NAME="${SERVER_NAME:-_}"
