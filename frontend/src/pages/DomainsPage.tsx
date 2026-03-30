@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
@@ -33,12 +33,18 @@ type Busy = {
   status?: boolean
 }
 
+type SslProgress = {
+  pct: number
+}
+
 export default function DomainsPage() {
   const { t } = useTranslation()
   const qc = useQueryClient()
   const [search, setSearch] = useState('')
   const [showAdd, setShowAdd] = useState(false)
   const [busy, setBusy] = useState<Record<number, Busy>>({})
+  const [sslProgress, setSslProgress] = useState<Record<number, SslProgress>>({})
+  const sslTimers = useRef<Record<number, number>>({})
 
   const domainsQ = useQuery({
     queryKey: ['domains', 'paginated'],
@@ -51,6 +57,42 @@ export default function DomainsPage() {
       [domainId]: { ...(prev[domainId] ?? {}), [key]: value },
     }))
   }
+
+  const startSslProgress = (domainId: number) => {
+    setSslProgress((prev) => ({ ...prev, [domainId]: { pct: 8 } }))
+    if (sslTimers.current[domainId]) {
+      window.clearInterval(sslTimers.current[domainId])
+    }
+    sslTimers.current[domainId] = window.setInterval(() => {
+      setSslProgress((prev) => {
+        const cur = prev[domainId]?.pct ?? 8
+        const next = Math.min(92, cur + Math.max(1, Math.round((100 - cur) / 18)))
+        return { ...prev, [domainId]: { pct: next } }
+      })
+    }, 700)
+  }
+
+  const finishSslProgress = (domainId: number, ok: boolean) => {
+    if (sslTimers.current[domainId]) {
+      window.clearInterval(sslTimers.current[domainId])
+      delete sslTimers.current[domainId]
+    }
+    setSslProgress((prev) => ({ ...prev, [domainId]: { pct: ok ? 100 : 0 } }))
+    window.setTimeout(() => {
+      setSslProgress((prev) => {
+        const next = { ...prev }
+        delete next[domainId]
+        return next
+      })
+    }, ok ? 1200 : 500)
+  }
+
+  useEffect(() => {
+    return () => {
+      Object.values(sslTimers.current).forEach((id) => window.clearInterval(id))
+      sslTimers.current = {}
+    }
+  }, [])
 
   const createM = useMutation({
     mutationFn: async (payload: { name: string; php_version: string; server_type: string }) => {
@@ -117,16 +159,21 @@ export default function DomainsPage() {
 
   const sslIssueM = useMutation({
     mutationFn: async (vars: { id: number }) => api.post(`/domains/${vars.id}/ssl/issue`, {}),
-    onMutate: (vars) => setBusyFlag(vars.id, 'ssl', true),
+    onMutate: (vars) => {
+      setBusyFlag(vars.id, 'ssl', true)
+      startSslProgress(vars.id)
+    },
     onSuccess: (_, vars) => {
       toast.success(t('ssl.issued'))
       qc.invalidateQueries({ queryKey: ['domains'] })
       setBusyFlag(vars.id, 'ssl', false)
+      finishSslProgress(vars.id, true)
     },
     onError: (err: unknown, vars) => {
       const ax = err as { response?: { data?: { message?: string } } }
       toast.error(ax.response?.data?.message ?? String(err))
       setBusyFlag(vars.id, 'ssl', false)
+      finishSslProgress(vars.id, false)
     },
   })
 
@@ -320,28 +367,39 @@ export default function DomainsPage() {
                             <span className="text-sm">{t('domains.ssl_active')}</span>
                           </div>
                         ) : (
-                          <div className="flex items-center gap-2">
-                            <div className="flex items-center gap-1.5 text-gray-400">
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-1.5 text-gray-400">
                               <Shield className="h-4 w-4" />
                               <span className="text-sm">{t('domains.ssl_none')}</span>
+                              </div>
+                              <button
+                                type="button"
+                                className="btn-secondary px-2.5 py-1.5 text-xs disabled:opacity-70"
+                                disabled={!!b.ssl}
+                                onClick={() => {
+                                  if (!window.confirm(t('domains.confirm_ssl_issue'))) {
+                                    return
+                                  }
+                                  sslIssueM.mutate({ id: domain.id })
+                                }}
+                              >
+                                {b.ssl ? <Loader2 className="h-4 w-4 animate-spin" /> : t('domains.ssl_add_letsencrypt')}
+                              </button>
                             </div>
-                            <button
-                              type="button"
-                              className="btn-secondary px-2.5 py-1.5 text-xs disabled:opacity-70"
-                              disabled={!!b.ssl}
-                              onClick={() => {
-                                if (
-                                  !window.confirm(
-                                    t('domains.confirm_ssl_issue'),
-                                  )
-                                ) {
-                                  return
-                                }
-                                sslIssueM.mutate({ id: domain.id })
-                              }}
-                            >
-                              {b.ssl ? <Loader2 className="h-4 w-4 animate-spin" /> : t('domains.ssl_add_letsencrypt')}
-                            </button>
+                            {b.ssl && (
+                              <div className="w-52 max-w-full">
+                                <div className="h-1.5 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden">
+                                  <div
+                                    className="h-1.5 rounded-full bg-primary-500 transition-all duration-700"
+                                    style={{ width: `${sslProgress[domain.id]?.pct ?? 8}%` }}
+                                  />
+                                </div>
+                                <p className="mt-1 text-[11px] text-gray-500 dark:text-gray-400">
+                                  {t('domains.ssl_loading_hint')}
+                                </p>
+                              </div>
+                            )}
                           </div>
                         )}
                       </td>

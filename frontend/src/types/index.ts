@@ -5,6 +5,8 @@ export interface User {
   locale: string
   status: 'active' | 'suspended' | 'pending' | 'disabled'
   roles: Role[]
+  /** Sanctum yetenekleri; '*' tam yetki. */
+  abilities?: string[]
   hosting_package?: HostingPackage
   /** Admin panelden paket atanırsa true; otomatik fatura senkronu bu kullanıcıda paketi güncellemez. */
   hosting_package_manual_override?: boolean
@@ -14,6 +16,11 @@ export interface User {
 export interface Role {
   id: number
   name: string
+  display_name?: string | null
+  assignable_by_reseller?: boolean
+  is_system?: boolean
+  owner_user_id?: number | null
+  permissions?: { id: number; name: string }[]
 }
 
 export interface Domain {

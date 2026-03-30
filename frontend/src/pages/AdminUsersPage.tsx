@@ -30,6 +30,12 @@ export default function AdminUsersPage() {
     enabled: !!isAdmin,
   })
 
+  const rolesQ = useQuery({
+    queryKey: ['admin-roles-options'],
+    queryFn: async () => (await api.get<{ id: number; name: string; display_name?: string | null }[]>('/admin/roles')).data,
+    enabled: !!isAdmin,
+  })
+
   const createM = useMutation({
     mutationFn: async (payload: Record<string, unknown>) => api.post('/admin/users', payload),
     onSuccess: () => {
@@ -123,10 +129,12 @@ export default function AdminUsersPage() {
                 required
                 placeholder="Şifre tekrar"
               />
-              <select name="role" className="input w-full" defaultValue="user">
-                <option value="user">user</option>
-                <option value="reseller">reseller</option>
-                <option value="admin">admin</option>
+              <select name="role" className="input w-full" defaultValue="user" required>
+                {(rolesQ.data ?? []).map((r) => (
+                  <option key={r.id} value={r.name}>
+                    {r.display_name ?? r.name}
+                  </option>
+                ))}
               </select>
               <select name="locale" className="input w-full" defaultValue="tr">
                 <option value="tr">tr</option>

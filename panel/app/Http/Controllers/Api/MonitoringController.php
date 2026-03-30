@@ -27,10 +27,6 @@ class MonitoringController extends Controller
 
     public function server(Request $request): JsonResponse
     {
-        if (! $request->user()->isAdmin()) {
-            abort(403);
-        }
-
         return response()->json([
             'stats' => $this->engine->getSystemStats(),
             'services' => $this->engine->getServices(),

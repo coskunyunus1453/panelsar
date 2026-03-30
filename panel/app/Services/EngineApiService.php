@@ -162,6 +162,73 @@ class EngineApiService
     }
 
     /**
+     * @return array{
+     *  nginx_manage_vhosts: bool,
+     *  nginx_reload_after_vhost: bool,
+     *  apache_manage_vhosts: bool,
+     *  apache_reload_after_vhost: bool,
+     *  php_fpm_manage_pools: bool,
+     *  php_fpm_reload_after_pool: bool,
+     *  php_fpm_socket: string,
+     *  php_fpm_listen_dir: string,
+     *  php_fpm_pool_dir_template: string,
+     *  php_fpm_pool_user: string,
+     *  php_fpm_pool_group: string
+     * }
+     */
+    public function getWebServerSettings(): array
+    {
+        return $this->get('/api/v1/webserver/settings')['settings'] ?? [];
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     * @return array{message?: string, settings?: array<string, mixed>, reload?: array<string, mixed>}
+     */
+    public function updateWebServerSettings(array $payload): array
+    {
+        return $this->patchJson('/api/v1/webserver/settings', $payload);
+    }
+
+    public function rebootSystem(): array
+    {
+        return $this->post('/api/v1/system/reboot');
+    }
+
+    public function getPhpVersions(): array
+    {
+        return $this->get('/api/v1/php/versions')['versions'] ?? [];
+    }
+
+    public function getPhpIni(string $version): array
+    {
+        return $this->get('/api/v1/php/'.rawurlencode($version).'/ini');
+    }
+
+    /**
+     * @param  array{ini: string, reload?: bool}  $payload
+     * @return array<string, mixed>
+     */
+    public function updatePhpIni(string $version, array $payload): array
+    {
+        return $this->patchJson('/api/v1/php/'.rawurlencode($version).'/ini', $payload);
+    }
+
+    public function getPhpModules(string $version): array
+    {
+        return $this->get('/api/v1/php/'.rawurlencode($version).'/modules');
+    }
+
+    /**
+     * @param  array{modules: array<int, array{directive: string, name: string, enabled: bool}>, reload?: bool}  $payload
+     * @return array<string, mixed>
+     */
+    public function updatePhpModules(string $version, array $payload): array
+    {
+        return $this->patchJson('/api/v1/php/'.rawurlencode($version).'/modules', $payload);
+    }
+
+    /**
      * @return array{entries: list<array<string, mixed>>, total: int, offset: int, limit: int, error: ?string}
      */
     /**

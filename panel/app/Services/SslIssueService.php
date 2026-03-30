@@ -53,6 +53,19 @@ class SslIssueService
             ]
         );
 
+        // Eski vhost şablonları ACME yolunu engelliyor olabilir; issue öncesi conf'u tekrar uygula.
+        $activate = $this->engine->activateSite($domain->name);
+        if (! empty($activate['error'])) {
+            $cert->update(['status' => 'failed']);
+            return [
+                'ok' => false,
+                'http_status' => 503,
+                'message' => (string) $activate['error'],
+                'certificate' => $cert->fresh(),
+                'engine' => $activate,
+            ];
+        }
+
         $engine = $this->engine->issueSSL($domain->name, is_string($email) ? $email : null);
         if (! empty($engine['error'])) {
             $cert->update(['status' => 'failed']);

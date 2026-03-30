@@ -3,10 +3,10 @@
 namespace Database\Seeders;
 
 use App\Models\HostingPackage;
+use App\Models\Role;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
-use Spatie\Permission\Models\Role;
 
 class DatabaseSeeder extends Seeder
 {
@@ -14,9 +14,12 @@ class DatabaseSeeder extends Seeder
     {
         foreach (['admin', 'reseller', 'user'] as $roleName) {
             Role::firstOrCreate(
-                ['name' => $roleName, 'guard_name' => 'web']
+                ['name' => $roleName, 'guard_name' => 'web'],
+                ['is_system' => true]
             );
         }
+
+        $this->call(PanelRolesAndPermissionsSeeder::class);
 
         $starter = HostingPackage::firstOrCreate(
             ['slug' => 'starter'],

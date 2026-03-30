@@ -8,6 +8,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -18,12 +20,15 @@ import (
 	"github.com/panelsar/engine/internal/installer"
 	"github.com/panelsar/engine/internal/monitoring"
 	"github.com/panelsar/engine/internal/panelmirror"
+	"github.com/panelsar/engine/internal/phpfpm"
 	"github.com/panelsar/engine/internal/stack"
 	"github.com/panelsar/engine/internal/tools"
 	"github.com/sirupsen/logrus"
 )
 
 func registerModuleRoutes(cfg *config.Config, d *daemon.Daemon, api *gin.RouterGroup, log *logrus.Logger) {
+	phpVerRe := regexp.MustCompile(`^[0-9]+\.[0-9]+$`)
+
 	api.GET("/system/stats", func(c *gin.Context) {
 		ext := monitoring.CollectExtended(cfg.Paths.WebRoot)
 		c.JSON(http.StatusOK, gin.H{
@@ -313,8 +318,389 @@ func registerModuleRoutes(cfg *config.Config, d *daemon.Daemon, api *gin.RouterG
 		c.JSON(http.StatusOK, gin.H{"ok": ok, "nginx_test": strings.TrimSpace(string(out))})
 	})
 
+	api.GET("/webserver/settings", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{
+			"settings": gin.H{
+				"nginx_manage_vhosts": cfg.Hosting.NginxManageVhosts,
+				"nginx_reload_after_vhost": cfg.Hosting.NginxReloadAfterVhost,
+				"apache_manage_vhosts": cfg.Hosting.ApacheManageVhosts,
+				"apache_reload_after_vhost": cfg.Hosting.ApacheReloadAfterVhost,
+				"php_fpm_manage_pools": cfg.Hosting.PHPFPMmanagePools,
+				"php_fpm_reload_after_pool": cfg.Hosting.PHPFPMreloadAfterPool,
+				"php_fpm_socket": cfg.Hosting.PHPFPMsocket,
+				"php_fpm_listen_dir": cfg.Hosting.PHPFPMlistenDir,
+				"php_fpm_pool_dir_template": cfg.Hosting.PHPFPMpoolDirTemplate,
+				"php_fpm_pool_user": cfg.Hosting.PHPFPMpoolUser,
+				"php_fpm_pool_group": cfg.Hosting.PHPFPMpoolGroup,
+			},
+		})
+	})
+
+	api.PATCH("/webserver/settings", func(c *gin.Context) {
+		var req struct {
+			NginxManageVhosts         *bool  `json:"nginx_manage_vhosts"`
+			NginxReloadAfterVhost     *bool  `json:"nginx_reload_after_vhost"`
+			ApacheManageVhosts        *bool  `json:"apache_manage_vhosts"`
+			ApacheReloadAfterVhost    *bool  `json:"apache_reload_after_vhost"`
+			PhpFpmManagePools         *bool  `json:"php_fpm_manage_pools"`
+			PhpFpmReloadAfterPool     *bool  `json:"php_fpm_reload_after_pool"`
+			PhpFpmSocket              *string `json:"php_fpm_socket"`
+			PhpFpmListenDir           *string `json:"php_fpm_listen_dir"`
+			PhpFpmPoolDirTemplate     *string `json:"php_fpm_pool_dir_template"`
+			PhpFpmPoolUser            *string `json:"php_fpm_pool_user"`
+			PhpFpmPoolGroup          *string `json:"php_fpm_pool_group"`
+			Reload                    *bool  `json:"reload"`
+		}
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		reload := true
+		if req.Reload != nil {
+			reload = *req.Reload
+		}
+
+		oldNginxManage := cfg.Hosting.NginxManageVhosts
+		oldNginxReload := cfg.Hosting.NginxReloadAfterVhost
+		oldApacheManage := cfg.Hosting.ApacheManageVhosts
+		oldApacheReload := cfg.Hosting.ApacheReloadAfterVhost
+		oldPhpManage := cfg.Hosting.PHPFPMmanagePools
+		oldPhpReload := cfg.Hosting.PHPFPMreloadAfterPool
+
+		if req.NginxManageVhosts != nil {
+			cfg.Hosting.NginxManageVhosts = *req.NginxManageVhosts
+		}
+		if req.NginxReloadAfterVhost != nil {
+			cfg.Hosting.NginxReloadAfterVhost = *req.NginxReloadAfterVhost
+		}
+		if req.ApacheManageVhosts != nil {
+			cfg.Hosting.ApacheManageVhosts = *req.ApacheManageVhosts
+		}
+		if req.ApacheReloadAfterVhost != nil {
+			cfg.Hosting.ApacheReloadAfterVhost = *req.ApacheReloadAfterVhost
+		}
+		if req.PhpFpmManagePools != nil {
+			cfg.Hosting.PHPFPMmanagePools = *req.PhpFpmManagePools
+		}
+		if req.PhpFpmReloadAfterPool != nil {
+			cfg.Hosting.PHPFPMreloadAfterPool = *req.PhpFpmReloadAfterPool
+		}
+		if req.PhpFpmSocket != nil {
+			cfg.Hosting.PHPFPMsocket = strings.TrimSpace(*req.PhpFpmSocket)
+		}
+		if req.PhpFpmListenDir != nil {
+			cfg.Hosting.PHPFPMlistenDir = strings.TrimSpace(*req.PhpFpmListenDir)
+		}
+		if req.PhpFpmPoolDirTemplate != nil {
+			cfg.Hosting.PHPFPMpoolDirTemplate = strings.TrimSpace(*req.PhpFpmPoolDirTemplate)
+		}
+		if req.PhpFpmPoolUser != nil {
+			cfg.Hosting.PHPFPMpoolUser = strings.TrimSpace(*req.PhpFpmPoolUser)
+		}
+		if req.PhpFpmPoolGroup != nil {
+			cfg.Hosting.PHPFPMpoolGroup = strings.TrimSpace(*req.PhpFpmPoolGroup)
+		}
+
+		nginxChanged := oldNginxManage != cfg.Hosting.NginxManageVhosts || oldNginxReload != cfg.Hosting.NginxReloadAfterVhost
+		apacheChanged := oldApacheManage != cfg.Hosting.ApacheManageVhosts || oldApacheReload != cfg.Hosting.ApacheReloadAfterVhost
+		phpChanged := oldPhpManage != cfg.Hosting.PHPFPMmanagePools || oldPhpReload != cfg.Hosting.PHPFPMreloadAfterPool
+
+		reloadResult := gin.H{}
+		if reload && nginxChanged {
+			out, err := exec.Command("nginx", "-t").CombinedOutput()
+			ok := err == nil
+			if ok {
+				_ = exec.Command("systemctl", "reload", "nginx").Run()
+			}
+			reloadResult["nginx"] = gin.H{"ok": ok, "nginx_test": strings.TrimSpace(string(out))}
+		}
+
+		if reload && apacheChanged {
+			ok := false
+			if _, err := exec.LookPath("apache2ctl"); err == nil {
+				ok = exec.Command("apache2ctl", "graceful").Run() == nil
+			} else {
+				ok = exec.Command("apachectl", "graceful").Run() == nil
+			}
+			reloadResult["apache"] = gin.H{"ok": ok}
+		}
+
+		if reload && phpChanged {
+			// Bu panel şu an standart PHP sürümü için pool tasarlıyor (8.2). Gerekirse genişletilir.
+			phpErr := phpfpm.Reload("8.2")
+			reloadResult["php_fpm"] = gin.H{"ok": phpErr == nil}
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"message": "webserver settings updated",
+			"settings": gin.H{
+				"nginx_manage_vhosts": cfg.Hosting.NginxManageVhosts,
+				"nginx_reload_after_vhost": cfg.Hosting.NginxReloadAfterVhost,
+				"apache_manage_vhosts": cfg.Hosting.ApacheManageVhosts,
+				"apache_reload_after_vhost": cfg.Hosting.ApacheReloadAfterVhost,
+				"php_fpm_manage_pools": cfg.Hosting.PHPFPMmanagePools,
+				"php_fpm_reload_after_pool": cfg.Hosting.PHPFPMreloadAfterPool,
+				"php_fpm_socket": cfg.Hosting.PHPFPMsocket,
+				"php_fpm_listen_dir": cfg.Hosting.PHPFPMlistenDir,
+				"php_fpm_pool_dir_template": cfg.Hosting.PHPFPMpoolDirTemplate,
+				"php_fpm_pool_user": cfg.Hosting.PHPFPMpoolUser,
+				"php_fpm_pool_group": cfg.Hosting.PHPFPMpoolGroup,
+			},
+			"reload": reloadResult,
+		})
+	})
+
+	api.GET("/php/versions", func(c *gin.Context) {
+		entries, err := os.ReadDir("/etc/php")
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		var versions []string
+		for _, e := range entries {
+			if !e.IsDir() {
+				continue
+			}
+			name := e.Name()
+			if phpVerRe.MatchString(name) {
+				versions = append(versions, name)
+			}
+		}
+		sort.Strings(versions)
+		c.JSON(http.StatusOK, gin.H{"versions": versions})
+	})
+
+	phpIniPath := func(version string) string {
+		return filepath.Join("/etc/php", version, "fpm", "php.ini")
+	}
+
+	moduleLineRe := regexp.MustCompile(`^(\s*)(;?)(\s*)(extension|zend_extension)\s*=\s*([^\s#;]+)`)
+
+	api.GET("/php/:version/ini", func(c *gin.Context) {
+		version := strings.TrimSpace(c.Param("version"))
+		if !phpVerRe.MatchString(version) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid php version"})
+			return
+		}
+
+		path := phpIniPath(version)
+		b, err := os.ReadFile(path)
+		if err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": err.Error(), "path": path})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"path": path,
+			"ini":  string(b),
+		})
+	})
+
+	api.PATCH("/php/:version/ini", func(c *gin.Context) {
+		version := strings.TrimSpace(c.Param("version"))
+		if !phpVerRe.MatchString(version) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid php version"})
+			return
+		}
+
+		var req struct {
+			Ini    string `json:"ini" binding:"required"`
+			Reload *bool  `json:"reload"`
+		}
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		reload := true
+		if req.Reload != nil {
+			reload = *req.Reload
+		}
+
+		path := phpIniPath(version)
+		if err := os.WriteFile(path, []byte(req.Ini), 0o644); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "path": path})
+			return
+		}
+
+		if reload {
+			_ = phpfpm.Reload(version)
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"message": "php.ini updated",
+			"path":    path,
+		})
+	})
+
+	api.GET("/php/:version/modules", func(c *gin.Context) {
+		version := strings.TrimSpace(c.Param("version"))
+		if !phpVerRe.MatchString(version) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid php version"})
+			return
+		}
+
+		path := phpIniPath(version)
+		b, err := os.ReadFile(path)
+		if err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": err.Error(), "path": path})
+			return
+		}
+
+		// module key = directive + ":" + moduleName
+		type mod struct {
+			Directive string `json:"directive"`
+			Name      string `json:"name"`
+			RawValue  string `json:"raw_value"`
+			Enabled   bool   `json:"enabled"`
+		}
+		found := map[string]mod{}
+
+		lines := strings.Split(string(b), "\n")
+		for _, line := range lines {
+			m := moduleLineRe.FindStringSubmatch(line)
+			if m == nil {
+				continue
+			}
+			indent := m[1]
+			semi := m[2]
+			_ = indent
+			directive := m[4]
+			rawVal := strings.Trim(m[5], "\"'")
+			rawVal = strings.TrimSpace(rawVal)
+
+			moduleName := rawVal
+			moduleName = strings.TrimSuffix(moduleName, ".so")
+			moduleName = filepath.Base(moduleName)
+
+			key := directive + ":" + moduleName
+			enabled := strings.TrimSpace(semi) == ""
+			found[key] = mod{
+				Directive: directive,
+				Name:      moduleName,
+				RawValue:  rawVal,
+				Enabled:   enabled,
+			}
+		}
+
+		var out []mod
+		for _, v := range found {
+			out = append(out, v)
+		}
+		// deterministic
+		sort.Slice(out, func(i, j int) bool {
+			if out[i].Directive == out[j].Directive {
+				return out[i].Name < out[j].Name
+			}
+			return out[i].Directive < out[j].Directive
+		})
+
+		c.JSON(http.StatusOK, gin.H{
+			"path":    path,
+			"modules": out,
+		})
+	})
+
+	api.PATCH("/php/:version/modules", func(c *gin.Context) {
+		version := strings.TrimSpace(c.Param("version"))
+		if !phpVerRe.MatchString(version) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid php version"})
+			return
+		}
+
+		var req struct {
+			Reload  *bool `json:"reload"`
+			Modules []struct {
+				Directive string `json:"directive" binding:"required"`
+				Name      string `json:"name" binding:"required"`
+				Enabled   bool   `json:"enabled"`
+			} `json:"modules" binding:"required"`
+		}
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		reload := true
+		if req.Reload != nil {
+			reload = *req.Reload
+		}
+
+		path := phpIniPath(version)
+		b, err := os.ReadFile(path)
+		if err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": err.Error(), "path": path})
+			return
+		}
+
+		enabledMap := map[string]bool{}
+		for _, m := range req.Modules {
+			key := m.Directive + ":" + m.Name
+			enabledMap[key] = m.Enabled
+		}
+
+		// rewrite php.ini: toggle leading comment char for matching module directives.
+		lines := strings.Split(string(b), "\n")
+		for i := range lines {
+			line := lines[i]
+			m := moduleLineRe.FindStringSubmatch(line)
+			if m == nil {
+				continue
+			}
+			indent := m[1]
+			// m[2] is semicolon marker (optional)
+			directive := m[4]
+			rawVal := strings.Trim(m[5], "\"'")
+			rawVal = strings.TrimSpace(rawVal)
+
+			moduleName := rawVal
+			moduleName = strings.TrimSuffix(moduleName, ".so")
+			moduleName = filepath.Base(moduleName)
+			key := directive + ":" + moduleName
+			enabled, ok := enabledMap[key]
+			if !ok {
+				continue
+			}
+
+			if enabled {
+				lines[i] = indent + directive + "=" + rawVal
+			} else {
+				lines[i] = indent + ";" + directive + "=" + rawVal
+			}
+		}
+
+		newContent := strings.Join(lines, "\n")
+		if err := os.WriteFile(path, []byte(newContent), 0o644); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "path": path})
+			return
+		}
+
+		if reload {
+			_ = phpfpm.Reload(version)
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"message": "php modules updated",
+			"path":    path,
+		})
+	})
+
 	api.GET("/system/processes", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"processes": []gin.H{}})
+	})
+
+	api.POST("/system/reboot", func(c *gin.Context) {
+		// Basit ve açık: sistem bazlı reboot. Çoğu dağıtımda systemctl reboot veya shutdown -r now çalışır.
+		go func() {
+			if _, err := exec.LookPath("systemctl"); err == nil {
+				_ = exec.Command("systemctl", "reboot").Run()
+				return
+			}
+			_ = exec.Command("shutdown", "-r", "now").Run()
+		}()
+		c.JSON(http.StatusAccepted, gin.H{"message": "reboot requested"})
 	})
 
 	api.GET("/stack/modules", func(c *gin.Context) {

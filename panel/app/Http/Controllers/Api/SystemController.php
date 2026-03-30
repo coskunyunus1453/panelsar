@@ -40,6 +40,19 @@ class SystemController extends Controller
         return response()->json($result);
     }
 
+    public function reboot(Request $request): JsonResponse
+    {
+        if (! $request->user()?->isAdmin()) {
+            abort(403);
+        }
+
+        $result = $this->engineApi->rebootSystem();
+
+        return response()->json([
+            'message' => $result['message'] ?? 'reboot requested',
+        ], 202);
+    }
+
     public function dashboard(Request $request): JsonResponse
     {
         $user = $request->user();

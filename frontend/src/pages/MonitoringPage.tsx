@@ -33,6 +33,7 @@ import clsx from 'clsx'
 import api from '../services/api'
 import { useAuthStore } from '../store/authStore'
 import { useThemeStore } from '../store/themeStore'
+import { tokenHasAbility } from '../lib/abilities'
 
 type HistoryPoint = { t: number; cpu: number; mem: number; disk: number }
 
@@ -122,7 +123,8 @@ function AnimatedBar({ value, colorClass }: { value: number; colorClass: string 
 export default function MonitoringPage() {
   const { t } = useTranslation()
   const { isDark } = useThemeStore()
-  const isAdmin = useAuthStore((s) => s.user?.roles?.some((r) => r.name === 'admin'))
+  const abilities = useAuthStore((s) => s.user?.abilities)
+  const canServer = tokenHasAbility(abilities, 'monitoring:server')
   const [history, setHistory] = useState<HistoryPoint[]>([])
   const [tick, setTick] = useState(() => Date.now())
 
@@ -139,9 +141,9 @@ export default function MonitoringPage() {
 
   const serverQ = useQuery({
     queryKey: ['monitoring-server'],
-    enabled: !!isAdmin,
+    enabled: canServer,
     queryFn: async () => (await api.get('/monitoring/server')).data,
-    refetchInterval: isAdmin ? 10_000 : false,
+    refetchInterval: canServer ? 10_000 : false,
   })
 
   const stats = serverQ.data?.stats as ServerStats | undefined
@@ -163,11 +165,11 @@ export default function MonitoringPage() {
   }, [])
 
   useEffect(() => {
-    if (!isAdmin) return
+    if (!canServer) return
     const st = serverQ.data?.stats as ServerStats | undefined
     if (!st) return
     pushHistory(st)
-  }, [isAdmin, serverQ.data, serverQ.dataUpdatedAt, pushHistory])
+  }, [canServer, serverQ.data, serverQ.dataUpdatedAt, pushHistory])
 
   const chartHistory = useMemo(
     () =>
@@ -453,7 +455,7 @@ export default function MonitoringPage() {
       </div>
 
       {/* Admin sunucu */}
-      {!isAdmin && (
+      {!canServer && (
         <div className="card flex items-start gap-4 border-dashed border-gray-300 p-6 dark:border-gray-600">
           <div className="rounded-xl bg-gray-100 p-3 dark:bg-gray-800">
             <Lock className="h-6 w-6 text-gray-500" />
@@ -465,7 +467,7 @@ export default function MonitoringPage() {
         </div>
       )}
 
-      {isAdmin && (
+      {canServer && (
         <div className="space-y-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div>

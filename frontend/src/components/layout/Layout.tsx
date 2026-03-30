@@ -3,11 +3,22 @@ import { Outlet } from 'react-router-dom'
 import Sidebar from './Sidebar'
 import Header from './Header'
 import { useThemeStore } from '../../store/themeStore'
+import { useAuthStore } from '../../store/authStore'
+import { authService } from '../../services/authService'
 
 export default function Layout() {
   const sidebarCollapsed = useThemeStore((s) => s.sidebarCollapsed)
   const mobileSidebarOpen = useThemeStore((s) => s.mobileSidebarOpen)
   const closeMobileSidebar = useThemeStore((s) => s.closeMobileSidebar)
+  const token = useAuthStore((s) => s.token)
+  const updateUser = useAuthStore((s) => s.updateUser)
+
+  useEffect(() => {
+    if (!token) {
+      return
+    }
+    authService.me().then((d) => updateUser(d.user)).catch(() => {})
+  }, [token, updateUser])
 
   useEffect(() => {
     if (!mobileSidebarOpen) {

@@ -109,4 +109,20 @@ class User extends Authenticatable
     {
         return $this->hasRole('reseller');
     }
+
+    /**
+     * Sanctum token yetenekleri (Spatie permission adlarıyla aynı stringler).
+     *
+     * @return list<string>
+     */
+    public function sanctumAbilities(): array
+    {
+        if ($this->isAdmin()) {
+            return ['*'];
+        }
+
+        $perms = $this->getAllPermissions()->pluck('name')->filter()->values()->all();
+
+        return array_values(array_unique(array_merge(['access:customer-panel'], $perms)));
+    }
 }

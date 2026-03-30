@@ -62,6 +62,15 @@ server {
     listen 80;
     listen [::]:80;
     server_name {{.ServerNames}};
+
+    # Let's Encrypt HTTP-01 challenge must stay reachable on plain HTTP.
+    location ^~ /.well-known/acme-challenge/ {
+        default_type "text/plain";
+        root {{.DocRoot}};
+        try_files $uri =404;
+        allow all;
+    }
+
     return 301 https://$host$request_uri;
 }
 
@@ -112,6 +121,14 @@ server {
 
     location / {
         try_files $uri $uri/ /index.php?$query_string;
+    }
+
+    # Let's Encrypt HTTP-01 challenge endpoint.
+    location ^~ /.well-known/acme-challenge/ {
+        default_type "text/plain";
+        root {{.DocRoot}};
+        try_files $uri =404;
+        allow all;
     }
 
     location ~ \.php$ {

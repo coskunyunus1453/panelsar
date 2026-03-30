@@ -1,10 +1,11 @@
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery } from '@tanstack/react-query'
 import { useAuthStore } from '../store/authStore'
 import api from '../services/api'
 import type { DashboardData } from '../types'
-import { Globe, Database, Mail, HardDrive, Plus, Users } from 'lucide-react'
+import { Globe, Database, Mail, HardDrive, Plus, Users, Power, RefreshCcw } from 'lucide-react'
+import toast from 'react-hot-toast'
 import ResourceChartsSection from '../components/dashboard/ResourceChartsSection'
 
 export default function DashboardPage() {
@@ -20,6 +21,24 @@ export default function DashboardPage() {
 
   const d = dashQ.data
   const sys = d?.system_stats
+
+  const rebootM = useMutation({
+    mutationFn: async () => api.post('/system/reboot'),
+    onSuccess: () => {
+      // Sunucu reboot isteği gönderildi; bağlantı kopabilir.
+      // Sadece kullanıcıya bildirim veriyoruz.
+      toast.success(t('dashboard.reboot_requested'))
+    },
+    onError: (err: unknown) => {
+      const ax = err as { response?: { data?: { message?: string } } }
+      toast.error(ax.response?.data?.message ?? String(err))
+    },
+  })
+
+  const updateClick = () => {
+    // Şimdilik sadece placeholder: ileride gerçek update mekanizmasına bağlanacak.
+    toast('Güncelleme sistemi yakında eklenecek.', { icon: '⏳' })
+  }
 
   const statCards = [
     {
@@ -83,13 +102,45 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-          {t('dashboard.overview')}
-        </h1>
-        <p className="text-gray-500 dark:text-gray-400 mt-1">
-          {t('dashboard.welcome')}, {user?.name}
-        </p>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+            {t('dashboard.overview')}
+          </h1>
+          <p className="text-gray-500 dark:text-gray-400 mt-1">
+            {t('dashboard.welcome')}, {user?.name}
+          </p>
+        </div>
+        {isAdmin && (
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-amber-300 text-amber-900 bg-amber-50 hover:bg-amber-100 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-100 text-xs sm:text-sm"
+              onClick={() => {
+                if (
+                  window.confirm(
+                    t('dashboard.reboot_confirm') ||
+                      'Sunucuyu güvenli şekilde yeniden başlatmak istediğinizden emin misiniz? Aktif bağlantılar kesilecektir.',
+                  )
+                ) {
+                  rebootM.mutate()
+                }
+              }}
+              disabled={rebootM.isPending}
+            >
+              <Power className="h-4 w-4" />
+              {t('dashboard.reboot')}
+            </button>
+            <button
+              type="button"
+              className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-sky-300 text-sky-900 bg-sky-50 hover:bg-sky-100 dark:border-sky-700 dark:bg-sky-900/20 dark:text-sky-100 text-xs sm:text-sm"
+              onClick={updateClick}
+            >
+              <RefreshCcw className="h-4 w-4" />
+              {t('dashboard.update_panel')}
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

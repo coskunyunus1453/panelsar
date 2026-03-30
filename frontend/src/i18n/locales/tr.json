@@ -30,7 +30,32 @@
     "toggle_sidebar": "Kenar çubuğunu daralt",
     "terminal": "SSH terminal",
     "stack": "Sunucu paketleri",
-    "outbound_mail": "Giden posta"
+    "outbound_mail": "Giden posta",
+    "roles": "Roller",
+    "webserver_settings": "Apache & Nginx",
+    "php_settings": "PHP",
+    "group_overview": "Genel",
+    "group_hosting": "Hosting",
+    "group_operations": "Operasyon",
+    "group_account": "Hesap",
+    "admin_server": "Sunucu yönetimi",
+    "admin_access": "Erişim ve yönetim"
+  },
+  "roles": {
+    "title": "Roller ve izinler",
+    "subtitle": "Panel yeteneklerine göre özel roller; bayilere atanabilir şablonlar oluşturabilirsiniz.",
+    "new_role": "Yeni rol",
+    "edit_role": "Rolu düzenle",
+    "saved": "Rol kaydedildi",
+    "deleted": "Rol silindi",
+    "system": "Sistem rolü",
+    "col_name": "Anahtar",
+    "col_display": "Görünen ad",
+    "col_reseller": "Bayi atayabilir",
+    "col_perms": "İzin sayısı",
+    "display_name": "Görünen ad",
+    "assignable_reseller": "Bayiler bu rolü atayabilsin (kendi izin kümesi içinde)",
+    "permissions": "İzinler"
   },
   "mail_settings": {
     "title": "Giden posta (panel bildirimleri)",
@@ -150,7 +175,11 @@
     "no_mount_data": "Mount bilgisi alınamadı.",
     "system_admin_only": "Sunucu kaynak özeti yalnızca yöneticiler için engine üzerinden gösterilir.",
     "system_engine_hint": "Engine çalışmıyorsa sunucu istatistikleri görünmez. Engine ve ENGINE_INTERNAL_KEY ayarlarını kontrol edin.",
-    "uptime_approx": "Çalışma süresi (yaklaşık)"
+    "uptime_approx": "Çalışma süresi (yaklaşık)",
+    "reboot": "Sunucuyu yeniden başlat",
+    "reboot_confirm": "Sunucuyu güvenli şekilde yeniden başlatmak istediğinizden emin misiniz? Tüm aktif oturumlar ve bağlantılar kesilecektir.",
+    "reboot_requested": "Sunucu yeniden başlatma isteği gönderildi.",
+    "update_panel": "Paneli güncelle (beta)"
   },
   "domains": {
     "title": "Alan Adı Yönetimi",
@@ -191,7 +220,8 @@
     "confirm_php_change": "PHP {{php}} olarak değiştirilecek. Emin misiniz?",
     "confirm_server_change": "Web sunucusu {{server}} olarak değiştirilecek. Emin misiniz?",
     "confirm_status_change": "Site durumu {{status}} olarak değiştirilecek. Emin misiniz?",
-    "confirm_ssl_issue": "Let’s Encrypt ile SSL kurulumu başlatılacak. Doğrulama nedeniyle birkaç dakika sürebilir. Devam edilsin mi?"
+    "confirm_ssl_issue": "Let’s Encrypt ile SSL kurulumu başlatılacak. Doğrulama nedeniyle birkaç dakika sürebilir. Devam edilsin mi?",
+    "ssl_loading_hint": "SSL doğrulaması sürüyor. Durum takibi için bu sekmeyi açık bırakın."
   },
   "databases": {
     "title": "Veritabanı Yönetimi",
@@ -527,7 +557,12 @@
     "subusers": "Alt kullanıcılar",
     "catalog": "Paketler",
     "password_again": "Şifre (tekrar)",
-    "user_created": "Kullanıcı oluşturuldu"
+    "user_created": "Kullanıcı oluşturuldu",
+    "new_role": "Özel rol oluştur",
+    "custom_roles": "Atanabilir roller",
+    "role_for_new_user": "Alt kullanıcı rolü",
+    "role_saved": "Rol oluşturuldu",
+    "role_deleted": "Rol silindi"
   },
   "users": {
     "created": "Kullanıcı oluşturuldu",
@@ -571,6 +606,48 @@
     "light_mode": "Aydınlık Mod",
     "profile": "Profil",
     "change_password": "Şifre Değiştir",
-    "two_factor": "İki Faktörlü Doğrulama"
+    "two_factor": "İki Faktörlü Doğrulama",
+    "branding": "Marka görselleri",
+    "branding_hint": "Müşteri paneli ile yönetici bölümü için ayrı logolar. Kenar çubukunda yol (/admin) hangi logo ile eşleşiyorsa o gösterilir; giriş ekranında müşteri logosu kullanılır.",
+    "logo_customer": "Müşteri paneli logosu",
+    "logo_admin": "Yönetici bölümü logosu",
+    "branding_saved": "Logolar güncellendi"
+  },
+  "webserver": {
+    "title": "Apache & Nginx Ayarları",
+    "subtitle": "Plesk benzeri web sunucusu yapılandırması (VHost ve PHP-FPM pool yönetimi)",
+    "load_error": "Web sunucusu ayarları alınamadı.",
+    "engine_hint": "Engine çalışıyor olmalı ve webserver ayar endpoint’ine erişebilmeliyiz.",
+    "saved": "Web sunucusu ayarları kaydedildi.",
+
+    "nginx": "Nginx",
+    "apache": "Apache",
+    "php_fpm": "PHP-FPM",
+
+    "manage_vhosts": "VHost yönetimi",
+    "reload_after_vhost": "VHost sonrası reload",
+
+    "manage_pools": "Pool yönetimi",
+    "reload_after_pool": "Pool sonrası reload",
+
+    "php_fpm_socket": "PHP-FPM socket (pool yönetimi kapalıyken)",
+    "php_fpm_listen_dir": "PHP-FPM listen dir",
+    "php_fpm_pool_dir_template": "Pool dizin şablonu",
+    "php_fpm_pool_user": "Pool user",
+    "php_fpm_pool_group": "Pool group",
+
+    "save_hint": "Değişiklikler engine tarafında uygulanır; mevcut vhost/pool yapısı hemen güncellenmeyebilir."
+  },
+  "php_settings": {
+    "title": "PHP Ayarları",
+    "subtitle": "php.ini düzenle ve PHP modüllerini enable/disable yap (php.ini içindeki extension/zend_extension satırları).",
+    "load_error": "PHP ayarları alınamadı.",
+    "modules": "PHP Modülleri",
+    "ini": "php.ini",
+    "ini_hint": "Modül seçimleri için bu sayfa PHP-FPM tarafından kullanılan php.ini içindeki extension/zend_extension satırlarını düzenler.",
+    "save_modules": "Modülleri kaydet",
+    "save_ini": "php.ini kaydet",
+    "modules_saved": "Modüller güncellendi",
+    "ini_saved": "php.ini güncellendi"
   }
 }

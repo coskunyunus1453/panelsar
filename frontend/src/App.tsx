@@ -27,6 +27,9 @@ import AdminLicensePage from './pages/AdminLicensePage'
 import TerminalPage from './pages/TerminalPage'
 import AdminStackPage from './pages/AdminStackPage'
 import AdminMailSettingsPage from './pages/AdminMailSettingsPage'
+import AdminRolesPage from './pages/AdminRolesPage'
+import AdminWebServerSettingsPage from './pages/AdminWebServerSettingsPage'
+import AdminPhpSettingsPage from './pages/AdminPhpSettingsPage'
 import ResellerPage from './pages/ResellerPage'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -75,12 +78,15 @@ export default function App() {
         <Route path="billing" element={<BillingPage />} />
         <Route path="reseller" element={<ResellerPage />} />
         <Route path="admin/users" element={<AdminUsersPage />} />
+        <Route path="admin/roles" element={<AdminRolesPage />} />
         <Route path="admin/packages" element={<AdminPackagesPage />} />
         <Route path="admin/system" element={<AdminSystemPage />} />
         <Route path="admin/license" element={<AdminLicensePage />} />
         <Route path="admin/terminal" element={<TerminalPage />} />
         <Route path="admin/stack" element={<AdminStackPage />} />
         <Route path="admin/mail-settings" element={<AdminMailSettingsPage />} />
+        <Route path="admin/webserver" element={<AdminWebServerSettingsPage />} />
+        <Route path="admin/php-settings" element={<AdminPhpSettingsPage />} />
         <Route path="settings" element={<SettingsPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

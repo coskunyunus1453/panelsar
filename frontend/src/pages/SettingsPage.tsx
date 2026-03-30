@@ -1,9 +1,10 @@
 import { useTranslation } from 'react-i18next'
-import { useMutation } from '@tanstack/react-query'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useThemeStore } from '../store/themeStore'
 import { useAuthStore } from '../store/authStore'
+import { useBranding } from '../hooks/useBranding'
 import api from '../services/api'
-import { Sun, Moon, Globe, User, Lock, Smartphone } from 'lucide-react'
+import { Sun, Moon, Globe, User, Lock, Smartphone, ImageIcon } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 const languages = [
@@ -22,8 +23,11 @@ const languages = [
 export default function SettingsPage() {
   const { t, i18n } = useTranslation()
   const { isDark, toggleTheme } = useThemeStore()
+  const qc = useQueryClient()
   const user = useAuthStore((s) => s.user)
   const updateUser = useAuthStore((s) => s.updateUser)
+  const isAdmin = user?.roles?.some((r) => r.name === 'admin')
+  const { data: branding } = useBranding()
 
   const profileM = useMutation({
     mutationFn: async (payload: { name: string; email: string; locale?: string }) =>
@@ -39,6 +43,18 @@ export default function SettingsPage() {
         ? Object.values(ax.response.data.errors)[0]?.[0]
         : undefined
       toast.error(first ?? ax.response?.data?.message ?? String(err))
+    },
+  })
+
+  const brandM = useMutation({
+    mutationFn: async (fd: FormData) => api.post('/admin/settings/branding', fd),
+    onSuccess: () => {
+      toast.success(t('settings.branding_saved'))
+      qc.invalidateQueries({ queryKey: ['branding'] })
+    },
+    onError: (err: unknown) => {
+      const ax = err as { response?: { data?: { message?: string } } }
+      toast.error(ax.response?.data?.message ?? String(err))
     },
   })
 
@@ -65,6 +81,57 @@ export default function SettingsPage() {
       <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
         {t('settings.title')}
       </h1>
+
+      {isAdmin && (
+        <div className="card p-6">
+          <div className="flex items-center gap-3 mb-6">
+            <ImageIcon className="h-5 w-5 text-gray-500" />
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                {t('settings.branding')}
+              </h2>
+              <p className="text-sm text-gray-500 dark:text-gray-400">{t('settings.branding_hint')}</p>
+            </div>
+          </div>
+          {(branding?.logo_customer_url || branding?.logo_admin_url) && (
+            <div className="flex flex-wrap gap-6 mb-4">
+              {branding?.logo_customer_url && (
+                <div>
+                  <p className="text-xs text-gray-500 mb-1">{t('settings.logo_customer')}</p>
+                  <img src={branding.logo_customer_url} alt="" className="h-12 object-contain" />
+                </div>
+              )}
+              {branding?.logo_admin_url && (
+                <div>
+                  <p className="text-xs text-gray-500 mb-1">{t('settings.logo_admin')}</p>
+                  <img src={branding.logo_admin_url} alt="" className="h-12 object-contain" />
+                </div>
+              )}
+            </div>
+          )}
+          <form
+            className="space-y-4 max-w-xl"
+            onSubmit={(ev) => {
+              ev.preventDefault()
+              const fd = new FormData(ev.currentTarget)
+              brandM.mutate(fd)
+              ev.currentTarget.reset()
+            }}
+          >
+            <div>
+              <label className="label">{t('settings.logo_customer')}</label>
+              <input name="logo_customer" type="file" accept="image/*" className="input w-full text-sm" />
+            </div>
+            <div>
+              <label className="label">{t('settings.logo_admin')}</label>
+              <input name="logo_admin" type="file" accept="image/*" className="input w-full text-sm" />
+            </div>
+            <button type="submit" className="btn-primary" disabled={brandM.isPending}>
+              {t('common.save')}
+            </button>
+          </form>
+        </div>
+      )}
 
       <div className="card p-6">
         <div className="flex items-center gap-3 mb-6">

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useAuthStore } from '../store/authStore'
 import { authService } from '../services/authService'
+import { useBranding } from '../hooks/useBranding'
 import { Server, Eye, EyeOff } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -15,6 +16,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
+  const { data: branding } = useBranding()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -37,9 +39,15 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 via-blue-950 to-gray-900 px-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary-600 mb-4">
-            <Server className="h-8 w-8 text-white" />
-          </div>
+          {branding?.logo_customer_url ? (
+            <div className="flex justify-center mb-4">
+              <img src={branding.logo_customer_url} alt="" className="max-h-20 object-contain" />
+            </div>
+          ) : (
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary-600 mb-4">
+              <Server className="h-8 w-8 text-white" />
+            </div>
+          )}
           <h1 className="text-3xl font-bold text-white">Panelsar</h1>
           <p className="text-gray-400 mt-2">{t('auth.login_subtitle')}</p>
         </div>

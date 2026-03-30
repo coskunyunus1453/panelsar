@@ -18,12 +18,55 @@ class FileManagerController extends Controller
         private EngineApiService $engine,
     ) {}
 
+    /**
+     * Panelin “site document_root altına göreli path” gönderdiği varsayımıyla,
+     * engine'in “engine web_root/domain altına göreli path” beklediği çeviriyi yapar.
+     */
+    private function panelRelToEngineRel(Domain $domain, string $panelRel): string
+    {
+        $hostingRoot = rtrim((string) config('panelsar.hosting_web_root'), "/\\");
+        $engineRoot = $hostingRoot.DIRECTORY_SEPARATOR.$domain->name;
+
+        // Domain.document_root panelde tam path (örn. /var/www/example.com/public_html)
+        $docRoot = (string) $domain->document_root;
+
+        $panelRelNorm = str_replace('\\', '/', trim($panelRel));
+        $panelRelNorm = ltrim($panelRelNorm, '/'); // engine tarafı leading slash'ları temizliyor ama biz net olsun diye
+
+        $engineRootNorm = str_replace('\\', '/', $engineRoot);
+        $docRootNorm = str_replace('\\', '/', $docRoot);
+
+        $baseRel = '';
+        if ($docRootNorm === $engineRootNorm) {
+            $baseRel = '';
+        } elseif (str_starts_with($docRootNorm, $engineRootNorm.'/')) {
+            $baseRel = substr($docRootNorm, strlen($engineRootNorm) + 1);
+        } else {
+            // Fallback: document_root hostingRoot/domain altında mı?
+            $expectedPrefix = $hostingRoot.'/'.$domain->name.'/';
+            if ($hostingRoot !== '' && str_starts_with($docRootNorm, $expectedPrefix)) {
+                $baseRel = substr($docRootNorm, strlen($expectedPrefix));
+            }
+        }
+
+        if ($baseRel === '') {
+            return $panelRelNorm;
+        }
+
+        if ($panelRelNorm === '') {
+            return $baseRel;
+        }
+
+        return $baseRel.'/'.$panelRelNorm;
+    }
+
     public function index(Request $request, Domain $domain): JsonResponse
     {
         if (! $this->userOwnsDomain($request, $domain)) {
             abort(403);
         }
         $path = (string) $request->query('path', '');
+        $engineRelPath = $this->panelRelToEngineRel($domain, $path);
 
         $limit = (int) $request->query('limit', 200);
         $offset = (int) $request->query('offset', 0);
@@ -35,7 +78,7 @@ class FileManagerController extends Controller
         $sort = in_array($sort, ['name', 'size', 'mtime'], true) ? $sort : 'name';
         $order = strtolower($order) === 'desc' ? 'desc' : 'asc';
 
-        $list = $this->engine->listFilesResult($domain->name, $path, $limit, $offset, $sort, $order);
+        $list = $this->engine->listFilesResult($domain->name, $engineRelPath, $limit, $offset, $sort, $order);
         if ($list['error'] !== null) {
             return response()->json([
                 'message' => $list['error'],
@@ -69,7 +112,7 @@ class FileManagerController extends Controller
         return response()->json([
             'hits' => $this->engine->searchFiles(
                 $domain->name,
-                (string) ($validated['path'] ?? ''),
+                $this->panelRelToEngineRel($domain, (string) ($validated['path'] ?? '')),
                 $validated['q']
             ),
         ]);
@@ -82,7 +125,10 @@ class FileManagerController extends Controller
         }
         $validated = $request->validate(['path' => 'required|string']);
 
-        $result = $this->engine->mkdirFile($domain->name, $validated['path']);
+        $result = $this->engine->mkdirFile(
+            $domain->name,
+            $this->panelRelToEngineRel($domain, $validated['path'])
+        );
         if (! empty($result['error'])) {
             return response()->json(['message' => $result['error']], 422);
         }
@@ -99,8 +145,9 @@ class FileManagerController extends Controller
         if ($from === '') {
             return response()->json(['message' => 'The path field is required.'], 422);
         }
+        $engineFrom = $this->panelRelToEngineRel($domain, $from);
         try {
-            $result = $this->engine->deleteFile($domain->name, $from);
+            $result = $this->engine->deleteFile($domain->name, $engineFrom);
             if (! empty($result['error'])) {
                 $this->logFileAction($request, $domain, 'delete', $from, null, false, $result['error']);
                 return response()->json(['message' => $result['error']], 422);
@@ -123,9 +170,10 @@ class FileManagerController extends Controller
         if ($path === '') {
             return response()->json(['message' => 'The path field is required.'], 422);
         }
+        $enginePath = $this->panelRelToEngineRel($domain, $path);
 
         return response()->json([
-            'content' => $this->engine->readFile($domain->name, $path),
+            'content' => $this->engine->readFile($domain->name, $enginePath),
         ]);
     }
 
@@ -140,8 +188,9 @@ class FileManagerController extends Controller
         ]);
 
         $from = $validated['path'];
+        $engineFrom = $this->panelRelToEngineRel($domain, $from);
         try {
-            $result = $this->engine->writeFile($domain->name, $from, $validated['content'] ?? '');
+            $result = $this->engine->writeFile($domain->name, $engineFrom, $validated['content'] ?? '');
             if (! empty($result['error'])) {
                 $this->logFileAction($request, $domain, 'edit', $from, null, false, $result['error']);
                 return response()->json(['message' => $result['error']], 422);
@@ -167,8 +216,9 @@ class FileManagerController extends Controller
         ]);
 
         $from = $validated['path'];
+        $engineFrom = $this->panelRelToEngineRel($domain, $from);
         try {
-            $result = $this->engine->createFile($domain->name, $from, $validated['content'] ?? '');
+            $result = $this->engine->createFile($domain->name, $engineFrom, $validated['content'] ?? '');
             if (! empty($result['error'])) {
                 $this->logFileAction($request, $domain, 'create', $from, null, false, $result['error']);
                 return response()->json(['message' => $result['error']], 422);
@@ -194,8 +244,9 @@ class FileManagerController extends Controller
             'file' => 'required|file|max:'.$maxKb,
         ]);
         $relPath = (string) ($validated['path'] ?? '');
+        $engineRelPath = $this->panelRelToEngineRel($domain, $relPath);
         try {
-            $result = $this->engine->uploadFile($domain->name, $relPath, $request->file('file'));
+            $result = $this->engine->uploadFile($domain->name, $engineRelPath, $request->file('file'));
             $ok = empty($result['error']);
             $this->logFileAction($request, $domain, 'upload', $relPath, null, $ok, $result['error'] ?? null);
 
@@ -220,8 +271,10 @@ class FileManagerController extends Controller
 
         $from = $validated['from'];
         $to = $validated['to'];
+        $engineFrom = $this->panelRelToEngineRel($domain, $from);
+        $engineTo = $this->panelRelToEngineRel($domain, $to);
         try {
-            $result = $this->engine->renameFile($domain->name, $from, $to);
+            $result = $this->engine->renameFile($domain->name, $engineFrom, $engineTo);
             if (! empty($result['error'])) {
                 $this->logFileAction($request, $domain, 'rename', $from, $to, false, $result['error']);
                 return response()->json(['message' => $result['error']], 422);
@@ -248,8 +301,10 @@ class FileManagerController extends Controller
 
         $from = $validated['from'];
         $to = $validated['to'];
+        $engineFrom = $this->panelRelToEngineRel($domain, $from);
+        $engineTo = $this->panelRelToEngineRel($domain, $to);
         try {
-            $result = $this->engine->moveFile($domain->name, $from, $to);
+            $result = $this->engine->moveFile($domain->name, $engineFrom, $engineTo);
             if (! empty($result['error'])) {
                 $this->logFileAction($request, $domain, 'move', $from, $to, false, $result['error']);
                 return response()->json(['message' => $result['error']], 422);
@@ -273,8 +328,9 @@ class FileManagerController extends Controller
         if ($path === '') {
             return response()->json(['message' => 'The path field is required.'], 422);
         }
+        $enginePath = $this->panelRelToEngineRel($domain, $path);
 
-        $result = $this->engine->downloadFile($domain->name, $path);
+        $result = $this->engine->downloadFile($domain->name, $enginePath);
         if (! empty($result['error'])) {
             $this->logFileAction($request, $domain, 'download', $path, null, false, $result['error']);
             return response()->json(['message' => $result['error']], 422);

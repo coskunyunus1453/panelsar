@@ -30,7 +30,32 @@
     "toggle_sidebar": "Collapse sidebar",
     "terminal": "SSH terminal",
     "stack": "Server packages",
-    "outbound_mail": "Outbound mail"
+    "outbound_mail": "Outbound mail",
+    "roles": "Roles",
+    "webserver_settings": "Apache & Nginx",
+    "php_settings": "PHP",
+    "group_overview": "Overview",
+    "group_hosting": "Hosting",
+    "group_operations": "Operations",
+    "group_account": "Account",
+    "admin_server": "Server management",
+    "admin_access": "Access & management"
+  },
+  "roles": {
+    "title": "Roles & permissions",
+    "subtitle": "Define custom roles from panel abilities; create templates assignable by resellers.",
+    "new_role": "New role",
+    "edit_role": "Edit role",
+    "saved": "Role saved",
+    "deleted": "Role deleted",
+    "system": "System role",
+    "col_name": "Key",
+    "col_display": "Display name",
+    "col_reseller": "Reseller can assign",
+    "col_perms": "Permissions",
+    "display_name": "Display name",
+    "assignable_reseller": "Resellers may assign this role (within their permission set)",
+    "permissions": "Permissions"
   },
   "mail_settings": {
     "title": "Outbound mail (panel notifications)",
@@ -150,7 +175,11 @@
     "no_mount_data": "Mount information unavailable.",
     "system_admin_only": "Server resource summary is shown to admins via the engine only.",
     "system_engine_hint": "If the engine is down, stats will not appear. Check the engine and ENGINE_INTERNAL_KEY.",
-    "uptime_approx": "Uptime (approx.)"
+    "uptime_approx": "Uptime (approx.)",
+    "reboot": "Reboot server",
+    "reboot_confirm": "Are you sure you want to safely reboot the server? All active sessions and connections will be interrupted.",
+    "reboot_requested": "Server reboot request sent.",
+    "update_panel": "Update panel (beta)"
   },
   "domains": {
     "title": "Domain Management",
@@ -191,7 +220,8 @@
     "confirm_php_change": "PHP will change to {{php}}. Are you sure?",
     "confirm_server_change": "Web server will change to {{server}}. Are you sure?",
     "confirm_status_change": "Site status will change to {{status}}. Continue?",
-    "confirm_ssl_issue": "Let's Encrypt SSL setup will start. Validation may take a few minutes. Continue?"
+    "confirm_ssl_issue": "Let's Encrypt SSL setup will start. Validation may take a few minutes. Continue?",
+    "ssl_loading_hint": "SSL validation is running. Keep this tab open to track progress."
   },
   "databases": {
     "title": "Database Management",
@@ -527,7 +557,12 @@
     "subusers": "Sub-users",
     "catalog": "Packages",
     "password_again": "Password (confirm)",
-    "user_created": "User created"
+    "user_created": "User created",
+    "new_role": "Create custom role",
+    "custom_roles": "Assignable roles",
+    "role_for_new_user": "Sub-user role",
+    "role_saved": "Role created",
+    "role_deleted": "Role deleted"
   },
   "users": {
     "created": "User created",
@@ -571,6 +606,48 @@
     "light_mode": "Light Mode",
     "profile": "Profile",
     "change_password": "Change Password",
-    "two_factor": "Two-Factor Authentication"
+    "two_factor": "Two-Factor Authentication",
+    "branding": "Branding",
+    "branding_hint": "Separate logos for customer UI vs admin area. Sidebar picks admin logo on /admin routes and customer logo elsewhere; login uses the customer logo.",
+    "logo_customer": "Customer panel logo",
+    "logo_admin": "Admin area logo",
+    "branding_saved": "Logos updated"
+  },
+  "webserver": {
+    "title": "Apache & Nginx Settings",
+    "subtitle": "Plesk-like web server configuration (VHost and PHP-FPM pool management)",
+    "load_error": "Could not load webserver settings.",
+    "engine_hint": "Engine must be reachable and expose the webserver settings endpoint.",
+    "saved": "Webserver settings saved.",
+
+    "nginx": "Nginx",
+    "apache": "Apache",
+    "php_fpm": "PHP-FPM",
+
+    "manage_vhosts": "VHost management",
+    "reload_after_vhost": "Reload after vhost",
+
+    "manage_pools": "Pool management",
+    "reload_after_pool": "Reload after pool",
+
+    "php_fpm_socket": "PHP-FPM socket (when pool management is off)",
+    "php_fpm_listen_dir": "PHP-FPM listen dir",
+    "php_fpm_pool_dir_template": "PHP-FPM pool dir template",
+    "php_fpm_pool_user": "Pool user",
+    "php_fpm_pool_group": "Pool group",
+
+    "save_hint": "Changes are applied in the engine; existing vhost/pool may not be updated immediately."
+  },
+  "php_settings": {
+    "title": "PHP Settings",
+    "subtitle": "Edit php.ini and enable/disable PHP extensions (from the ini directives).",
+    "load_error": "Could not load PHP settings.",
+    "modules": "PHP Modules",
+    "ini": "php.ini",
+    "ini_hint": "For module toggles, this page edits extension/zend_extension lines inside the php.ini used by PHP-FPM.",
+    "save_modules": "Save modules",
+    "save_ini": "Save php.ini",
+    "modules_saved": "PHP modules updated",
+    "ini_saved": "php.ini updated"
   }
 }

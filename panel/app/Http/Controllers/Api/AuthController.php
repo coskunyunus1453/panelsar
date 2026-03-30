@@ -31,10 +31,14 @@ class AuthController extends Controller
         }
 
         $expiresAt = now()->addHours(24);
-        $token = $user->createToken('panel-token', $this->getAbilities($user), $expiresAt);
+        $abilities = $user->sanctumAbilities();
+        $token = $user->createToken('panel-token', $abilities, $expiresAt);
+
+        $userPayload = $user->load('roles')->toArray();
+        $userPayload['abilities'] = $abilities;
 
         return response()->json([
-            'user' => $user->load('roles'),
+            'user' => $userPayload,
             'token' => $token->plainTextToken,
             'expires_at' => $expiresAt,
         ]);
@@ -49,8 +53,12 @@ class AuthController extends Controller
 
     public function me(Request $request): JsonResponse
     {
+        $user = $request->user();
+        $userPayload = $user->load(['roles', 'hostingPackage'])->toArray();
+        $userPayload['abilities'] = $user->sanctumAbilities();
+
         return response()->json([
-            'user' => $request->user()->load(['roles', 'hostingPackage']),
+            'user' => $userPayload,
         ]);
     }
 
@@ -59,43 +67,13 @@ class AuthController extends Controller
         $user = $request->user();
         $user->currentAccessToken()->delete();
         $expiresAt = now()->addHours(24);
-        $token = $user->createToken('panel-token', $this->getAbilities($user), $expiresAt);
+        $abilities = $user->sanctumAbilities();
+        $token = $user->createToken('panel-token', $abilities, $expiresAt);
 
         return response()->json([
             'token' => $token->plainTextToken,
             'expires_at' => $expiresAt,
+            'abilities' => $abilities,
         ]);
-    }
-
-    private function getAbilities(User $user): array
-    {
-        if ($user->isAdmin()) {
-            return ['*'];
-        }
-
-        if ($user->isReseller()) {
-            return array_merge($this->customerPanelAbilities(), [
-                'users:manage',
-                'packages:manage',
-            ]);
-        }
-
-        return $this->customerPanelAbilities();
-    }
-
-    /**
-     * @return list<string>
-     */
-    private function customerPanelAbilities(): array
-    {
-        return [
-            'access:customer-panel',
-            'domains:read', 'domains:create',
-            'databases:read', 'databases:create',
-            'email:read', 'email:create',
-            'ftp:read', 'ftp:create',
-            'ssl:read', 'cron:read', 'cron:create',
-            'backup:read', 'backup:create',
-        ];
     }
 }

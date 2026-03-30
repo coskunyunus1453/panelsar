@@ -1,9 +1,30 @@
+import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import api from '../services/api'
-import { Shield } from 'lucide-react'
+import {
+  AlertTriangle,
+  CheckCircle2,
+  Clock,
+  RefreshCw,
+  Shield,
+  ShieldCheck,
+  ShieldX,
+} from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useAuthStore } from '../store/authStore'
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Legend,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+} from 'recharts'
 
 export default function SecurityPage() {
   const { t } = useTranslation()
@@ -13,6 +34,7 @@ export default function SecurityPage() {
   const q = useQuery({
     queryKey: ['security-overview'],
     queryFn: async () => (await api.get('/security/overview')).data,
+    refetchInterval: 45_000,
   })
 
   const fwM = useMutation({
@@ -38,7 +60,13 @@ export default function SecurityPage() {
     firewall?: {
       backend?: string
       default_policy?: string
-      recent_rules?: Record<string, unknown>[]
+      recent_rules?: Array<{
+        action?: string
+        protocol?: string
+        port?: string
+        source?: string
+        applied_at?: unknown
+      }>
     }
     modsecurity?: { enabled?: boolean }
     clamav?: { last_scan?: unknown }
@@ -46,6 +74,57 @@ export default function SecurityPage() {
 
   const overview = q.data?.overview as Overview | undefined
   const fwRules = overview?.firewall?.recent_rules ?? []
+
+  const coverage = useMemo(() => {
+    const fail2banOk = !!overview?.fail2ban?.enabled
+    const firewallOk =
+      typeof overview?.firewall?.default_policy === 'string' && (overview?.firewall?.default_policy ?? '') !== ''
+    const modsecOk = !!overview?.modsecurity?.enabled
+    const clamavOk = overview?.clamav?.last_scan != null
+    const enabledCount = [fail2banOk, firewallOk, modsecOk, clamavOk].filter(Boolean).length
+    const total = 4
+    const pct = Math.round((enabledCount / total) * 100)
+    return { enabledCount, total, pct, fail2banOk, firewallOk, modsecOk, clamavOk }
+  }, [overview])
+
+  const actionDist = useMemo(() => {
+    const out: Record<string, number> = {}
+    for (const r of fwRules) {
+      const a = String(r.action ?? '').toLowerCase().trim()
+      if (!a) continue
+      out[a] = (out[a] ?? 0) + 1
+    }
+    const allow = out['allow'] ?? 0
+    const deny = out['deny'] ?? 0
+    const other = Object.entries(out).reduce((acc, [k, v]) => (k === 'allow' || k === 'deny' ? acc : acc + v), 0)
+    return [
+      { key: 'allow', label: 'allow', value: allow, color: '#22c55e' },
+      { key: 'deny', label: 'deny', value: deny, color: '#ef4444' },
+      ...(other > 0 ? [{ key: 'other', label: 'other', value: other, color: '#f59e0b' }] : []),
+    ]
+  }, [fwRules])
+
+  const protocolDist = useMemo(() => {
+    const out: Record<string, number> = {}
+    for (const r of fwRules) {
+      const p = String(r.protocol ?? '').toLowerCase().trim()
+      if (!p) continue
+      out[p] = (out[p] ?? 0) + 1
+    }
+    const items = Object.entries(out)
+      .map(([key, value]) => ({ key, label: key, value }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 6)
+    return items.length ? items : [{ key: 'unknown', label: 'unknown', value: 0 }]
+  }, [fwRules])
+
+  const coveragePieData = useMemo(
+    () => [
+      { key: 'enabled', name: 'enabled', value: coverage.pct, color: '#22c55e' },
+      { key: 'disabled', name: 'disabled', value: Math.max(0, 100 - coverage.pct), color: '#ef4444' },
+    ],
+    [coverage.pct],
+  )
 
   return (
     <div className="space-y-6">
@@ -58,49 +137,198 @@ export default function SecurityPage() {
       </div>
 
       <div className="card p-6 space-y-4">
-        <h3 className="text-sm font-semibold">Engine özeti</h3>
+        <div className="flex items-center justify-between gap-3">
+          <h3 className="text-sm font-semibold">Engine özeti</h3>
+          <button
+            type="button"
+            className="btn-secondary inline-flex items-center gap-2 text-sm"
+            onClick={() => void q.refetch()}
+            disabled={q.isLoading || q.isFetching}
+            title="Yenile"
+          >
+            <RefreshCw className={q.isFetching ? 'h-4 w-4 animate-spin' : 'h-4 w-4'} />
+            Yenile
+          </button>
+        </div>
         {q.isLoading ? (
           <p className="text-gray-500">{t('common.loading')}</p>
         ) : q.isError ? (
           <p className="text-sm text-amber-600">Özet alınamadı.</p>
         ) : (
           <>
-            <div className="grid sm:grid-cols-2 gap-3 text-sm">
-              <div className="rounded-lg border border-gray-100 dark:border-gray-800 p-3">
-                <p className="text-gray-500 text-xs mb-1">Fail2ban</p>
-                <p>
-                  Durum:{' '}
-                  <strong>{overview?.fail2ban?.enabled ? 'açık' : 'kapalı'}</strong>
+            <div className="grid gap-3 lg:grid-cols-4 text-sm">
+              <div
+                className={[
+                  'rounded-xl border p-4 transition-colors',
+                  coverage.fail2banOk
+                    ? 'border-emerald-200 bg-emerald-50/50 dark:border-emerald-900/50 dark:bg-emerald-900/10'
+                    : 'border-amber-200 bg-amber-50/60 dark:border-amber-900/50 dark:bg-amber-900/10',
+                ].join(' ')}
+              >
+                <div className="flex items-center justify-between">
+                  <p className="text-gray-500 text-xs">Fail2ban</p>
+                  {coverage.fail2banOk ? (
+                    <ShieldCheck className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                  ) : (
+                    <ShieldX className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                  )}
+                </div>
+                <p className="mt-2 text-sm font-semibold">
+                  Durum: {coverage.fail2banOk ? 'açık' : 'kapalı'}
                 </p>
                 {overview?.fail2ban?.jails && overview.fail2ban.jails.length > 0 && (
-                  <p className="text-xs text-gray-500 mt-1 font-mono">
+                  <p className="mt-2 text-xs text-gray-600 dark:text-gray-300 font-mono">
                     {overview.fail2ban.jails.join(', ')}
                   </p>
                 )}
               </div>
-              <div className="rounded-lg border border-gray-100 dark:border-gray-800 p-3">
-                <p className="text-gray-500 text-xs mb-1">Güvenlik duvarı</p>
-                <p>
+
+              <div
+                className={[
+                  'rounded-xl border p-4 transition-colors',
+                  coverage.firewallOk
+                    ? 'border-emerald-200 bg-emerald-50/50 dark:border-emerald-900/50 dark:bg-emerald-900/10'
+                    : 'border-amber-200 bg-amber-50/60 dark:border-amber-900/50 dark:bg-amber-900/10',
+                ].join(' ')}
+              >
+                <div className="flex items-center justify-between">
+                  <p className="text-gray-500 text-xs">Firewall</p>
+                  {coverage.firewallOk ? (
+                    <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                  ) : (
+                    <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                  )}
+                </div>
+                <p className="mt-2 text-sm font-semibold">
                   <span className="font-mono">{overview?.firewall?.backend ?? '—'}</span>
-                  {' · '}
-                  <span className="font-mono">{overview?.firewall?.default_policy ?? '—'}</span>
+                </p>
+                <p className="mt-1 text-xs text-gray-600 dark:text-gray-300 font-mono">
+                  varsayılan: {overview?.firewall?.default_policy ?? '—'}
                 </p>
               </div>
-              <div className="rounded-lg border border-gray-100 dark:border-gray-800 p-3">
-                <p className="text-gray-500 text-xs mb-1">ModSecurity</p>
-                <p>
-                  <strong>{overview?.modsecurity?.enabled ? 'açık' : 'kapalı'}</strong>
-                </p>
+
+              <div
+                className={[
+                  'rounded-xl border p-4 transition-colors',
+                  coverage.modsecOk
+                    ? 'border-emerald-200 bg-emerald-50/50 dark:border-emerald-900/50 dark:bg-emerald-900/10'
+                    : 'border-amber-200 bg-amber-50/60 dark:border-amber-900/50 dark:bg-amber-900/10',
+                ].join(' ')}
+              >
+                <div className="flex items-center justify-between">
+                  <p className="text-gray-500 text-xs">ModSecurity</p>
+                  {coverage.modsecOk ? (
+                    <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                  ) : (
+                    <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                  )}
+                </div>
+                <p className="mt-2 text-sm font-semibold">Durum: {coverage.modsecOk ? 'açık' : 'kapalı'}</p>
               </div>
-              <div className="rounded-lg border border-gray-100 dark:border-gray-800 p-3">
-                <p className="text-gray-500 text-xs mb-1">ClamAV</p>
-                <p className="font-mono text-xs">
-                  {overview?.clamav?.last_scan != null
-                    ? String(overview.clamav.last_scan)
-                    : 'Tarama kaydı yok'}
+
+              <div
+                className={[
+                  'rounded-xl border p-4 transition-colors',
+                  coverage.clamavOk
+                    ? 'border-emerald-200 bg-emerald-50/50 dark:border-emerald-900/50 dark:bg-emerald-900/10'
+                    : 'border-amber-200 bg-amber-50/60 dark:border-amber-900/50 dark:bg-amber-900/10',
+                ].join(' ')}
+              >
+                <div className="flex items-center justify-between">
+                  <p className="text-gray-500 text-xs">ClamAV</p>
+                  <Clock className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                </div>
+                <p className="mt-2 text-sm font-semibold">Son tarama</p>
+                <p className="mt-1 text-xs text-gray-600 dark:text-gray-300 font-mono">
+                  {overview?.clamav?.last_scan != null ? String(overview.clamav.last_scan) : 'kayıt yok'}
                 </p>
               </div>
             </div>
+
+            <div className="grid gap-4 lg:grid-cols-3 mt-4">
+              <div className="rounded-xl border border-gray-100 dark:border-gray-800 p-4">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-semibold">Güvenlik kapsaması</p>
+                  <span className="text-xs text-gray-500 dark:text-gray-400 font-mono">
+                    {coverage.enabledCount}/{coverage.total} ({coverage.pct}%)
+                  </span>
+                </div>
+                <div className="mt-3" style={{ height: 190 }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Tooltip />
+                      <Legend />
+                      <Pie
+                        data={coveragePieData}
+                        dataKey="value"
+                        nameKey="name"
+                        innerRadius={62}
+                        outerRadius={82}
+                        stroke="none"
+                        isAnimationActive
+                      >
+                        {coveragePieData.map((p) => (
+                          <Cell key={p.key} fill={p.color} />
+                        ))}
+                      </Pie>
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+                <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                  Modül durumu (Fail2ban, Firewall, ModSecurity, ClamAV) üzerinden yüzdesel özet.
+                </p>
+              </div>
+
+              <div className="rounded-xl border border-gray-100 dark:border-gray-800 p-4 lg:col-span-2">
+                <p className="text-sm font-semibold">Eylem & protokol dağılımı</p>
+                <div className="mt-3 grid gap-4 sm:grid-cols-2">
+                  <div className="rounded-lg border border-gray-100 dark:border-gray-800 p-3">
+                    <p className="text-xs text-gray-500 dark:text-gray-400 font-semibold mb-2">Eylem</p>
+                    <div style={{ height: 190 }}>
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={actionDist}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis dataKey="label" />
+                          <Tooltip />
+                          <Legend />
+                          <Bar dataKey="value" radius={[8, 8, 8, 8]}>
+                            {actionDist.map((a) => (
+                              <Cell key={a.key} fill={a.color} />
+                            ))}
+                          </Bar>
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+
+                  <div className="rounded-lg border border-gray-100 dark:border-gray-800 p-3">
+                    <p className="text-xs text-gray-500 dark:text-gray-400 font-semibold mb-2">Protokol</p>
+                    <div style={{ height: 190 }}>
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Tooltip />
+                          <Legend />
+                          <Pie
+                            data={protocolDist}
+                            dataKey="value"
+                            nameKey="label"
+                            innerRadius={45}
+                            outerRadius={70}
+                            isAnimationActive
+                          >
+                            {protocolDist.map((p, i) => {
+                              const palette = ['#3b82f6', '#8b5cf6', '#f59e0b', '#10b981', '#ef4444', '#64748b']
+                              return <Cell key={p.key} fill={palette[i % palette.length]} />
+                            })}
+                          </Pie>
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             {fwRules.length > 0 && (
               <div>
                 <p className="text-sm font-semibold mb-2">Son güvenlik duvarı kuralları</p>
@@ -118,7 +346,22 @@ export default function SecurityPage() {
                     <tbody>
                       {fwRules.map((r, i) => (
                         <tr key={i} className="border-t border-gray-100 dark:border-gray-800">
-                          <td className="px-3 py-2 font-mono">{String(r.action ?? '—')}</td>
+                          <td className="px-3 py-2 font-mono">
+                            {(() => {
+                              const a = String(r.action ?? '').toLowerCase()
+                              const cls =
+                                a === 'allow'
+                                  ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-200 border-emerald-200 dark:border-emerald-900/40'
+                                  : a === 'deny'
+                                    ? 'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-200 border-red-200 dark:border-red-900/40'
+                                    : 'bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-200 border-amber-200 dark:border-amber-900/40'
+                              return (
+                                <span className={`inline-flex items-center rounded-full border px-2 py-1 text-xs font-mono ${cls}`}>
+                                  {String(r.action ?? '—')}
+                                </span>
+                              )
+                            })()}
+                          </td>
                           <td className="px-3 py-2 font-mono">{String(r.protocol ?? '—')}</td>
                           <td className="px-3 py-2 font-mono">{String(r.port ?? '—')}</td>
                           <td className="px-3 py-2 font-mono text-xs">{String(r.source ?? '—')}</td>

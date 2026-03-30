@@ -3,11 +3,13 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Role;
 use App\Models\User;
 use App\Services\UserHostingPackageSync;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\Rule;
 
 class UserController extends Controller
 {
@@ -37,19 +39,20 @@ class UserController extends Controller
 
     public function store(Request $request): JsonResponse
     {
+        $rolesTable = config('permission.table_names.roles');
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'required|email|unique:users',
             'password' => 'required|string|min:8|confirmed',
-            'role' => 'required|string|in:admin,reseller,user',
+            'role' => ['required', 'string', Rule::exists($rolesTable, 'name')->where('guard_name', 'web')],
             'hosting_package_id' => 'nullable|exists:hosting_packages,id',
             'locale' => 'nullable|string|in:en,tr,de,fr,es,pt,zh,ja,ar,ru',
         ]);
 
+        $roleModel = Role::query()->where('name', $validated['role'])->where('guard_name', 'web')->firstOrFail();
+
         if ($request->user()->isReseller() && ! $request->user()->isAdmin()) {
-            if ($validated['role'] !== 'user') {
-                abort(403, 'Bayiler yalnızca son kullanıcı oluşturabilir.');
-            }
+            abort_unless($this->resellerMayAssignRole($request->user(), $roleModel), 403, __('users.reseller_role_forbidden'));
         }
 
         $user = User::create([
@@ -65,7 +68,7 @@ class UserController extends Controller
                 : null,
         ]);
 
-        $user->assignRole($validated['role']);
+        $user->syncRoles([$roleModel->name]);
 
         return response()->json([
             'message' => __('users.created'),
@@ -82,6 +85,7 @@ class UserController extends Controller
 
     public function update(Request $request, User $user): JsonResponse
     {
+        $rolesTable = config('permission.table_names.roles');
         $validated = $request->validate([
             'name' => 'sometimes|string|max:255',
             'email' => 'sometimes|email|unique:users,email,'.$user->id,
@@ -89,7 +93,17 @@ class UserController extends Controller
             'hosting_package_id' => 'nullable|exists:hosting_packages,id',
             'locale' => 'nullable|string',
             'sync_hosting_package_from_billing' => 'sometimes|boolean',
+            'role' => ['sometimes', 'string', Rule::exists($rolesTable, 'name')->where('guard_name', 'web')],
         ]);
+
+        $roleModel = null;
+        if (isset($validated['role'])) {
+            $roleModel = Role::query()->where('name', $validated['role'])->where('guard_name', 'web')->firstOrFail();
+            if ($request->user()->isReseller() && ! $request->user()->isAdmin()) {
+                abort_unless($this->resellerMayAssignRole($request->user(), $roleModel), 403, __('users.reseller_role_forbidden'));
+            }
+        }
+        unset($validated['role']);
 
         $syncFromBilling = (bool) ($validated['sync_hosting_package_from_billing'] ?? false);
         unset($validated['sync_hosting_package_from_billing']);
@@ -104,7 +118,13 @@ class UserController extends Controller
             if (array_key_exists('hosting_package_id', $validated)) {
                 $validated['hosting_package_manual_override'] = true;
             }
-            $user->update($validated);
+            if ($validated !== []) {
+                $user->update($validated);
+            }
+        }
+
+        if ($roleModel !== null) {
+            $user->syncRoles([$roleModel->name]);
         }
 
         return response()->json([
@@ -125,5 +145,26 @@ class UserController extends Controller
         $user->update(['status' => 'active']);
 
         return response()->json(['message' => __('users.activated')]);
+    }
+
+    private function resellerMayAssignRole(User $reseller, Role $role): bool
+    {
+        if ($role->name === 'admin' || $role->name === 'reseller') {
+            return false;
+        }
+
+        if ($role->name === 'user') {
+            return true;
+        }
+
+        if (! $role->assignable_by_reseller) {
+            return false;
+        }
+
+        if ($role->owner_user_id !== null && (int) $role->owner_user_id !== (int) $reseller->id) {
+            return false;
+        }
+
+        return true;
     }
 }
