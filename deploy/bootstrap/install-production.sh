@@ -29,6 +29,7 @@
 #   WITH_APACHE=1               # apache2; Nginx 80 ile çakışmaz — Apache :8080 + engine apache_http_port: 8080
 #   WITH_LOCAL_POSTFIX=1        # Postfix + mailutils (panel giden posta: sendmail; Admin → Giden posta’dan SMTP’ye geçilebilir)
 #   SKIP_DB_SEED=1              # migrate sonrası db:seed atla
+#   RESET_PANEL_DB=1            # DİKKAT: Panel veritabanını her çalıştırmada sıfırlar (kullanıcı/domain vb. silinir)
 #   (engine systemd drop-in) PANELSAR_TERMINAL_NO_ROOT=1  # web terminali www-data kabuğunda (varsayılan: root sudo)
 #   PANELSAR_ADMIN_EMAIL=...    # ilk admin e-posta (varsayılan admin@panelsar.com)
 #   PANELSAR_ADMIN_PASSWORD=... # sabit şifre; verilmezse kurulumda rastgele üretilir
@@ -359,7 +360,12 @@ if [[ -f "$FRONTEND_ROOT/package.json" ]]; then
     "$FRONTEND_ROOT/dist/" "$PANEL_ROOT/public/"
 fi
 
-sudo -u www-data php "$PANEL_ROOT/artisan" migrate --force
+if [[ "${RESET_PANEL_DB:-0}" == "1" ]] || [[ "${RESET_PANEL_DB:-0}" == "yes" ]]; then
+  echo "==> RESET_PANEL_DB=1: Panel veritabanı sıfırlanıyor (migrate:fresh)."
+  sudo -u www-data php "$PANEL_ROOT/artisan" migrate:fresh --force
+else
+  sudo -u www-data php "$PANEL_ROOT/artisan" migrate --force
+fi
 sudo -u www-data php "$PANEL_ROOT/artisan" panelsar:init-outbound-mail --no-interaction 2>/dev/null || true
 
 if [[ "${SKIP_DB_SEED:-}" != "1" ]]; then

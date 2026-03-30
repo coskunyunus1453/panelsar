@@ -15,15 +15,16 @@ class DomainService
     public function create(User $user, string $name, string $phpVersion, string $serverType): Domain
     {
         return DB::transaction(function () use ($user, $name, $phpVersion, $serverType) {
+            $name = strtolower(trim($name));
             $existing = Domain::query()->where('name', $name)->first();
             if ($existing) {
-                if ($existing->status === 'active') {
-                    abort(422, (string) __('domains.already_active'));
-                }
                 if ($existing->user_id !== $user->id) {
                     abort(403, (string) __('domains.name_owned_elsewhere'));
                 }
 
+                // Aynı kullanıcı aynı alan adını tekrar isterse "self-heal / reprovision" yaklaşımı:
+                // - active ise "zaten aktif" demek yerine idempotent createSite ile doğrula.
+                // - suspended/pending/failed/deleting gibi durumlarda tekrar aktif hale getir.
                 $resp = $this->engineApi->createSite($name, $user->id, $phpVersion, $serverType);
                 if (! empty($resp['error'])) {
                     abort(503, (string) $resp['error']);
@@ -41,7 +42,7 @@ class DomainService
                     'server_type' => $serverType,
                 ]);
 
-                // Mevcut kaydı “active” durumuna al ve engine'i (suspend'tan) aktive et.
+                // Mevcut kaydı “active” durumuna al ve engine'i (gerekirse suspend'tan) aktive et.
                 $this->setPanelStatus($existing, 'active');
 
                 return $existing->fresh();
@@ -76,6 +77,7 @@ class DomainService
     {
         DB::transaction(function () use ($domain) {
             $domain->loadMissing(['databases', 'ftpAccounts']);
+            $domain->update(['status' => 'deleting']);
 
             foreach ($domain->ftpAccounts as $ftp) {
                 try {
@@ -87,7 +89,8 @@ class DomainService
             }
 
             $del = $this->engineApi->deleteSite($domain->name);
-            if (! empty($del['error'])) {
+            if (! empty($del['error']) && ! $this->isIgnorableDeleteError((string) $del['error'])) {
+                $domain->update(['status' => 'failed']);
                 abort(503, (string) $del['error']);
             }
 
@@ -132,7 +135,7 @@ class DomainService
         $status = $status === 'suspended' ? 'suspended' : 'active';
 
         if ($status === 'suspended') {
-            if ($domain->status !== 'suspended') {
+            if (! in_array($domain->status, ['suspended', 'deleting'], true)) {
                 $resp = $this->engineApi->suspendSite($domain->name);
                 if (! empty($resp['error'])) {
                     abort(503, (string) $resp['error']);
@@ -150,5 +153,19 @@ class DomainService
             }
         }
         $domain->update(['status' => 'active']);
+    }
+
+    private function isIgnorableDeleteError(string $error): bool
+    {
+        $e = strtolower(trim($error));
+        if ($e === '') {
+            return false;
+        }
+
+        // Silme idempotent olsun: site zaten yoksa panel tarafı temizliği devam edebilsin.
+        return str_contains($e, 'not found')
+            || str_contains($e, 'site not found')
+            || str_contains($e, 'no such file')
+            || str_contains($e, 'does not exist');
     }
 }
