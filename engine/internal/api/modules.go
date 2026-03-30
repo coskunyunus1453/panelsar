@@ -1,11 +1,14 @@
 package api
 
 import (
+	"encoding/base64"
 	"errors"
+	"mime"
 	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -54,6 +57,10 @@ func registerModuleRoutes(cfg *config.Config, d *daemon.Daemon, api *gin.RouterG
 	api.DELETE("/files", handleFileDelete(cfg))
 	api.GET("/files/read", handleFileRead(cfg))
 	api.POST("/files/write", handleFileWrite(cfg))
+	api.POST("/files/create", handleFileCreate(cfg))
+	api.POST("/files/rename", handleFileRename(cfg))
+	api.POST("/files/move", handleFileMove(cfg))
+	api.GET("/files/download", handleFileDownload(cfg))
 	api.POST("/files/upload", handleFileUpload(cfg))
 
 	api.GET("/backups", func(c *gin.Context) {
@@ -418,17 +425,48 @@ func handleFileList(cfg *config.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		domain := c.Query("domain")
 		path := c.Query("path")
+		limitStr := c.Query("limit")
+		offsetStr := c.Query("offset")
+		sortKey := strings.ToLower(strings.TrimSpace(c.Query("sort")))
+		order := strings.ToLower(strings.TrimSpace(c.Query("order")))
 		if domain == "" {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "domain required"})
 			return
 		}
+
+		limit := 200
+		offset := 0
+		if limitStr != "" {
+			if v, err := strconv.Atoi(limitStr); err == nil && v > 0 && v <= 5000 {
+				limit = v
+			}
+		}
+		if offsetStr != "" {
+			if v, err := strconv.Atoi(offsetStr); err == nil && v >= 0 {
+				offset = v
+			}
+		}
+
+		switch sortKey {
+		case "name", "size", "mtime":
+		default:
+			sortKey = "name"
+		}
+		if order != "desc" {
+			order = "asc"
+		}
 		root := cfg.Paths.WebRoot + "/" + domain
-		list, err := files.List(root, path)
+		list, total, err := files.ListPaged(root, path, offset, limit, sortKey, order)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		c.JSON(http.StatusOK, gin.H{"entries": list})
+		c.JSON(http.StatusOK, gin.H{
+			"entries": list,
+			"total":   total,
+			"offset":  offset,
+			"limit":   limit,
+		})
 	}
 }
 
@@ -506,6 +544,87 @@ func handleFileWrite(cfg *config.Config) gin.HandlerFunc {
 	}
 }
 
+func handleFileCreate(cfg *config.Config) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var req struct {
+			Domain  string `json:"domain" binding:"required"`
+			Path    string `json:"path" binding:"required"`
+			Content string `json:"content"`
+		}
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		root := cfg.Paths.WebRoot + "/" + req.Domain
+		if err := files.CreateFile(root, req.Path, []byte(req.Content), 0o644); err != nil {
+			c.JSON(http.StatusUnprocessableEntity, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"message": "created"})
+	}
+}
+
+func handleFileRename(cfg *config.Config) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var req struct {
+			Domain string `json:"domain" binding:"required"`
+			From   string `json:"from" binding:"required"`
+			To     string `json:"to" binding:"required"`
+		}
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		root := cfg.Paths.WebRoot + "/" + req.Domain
+		if err := files.Rename(root, req.From, req.To); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{"message": "renamed"})
+	}
+}
+
+func handleFileMove(cfg *config.Config) gin.HandlerFunc {
+	// Currently “move” is the same as rename within the engine root.
+	return handleFileRename(cfg)
+}
+
+func handleFileDownload(cfg *config.Config) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		domain := c.Query("domain")
+		path := c.Query("path")
+		if domain == "" || path == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "domain and path required"})
+			return
+		}
+
+		root := cfg.Paths.WebRoot + "/" + domain
+		b, err := files.ReadFileForDownload(root, path)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		// Return base64 so the panel can stream it safely.
+		encoded := base64.StdEncoding.EncodeToString(b)
+		ext := strings.ToLower(filepath.Ext(path))
+		mimeType := mime.TypeByExtension(ext)
+		if mimeType == "" {
+			mimeType = "application/octet-stream"
+		}
+		filename := filepath.Base(path)
+
+		c.JSON(http.StatusOK, gin.H{
+			"content_base64": encoded,
+			"filename":       filename,
+			"mime":           mimeType,
+			"size":           len(b),
+		})
+	}
+}
+
 func handleFileUpload(cfg *config.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		domain := c.PostForm("domain")
@@ -522,6 +641,10 @@ func handleFileUpload(cfg *config.Config) gin.HandlerFunc {
 		name := filepath.Base(fh.Filename)
 		if name == "." || name == ".." || name == "" {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid filename"})
+			return
+		}
+		if files.IsExecutionRiskFile(name) {
+			c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "upload of risky file types is blocked"})
 			return
 		}
 		root := cfg.Paths.WebRoot + "/" + domain

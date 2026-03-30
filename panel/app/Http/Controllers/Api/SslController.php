@@ -44,6 +44,10 @@ class SslController extends Controller
             $email = config('panelsar.lets_encrypt_email') ?: null;
         }
         if ($email === null || $email === '') {
+            // Panelde email girmeden SSL başlatılabiliyor; fallback olarak kullanıcının e-posta adresini kullan.
+            $email = $request->user()?->email;
+        }
+        if ($email === null || $email === '') {
             return response()->json([
                 'message' => __('ssl.email_required'),
             ], 422);

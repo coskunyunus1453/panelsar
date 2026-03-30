@@ -187,7 +187,11 @@
     "delete_confirm_expected": "SILMEKİSTİYORUM",
     "delete_forever": "Kalıcı olarak sil",
     "ssl_active": "Aktif",
-    "ssl_none": "Yok"
+    "ssl_none": "Yok",
+    "confirm_php_change": "PHP {{php}} olarak değiştirilecek. Emin misiniz?",
+    "confirm_server_change": "Web sunucusu {{server}} olarak değiştirilecek. Emin misiniz?",
+    "confirm_status_change": "Site durumu {{status}} olarak değiştirilecek. Emin misiniz?",
+    "confirm_ssl_issue": "Let’s Encrypt ile SSL kurulumu başlatılacak. Doğrulama nedeniyle birkaç dakika sürebilir. Devam edilsin mi?"
   },
   "databases": {
     "title": "Veritabanı Yönetimi",
@@ -280,6 +284,7 @@
     "unsaved_close": "Kaydedilmemiş değişiklikler var. Kapatılsın mı?",
     "editing": "Dosya",
     "cannot_edit": "Bu dosya türü düzenleyicide açılamaz",
+    "risky_readonly": "Güvenlik nedeniyle bu dosya türü salt okunurdur.",
     "read_error": "Dosya okunamadı"
   },
   "backups": {

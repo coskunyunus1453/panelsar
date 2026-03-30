@@ -29,7 +29,7 @@ class DomainController extends Controller
     public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'name' => 'required|string|unique:domains,name|max:255',
+            'name' => 'required|string|max:255',
             'php_version' => 'nullable|string|in:7.4,8.0,8.1,8.2,8.3,8.4',
             'server_type' => 'nullable|string|in:nginx,apache',
         ]);
@@ -113,7 +113,17 @@ class DomainController extends Controller
             'server_type' => 'required|string|in:nginx,apache',
         ]);
 
-        $this->domainService->switchServerType($domain, $validated['server_type']);
+        try {
+            $this->domainService->switchServerType($domain, $validated['server_type']);
+        } catch (\Throwable $e) {
+            report($e);
+            $code = method_exists($e, 'getStatusCode') ? $e->getStatusCode() : 503;
+            if (! is_int($code) || $code < 400 || $code > 599) $code = 503;
+
+            return response()->json([
+                'message' => $e->getMessage() ?: __('domains.server_switched'),
+            ], $code);
+        }
 
         return response()->json([
             'message' => __('domains.server_switched'),
@@ -129,7 +139,17 @@ class DomainController extends Controller
             'php_version' => 'required|string|in:7.4,8.0,8.1,8.2,8.3,8.4',
         ]);
 
-        $this->domainService->switchPhpVersion($domain, $validated['php_version']);
+        try {
+            $this->domainService->switchPhpVersion($domain, $validated['php_version']);
+        } catch (\Throwable $e) {
+            report($e);
+            $code = method_exists($e, 'getStatusCode') ? $e->getStatusCode() : 503;
+            if (! is_int($code) || $code < 400 || $code > 599) $code = 503;
+
+            return response()->json([
+                'message' => $e->getMessage() ?: __('domains.php_switched'),
+            ], $code);
+        }
 
         return response()->json([
             'message' => __('domains.php_switched'),

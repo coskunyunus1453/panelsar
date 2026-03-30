@@ -123,25 +123,94 @@ class EngineApiService
     }
 
     /**
-     * @return array{entries: list<array<string, mixed>>, error: ?string}
+     * @return array{entries: list<array<string, mixed>>, total: int, offset: int, limit: int, error: ?string}
      */
-    public function listFilesResult(string $domain, string $path = ''): array
+    /**
+     * @return array{entries: list<array<string, mixed>>, total: int, offset: int, limit: int, error: ?string}
+     */
+    public function listFilesResult(
+        string $domain,
+        string $path = '',
+        int $limit = 200,
+        int $offset = 0,
+        string $sort = 'name',
+        string $order = 'asc',
+    ): array
     {
-        $q = http_build_query(['domain' => $domain, 'path' => $path]);
+        $q = http_build_query([
+            'domain' => $domain,
+            'path' => $path,
+            'limit' => $limit,
+            'offset' => $offset,
+            'sort' => $sort,
+            'order' => $order,
+        ]);
         try {
             $response = $this->client()->get($this->baseUrl.'/api/v1/files?'.$q);
             $json = $response->json() ?? [];
             if (! $response->successful()) {
                 $msg = is_string($json['error'] ?? null) ? $json['error'] : ($response->body() ?: 'HTTP '.$response->status());
 
-                return ['entries' => [], 'error' => $msg];
+                return ['entries' => [], 'total' => 0, 'offset' => 0, 'limit' => 0, 'error' => $msg];
             }
 
-            return ['entries' => $json['entries'] ?? [], 'error' => null];
+            return [
+                'entries' => $json['entries'] ?? [],
+                'total' => (int) ($json['total'] ?? 0),
+                'offset' => (int) ($json['offset'] ?? 0),
+                'limit' => (int) ($json['limit'] ?? 0),
+                'error' => null,
+            ];
         } catch (\Exception $e) {
             Log::error('Engine API GET /files failed: '.$e->getMessage());
 
-            return ['entries' => [], 'error' => $e->getMessage()];
+            return ['entries' => [], 'total' => 0, 'offset' => 0, 'limit' => 0, 'error' => $e->getMessage()];
+        }
+    }
+
+    /**
+     * @return array{message?: string, error?: string}
+     */
+    public function renameFile(string $domain, string $from, string $to): array
+    {
+        return $this->postEngineJsonChecked('/api/v1/files/rename', [
+            'domain' => $domain,
+            'from' => $from,
+            'to' => $to,
+        ]);
+    }
+
+    /**
+     * @return array{message?: string, error?: string}
+     */
+    public function moveFile(string $domain, string $from, string $to): array
+    {
+        return $this->postEngineJsonChecked('/api/v1/files/move', [
+            'domain' => $domain,
+            'from' => $from,
+            'to' => $to,
+        ]);
+    }
+
+    /**
+     * @return array{content_base64?: string, filename?: string, mime?: string, size?: int, error?: string}
+     */
+    public function downloadFile(string $domain, string $path): array
+    {
+        $q = http_build_query(['domain' => $domain, 'path' => $path]);
+        try {
+            $response = $this->client()->get($this->baseUrl.'/api/v1/files/download?'.$q);
+            $json = $response->json() ?? [];
+            if (! $response->successful()) {
+                $msg = is_string($json['error'] ?? null) ? $json['error'] : ($response->body() ?: 'HTTP '.$response->status());
+
+                return ['error' => $msg];
+            }
+            return $json;
+        } catch (\Exception $e) {
+            Log::error('Engine API GET /files/download failed: '.$e->getMessage());
+
+            return ['error' => $e->getMessage()];
         }
     }
 
@@ -197,6 +266,15 @@ class EngineApiService
     public function writeFile(string $domain, string $path, string $content): array
     {
         return $this->postEngineJsonChecked('/api/v1/files/write', [
+            'domain' => $domain,
+            'path' => $path,
+            'content' => $content,
+        ]);
+    }
+
+    public function createFile(string $domain, string $path, string $content): array
+    {
+        return $this->postEngineJsonChecked('/api/v1/files/create', [
             'domain' => $domain,
             'path' => $path,
             'content' => $content,

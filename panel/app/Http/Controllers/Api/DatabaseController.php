@@ -80,6 +80,18 @@ class DatabaseController extends Controller
             $this->databaseService->updateGrantHost($database, $validated['grant_host']);
         } catch (\InvalidArgumentException $e) {
             return response()->json(['message' => $e->getMessage()], 422);
+        } catch (PDOException $e) {
+            report($e);
+
+            return response()->json([
+                'message' => __('databases.provision_failed').': '.$e->getMessage(),
+            ], 503);
+        } catch (\Throwable $e) {
+            report($e);
+
+            return response()->json([
+                'message' => $e->getMessage() ?: __('databases.provision_failed'),
+            ], 500);
         }
 
         return response()->json([
@@ -100,6 +112,18 @@ class DatabaseController extends Controller
             $result = $this->databaseService->rotatePassword($database);
         } catch (\InvalidArgumentException $e) {
             return response()->json(['message' => $e->getMessage()], 422);
+        } catch (PDOException $e) {
+            report($e);
+
+            return response()->json([
+                'message' => __('databases.provision_failed').': '.$e->getMessage(),
+            ], 503);
+        } catch (\Throwable $e) {
+            report($e);
+
+            return response()->json([
+                'message' => $e->getMessage() ?: __('databases.provision_failed'),
+            ], 500);
         }
 
         return response()->json([
@@ -113,7 +137,21 @@ class DatabaseController extends Controller
     {
         $this->authorize('delete', $database);
 
-        $this->databaseService->delete($database);
+        try {
+            $this->databaseService->delete($database);
+        } catch (PDOException $e) {
+            report($e);
+
+            return response()->json([
+                'message' => __('databases.provision_failed').': '.$e->getMessage(),
+            ], 503);
+        } catch (\Throwable $e) {
+            report($e);
+
+            return response()->json([
+                'message' => $e->getMessage() ?: __('databases.provision_failed'),
+            ], 500);
+        }
 
         return response()->json(['message' => __('databases.deleted')]);
     }

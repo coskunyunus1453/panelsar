@@ -54,6 +54,9 @@ export default function DatabasesPage() {
     queryFn: async () => (await api.get('/domains')).data,
   })
 
+  const phpmyadminUrl = uiLinksQ.data?.phpmyadmin_url?.trim() ?? ''
+  const adminerUrl = uiLinksQ.data?.adminer_url?.trim() ?? ''
+
   const createM = useMutation({
     mutationFn: async (payload: {
       name: string
@@ -129,8 +132,8 @@ export default function DatabasesPage() {
   const filtered = list.filter((db) => db.name.toLowerCase().includes(search.toLowerCase()))
 
   const openDbWebUi = (db: DbRow) => {
-    const php = uiLinksQ.data?.phpmyadmin_url?.trim() ?? ''
-    const adm = uiLinksQ.data?.adminer_url?.trim() ?? ''
+    const php = phpmyadminUrl
+    const adm = adminerUrl
     if (db.type === 'mysql') {
       if (!php) {
         toast.error(
@@ -414,15 +417,24 @@ export default function DatabasesPage() {
                             <KeyRound className="h-4 w-4" />
                           </button>
                         )}
-                        {(db.type === 'mysql' || db.type === 'postgresql') && (
+                        {db.type === 'mysql' && phpmyadminUrl && (
                           <button
                             type="button"
                             className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500"
                             title={
-                              db.type === 'mysql'
-                                ? t('databases.phpmyadmin')
-                                : t('databases.adminer')
+                              t('databases.phpmyadmin')
                             }
+                            onClick={() => openDbWebUi(db)}
+                          >
+                            <ExternalLink className="h-4 w-4" />
+                          </button>
+                        )}
+
+                        {db.type === 'postgresql' && adminerUrl && (
+                          <button
+                            type="button"
+                            className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500"
+                            title={t('databases.adminer')}
                             onClick={() => openDbWebUi(db)}
                           >
                             <ExternalLink className="h-4 w-4" />

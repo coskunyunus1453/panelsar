@@ -15,6 +15,38 @@ class DomainService
     public function create(User $user, string $name, string $phpVersion, string $serverType): Domain
     {
         return DB::transaction(function () use ($user, $name, $phpVersion, $serverType) {
+            $existing = Domain::query()->where('name', $name)->first();
+            if ($existing) {
+                if ($existing->status === 'active') {
+                    abort(422, (string) __('domains.already_active'));
+                }
+                if ($existing->user_id !== $user->id) {
+                    abort(403, (string) __('domains.name_owned_elsewhere'));
+                }
+
+                $resp = $this->engineApi->createSite($name, $user->id, $phpVersion, $serverType);
+                if (! empty($resp['error'])) {
+                    abort(503, (string) $resp['error']);
+                }
+                if (empty($resp['domain'])) {
+                    abort(503, 'Engine yanıt vermedi; motor çalışıyor mu ve ENGINE_INTERNAL_KEY eşleşiyor mu kontrol edin.');
+                }
+
+                $fallbackRoot = rtrim((string) config('panelsar.hosting_web_root'), DIRECTORY_SEPARATOR);
+                $documentRoot = (string) ($resp['document_root'] ?? $fallbackRoot.DIRECTORY_SEPARATOR.$name.DIRECTORY_SEPARATOR.'public_html');
+
+                $existing->update([
+                    'document_root' => $documentRoot,
+                    'php_version' => $phpVersion,
+                    'server_type' => $serverType,
+                ]);
+
+                // Mevcut kaydı “active” durumuna al ve engine'i (suspend'tan) aktive et.
+                $this->setPanelStatus($existing, 'active');
+
+                return $existing->fresh();
+            }
+
             $resp = $this->engineApi->createSite($name, $user->id, $phpVersion, $serverType);
             if (! empty($resp['error'])) {
                 abort(503, (string) $resp['error']);

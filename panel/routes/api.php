@@ -54,13 +54,17 @@ Route::middleware(['auth:sanctum', 'abilities:access:customer-panel'])->group(fu
     Route::post('databases/{database}/rotate-password', [DatabaseController::class, 'rotatePassword']);
 
     Route::prefix('domains/{domain}/files')->group(function () {
-        Route::get('/', [FileManagerController::class, 'index']);
-        Route::get('search', [FileManagerController::class, 'search']);
-        Route::post('mkdir', [FileManagerController::class, 'mkdir']);
-        Route::delete('/', [FileManagerController::class, 'destroy']);
-        Route::get('read', [FileManagerController::class, 'read']);
-        Route::post('write', [FileManagerController::class, 'write']);
-        Route::post('upload', [FileManagerController::class, 'upload']);
+        Route::get('/', [FileManagerController::class, 'index'])->middleware('throttle:files-read');
+        Route::get('search', [FileManagerController::class, 'search'])->middleware('throttle:files-read');
+        Route::post('mkdir', [FileManagerController::class, 'mkdir'])->middleware('throttle:files-write');
+        Route::delete('/', [FileManagerController::class, 'destroy'])->middleware('throttle:files-write');
+        Route::get('read', [FileManagerController::class, 'read'])->middleware('throttle:files-read');
+        Route::post('write', [FileManagerController::class, 'write'])->middleware('throttle:files-write');
+        Route::post('create', [FileManagerController::class, 'create'])->middleware('throttle:files-write');
+        Route::post('upload', [FileManagerController::class, 'upload'])->middleware('throttle:files-upload');
+        Route::post('rename', [FileManagerController::class, 'rename'])->middleware('throttle:files-write');
+        Route::post('move', [FileManagerController::class, 'move'])->middleware('throttle:files-write');
+        Route::get('download', [FileManagerController::class, 'download'])->middleware('throttle:files-read');
     });
 
     Route::get('backups', [BackupController::class, 'index']);

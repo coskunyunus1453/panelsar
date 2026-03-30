@@ -44,6 +44,21 @@ class AppServiceProvider extends ServiceProvider
             return Limit::perMinute(600)->by($request->ip());
         });
 
+        // Dosya yöneticisi: okuma (listele/oku/indir) daha yüksek limit
+        RateLimiter::for('files-read', function (Request $request) {
+            return Limit::perMinute(60)->by($request->user()?->id ?: $request->ip());
+        });
+
+        // Dosya yöneticisi: yazma/silme/taşıma/yeniden adlandırma
+        RateLimiter::for('files-write', function (Request $request) {
+            return Limit::perMinute(30)->by($request->user()?->id ?: $request->ip());
+        });
+
+        // Upload daha kısıtlı
+        RateLimiter::for('files-upload', function (Request $request) {
+            return Limit::perMinute(10)->by($request->user()?->id ?: $request->ip());
+        });
+
         Gate::policy(Domain::class, DomainPolicy::class);
         Gate::policy(Database::class, DatabasePolicy::class);
 

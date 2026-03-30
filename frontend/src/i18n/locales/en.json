@@ -187,7 +187,11 @@
     "delete_confirm_expected": "DELETEALLDATA",
     "delete_forever": "Delete permanently",
     "ssl_active": "Active",
-    "ssl_none": "None"
+    "ssl_none": "None",
+    "confirm_php_change": "PHP will change to {{php}}. Are you sure?",
+    "confirm_server_change": "Web server will change to {{server}}. Are you sure?",
+    "confirm_status_change": "Site status will change to {{status}}. Continue?",
+    "confirm_ssl_issue": "Let's Encrypt SSL setup will start. Validation may take a few minutes. Continue?"
   },
   "databases": {
     "title": "Database Management",
@@ -280,6 +284,7 @@
     "unsaved_close": "You have unsaved changes. Close anyway?",
     "editing": "File",
     "cannot_edit": "This file type cannot be opened in the editor",
+    "risky_readonly": "This file type is read-only for security reasons.",
     "read_error": "Could not read file"
   },
   "backups": {
