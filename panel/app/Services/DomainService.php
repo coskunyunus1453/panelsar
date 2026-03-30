@@ -76,7 +76,7 @@ class DomainService
     public function delete(Domain $domain): void
     {
         DB::transaction(function () use ($domain) {
-            $domain->loadMissing(['databases', 'ftpAccounts']);
+            $domain->loadMissing(['databases', 'ftpAccounts', 'siteSubdomains']);
             $domain->update(['status' => 'deleting']);
 
             foreach ($domain->ftpAccounts as $ftp) {
@@ -86,6 +86,18 @@ class DomainService
                     report($e);
                 }
                 $ftp->delete();
+            }
+
+            foreach ($domain->siteSubdomains as $sub) {
+                try {
+                    $rm = $this->engineApi->siteRemoveSubdomain($domain->name, $sub->path_segment);
+                    if (! empty($rm['error']) && ! $this->isIgnorableDeleteError((string) $rm['error'])) {
+                        $domain->update(['status' => 'failed']);
+                        abort(503, (string) $rm['error']);
+                    }
+                } catch (\Throwable $e) {
+                    report($e);
+                }
             }
 
             $del = $this->engineApi->deleteSite($domain->name);

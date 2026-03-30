@@ -57,6 +57,10 @@ func NewRouter(cfg *config.Config, d *daemon.Daemon, log *logrus.Logger) *gin.En
 			site.POST("/:domain/activate", handleActivateSite(cfg, d))
 			site.DELETE("/:domain", handleDeleteSite(cfg, d))
 			site.GET("", handleListSites(cfg, d))
+			site.POST("/:domain/subdomains", handleAddSubdomain(cfg, d))
+			site.DELETE("/:domain/subdomains", handleRemoveSubdomain(cfg, d))
+			site.POST("/:domain/aliases", handleAddSiteAlias(cfg, d))
+			site.DELETE("/:domain/aliases", handleRemoveSiteAlias(cfg, d))
 		}
 
 		ssl := api.Group("/ssl")
@@ -384,5 +388,144 @@ func handleRevokeSSL(cfg *config.Config) gin.HandlerFunc {
 			}
 		}
 		c.JSON(http.StatusOK, gin.H{"message": "SSL removed", "domain": req.Domain})
+	}
+}
+
+func handleAddSubdomain(cfg *config.Config, d *daemon.Daemon) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		parent := strings.TrimSpace(c.Param("domain"))
+		var req struct {
+			Hostname    string `json:"hostname" binding:"required"`
+			PathSegment string `json:"path_segment" binding:"required"`
+			PHPVersion  string `json:"php_version"`
+		}
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		parentMeta, _ := sites.ReadSiteMeta(cfg.Paths.WebRoot, parent)
+		phpV := strings.TrimSpace(req.PHPVersion)
+		if phpV == "" && parentMeta != nil {
+			phpV = parentMeta.PHPVersion
+		}
+		if phpV == "" {
+			phpV = "8.2"
+		}
+		st := "nginx"
+		if parentMeta != nil && parentMeta.ServerType != "" {
+			st = strings.ToLower(parentMeta.ServerType)
+		}
+		docRoot, err := sites.ProvisionSubdomain(cfg.Paths.WebRoot, parent, req.Hostname, req.PathSegment, phpV, st)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		subMeta := &sites.SiteMeta{
+			PHPVersion:   phpV,
+			DocumentRoot: docRoot,
+			ServerType:   st,
+		}
+		if err := hosting.ApplySubdomainVhost(cfg, parent, req.Hostname, docRoot, subMeta); err != nil {
+			_ = hosting.RemoveSubdomainVhost(cfg, req.Hostname, subMeta)
+			_, _ = sites.RemoveSubdomain(cfg.Paths.WebRoot, parent, req.PathSegment)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusCreated, gin.H{
+			"message":        "subdomain created",
+			"document_root":  docRoot,
+			"hostname":       req.Hostname,
+			"path_segment":   req.PathSegment,
+		})
+	}
+}
+
+func handleRemoveSubdomain(cfg *config.Config, d *daemon.Daemon) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		parent := strings.TrimSpace(c.Param("domain"))
+		var req struct {
+			PathSegment string `json:"path_segment" binding:"required"`
+		}
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		subMeta, _ := sites.ReadSubdomainMeta(cfg.Paths.WebRoot, parent, req.PathSegment)
+		if subMeta != nil && strings.TrimSpace(subMeta.Hostname) != "" {
+			_ = hosting.RemoveSubdomainVhost(cfg, subMeta.Hostname, subMeta)
+		}
+		_, err := sites.RemoveSubdomain(cfg.Paths.WebRoot, parent, req.PathSegment)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"message": "subdomain removed"})
+	}
+}
+
+func handleAddSiteAlias(cfg *config.Config, d *daemon.Daemon) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		parent := strings.TrimSpace(c.Param("domain"))
+		var req struct {
+			Hostname string `json:"hostname" binding:"required"`
+		}
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		if err := sites.AppendAlias(cfg.Paths.WebRoot, parent, req.Hostname); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		meta, err := sites.ReadSiteMeta(cfg.Paths.WebRoot, parent)
+		if err != nil || meta == nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "site not found"})
+			return
+		}
+		phpSock := ""
+		if cfg.Hosting.PHPFPMmanagePools {
+			phpSock = phpfpmSettings(cfg).SocketForDomain(parent)
+		} else {
+			phpSock = nginx.EffectivePHPSocket(meta.PHPVersion, cfg.Hosting.PHPFPMsocket)
+		}
+		if err := hosting.ApplyWebServer(cfg, parent, meta.DocumentRoot, meta, phpSock); err != nil {
+			_ = sites.RemoveAlias(cfg.Paths.WebRoot, parent, req.Hostname)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"message": "alias added", "hostname": req.Hostname})
+	}
+}
+
+func handleRemoveSiteAlias(cfg *config.Config, d *daemon.Daemon) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		parent := strings.TrimSpace(c.Param("domain"))
+		var req struct {
+			Hostname string `json:"hostname" binding:"required"`
+		}
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		if err := sites.RemoveAlias(cfg.Paths.WebRoot, parent, req.Hostname); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		meta, err := sites.ReadSiteMeta(cfg.Paths.WebRoot, parent)
+		if err != nil || meta == nil {
+			c.JSON(http.StatusOK, gin.H{"message": "alias removed"})
+			return
+		}
+		phpSock := ""
+		if cfg.Hosting.PHPFPMmanagePools {
+			phpSock = phpfpmSettings(cfg).SocketForDomain(parent)
+		} else {
+			phpSock = nginx.EffectivePHPSocket(meta.PHPVersion, cfg.Hosting.PHPFPMsocket)
+		}
+		if err := hosting.ApplyWebServer(cfg, parent, meta.DocumentRoot, meta, phpSock); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"message": "alias removed"})
 	}
 }

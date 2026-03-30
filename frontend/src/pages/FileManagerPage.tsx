@@ -181,9 +181,6 @@ export default function FileManagerPage() {
   const [sortKey, setSortKey] = useState<'name' | 'size' | 'mtime'>('name')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
 
-  // Sunucu sayfalaması: yalnızca geçerli sayfa girdileri.
-  const [mergedEntries, setMergedEntries] = useState<ListEntry[]>([])
-  const [totalCount, setTotalCount] = useState(0)
   const listScrollRef = useRef<HTMLDivElement | null>(null)
   const fileOpsRef = useRef<HTMLDivElement | null>(null)
 
@@ -268,28 +265,14 @@ export default function FileManagerPage() {
 
   useEffect(() => {
     setOffset(0)
-    setMergedEntries([])
-    setTotalCount(0)
     setSelectedIds(new Set())
   }, [path, sortKey, sortOrder, domainId, pageSize])
 
-  useEffect(() => {
-    if (!filesQ.data) return
-    const pageEntries = filesQ.data.entries ?? []
-    const tot = filesQ.data.total ?? 0
-    setTotalCount(tot)
-    setMergedEntries(pageEntries)
-  }, [filesQ.data])
-
-  const goIntoFolder = useCallback(
-    (folderName: string) => {
-      if (!folderName || filesQ.isFetching) return
-      const next = path ? joinRel(path, folderName) : folderName
-      setPath(next)
-      setSelected(null)
-    },
-    [path, filesQ.isFetching],
-  )
+  const goIntoFolder = useCallback((folderName: string) => {
+    if (!folderName) return
+    setPath((prev) => (prev ? joinRel(prev, folderName) : folderName))
+    setSelected(null)
+  }, [])
 
   const docHint = filesQ.data?.document_root_hint
 
@@ -396,7 +379,6 @@ export default function FileManagerPage() {
     onSuccess: async () => {
       toast.success(t('files.folder_created'))
       setOffset(0)
-      setMergedEntries([])
       await qc.invalidateQueries({ queryKey: ['files', domainId, path] })
       await qc.refetchQueries({ queryKey: ['files', domainId, path] })
     },
@@ -415,7 +397,6 @@ export default function FileManagerPage() {
     onSuccess: async (relPath) => {
       toast.success(t('files.file_created'))
       setOffset(0)
-      setMergedEntries([])
       await qc.invalidateQueries({ queryKey: ['files', domainId, path] })
       await qc.refetchQueries({ queryKey: ['files', domainId, path] })
       const base = relPath.split('/').pop() || relPath
@@ -439,7 +420,6 @@ export default function FileManagerPage() {
     onSuccess: async () => {
       toast.success(t('files.upload_ok'))
       setOffset(0)
-      setMergedEntries([])
       await qc.invalidateQueries({ queryKey: ['files', domainId, path] })
       await qc.refetchQueries({ queryKey: ['files', domainId, path] })
     },
@@ -455,13 +435,15 @@ export default function FileManagerPage() {
 
   const deleteM = useMutation({
     mutationFn: async (rel: string) => {
-      await api.delete(`/domains/${domainId}/files`, { params: { path: rel } })
+      await api.delete(`/domains/${domainId}/files`, {
+        params: { path: rel },
+        data: { path: rel },
+      })
     },
     onSuccess: () => {
       toast.success(t('files.deleted'))
       setSelected(null)
       setOffset(0)
-      setMergedEntries([])
       qc.invalidateQueries({ queryKey: ['files', domainId, path] })
     },
     onError: (err: unknown) => {
@@ -478,7 +460,6 @@ export default function FileManagerPage() {
       qc.invalidateQueries({ queryKey: ['files', domainId, path] })
       setSelected(null)
       setOffset(0)
-      setMergedEntries([])
       setRenameDialog(null)
     },
     onError: (err: unknown) => {
@@ -495,7 +476,6 @@ export default function FileManagerPage() {
       qc.invalidateQueries({ queryKey: ['files', domainId, path] })
       setSelected(null)
       setOffset(0)
-      setMergedEntries([])
       setMoveDialog(null)
     },
     onError: (err: unknown) => {
@@ -579,8 +559,8 @@ export default function FileManagerPage() {
     multiple: true,
   })
 
-  const entries = mergedEntries
-  const total = totalCount
+  const entries = filesQ.data?.entries ?? []
+  const total = filesQ.data?.total ?? 0
   const crumbs = splitBreadcrumbs(path)
   const currentTab = tabs[activeTab]
 
@@ -1073,9 +1053,8 @@ export default function FileManagerPage() {
                                   'inline-flex max-w-md items-center gap-2 rounded-md px-1 py-0.5 text-left font-mono text-gray-900 hover:bg-gray-100 dark:text-gray-100 dark:hover:bg-gray-800',
                                   isSel && 'bg-primary-100 ring-1 ring-primary-300 dark:bg-primary-900/30 dark:ring-primary-700',
                                 )}
-                                onClick={() => setSelected(e.name)}
-                                onDoubleClick={(ev) => {
-                                  ev.preventDefault()
+                                onClick={() => {
+                                  setSelected(e.name)
                                   goIntoFolder(e.name)
                                 }}
                               >
@@ -1214,10 +1193,17 @@ export default function FileManagerPage() {
                             ? 'border-primary-400 bg-primary-50/80 dark:bg-primary-900/20'
                             : 'border-gray-200 bg-white hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900/40 dark:hover:bg-gray-800',
                         )}
-                        onClick={() => setSelected(e.name)}
+                        onClick={() => {
+                          if (e.is_dir) {
+                            setSelected(e.name)
+                            goIntoFolder(e.name)
+                          } else {
+                            setSelected(e.name)
+                          }
+                        }}
                         onDoubleClick={() => {
-                          if (e.is_dir) goIntoFolder(e.name)
-                          else if (isImageFile(rel)) void previewImage(rel)
+                          if (e.is_dir) return
+                          if (isImageFile(rel)) void previewImage(rel)
                           else void openFileWrapped(rel)
                         }}
                         onKeyDown={(ev) => {

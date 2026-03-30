@@ -96,6 +96,45 @@ class EngineApiService
         return $this->postChecked('/api/v1/sites/'.rawurlencode($domain).'/activate', []);
     }
 
+    /**
+     * @param  array{hostname: string, path_segment: string, php_version?: string}  $payload
+     * @return array<string, mixed>
+     */
+    public function siteAddSubdomain(string $parentDomain, array $payload): array
+    {
+        return $this->postChecked('/api/v1/sites/'.rawurlencode($parentDomain).'/subdomains', $payload);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function siteRemoveSubdomain(string $parentDomain, string $pathSegment): array
+    {
+        return $this->deleteJsonChecked('/api/v1/sites/'.rawurlencode($parentDomain).'/subdomains', [
+            'path_segment' => $pathSegment,
+        ]);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function siteAddAlias(string $parentDomain, string $hostname): array
+    {
+        return $this->postChecked('/api/v1/sites/'.rawurlencode($parentDomain).'/aliases', [
+            'hostname' => $hostname,
+        ]);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function siteRemoveAlias(string $parentDomain, string $hostname): array
+    {
+        return $this->deleteJsonChecked('/api/v1/sites/'.rawurlencode($parentDomain).'/aliases', [
+            'hostname' => $hostname,
+        ]);
+    }
+
     public function issueSSL(string $domain, ?string $email = null): array
     {
         $data = ['domain' => $domain];
@@ -506,6 +545,31 @@ class EngineApiService
     {
         try {
             $response = $this->client()->delete($this->baseUrl.$path);
+            $json = $response->json() ?? [];
+            if (! $response->successful()) {
+                $msg = is_string($json['error'] ?? null) ? $json['error'] : ($response->body() ?: 'HTTP '.$response->status());
+
+                return ['error' => $msg];
+            }
+
+            return $json;
+        } catch (\Exception $e) {
+            Log::error("Engine API DELETE {$path} failed: {$e->getMessage()}");
+
+            return ['error' => $e->getMessage()];
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    private function deleteJsonChecked(string $path, array $data): array
+    {
+        try {
+            $response = $this->client()
+                ->withBody(json_encode($data, JSON_THROW_ON_ERROR), 'application/json')
+                ->delete($this->baseUrl.$path);
             $json = $response->json() ?? [];
             if (! $response->successful()) {
                 $msg = is_string($json['error'] ?? null) ? $json['error'] : ($response->body() ?: 'HTTP '.$response->status());

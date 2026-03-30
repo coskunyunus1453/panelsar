@@ -73,4 +73,16 @@ class Domain extends Model
     {
         return $this->hasMany(FtpAccount::class);
     }
+
+    /** Alt alan adları (örn. blog.example.com) — fiziksel dizin site kökü altında. */
+    public function siteSubdomains()
+    {
+        return $this->hasMany(SiteSubdomain::class, 'domain_id');
+    }
+
+    /** Bu siteye eklenen ek alan adları (aynı belge kökü). */
+    public function siteDomainAliases()
+    {
+        return $this->hasMany(SiteDomainAlias::class, 'domain_id');
+    }
 }

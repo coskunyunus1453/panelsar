@@ -20,18 +20,55 @@ func DomainSafe(domain string) bool {
 	return domainSafe.MatchString(domain)
 }
 
-const vhostTemplateSSL = `# Panelsar — {{.Domain}} (HTTPS)
+// BuildServerNamesLine birincil alan adı ve ek adlar için nginx server_name satırı üretir.
+func BuildServerNamesLine(primary string, aliases []string) string {
+	primary = strings.ToLower(strings.TrimSpace(primary))
+	if primary == "" || !domainSafe.MatchString(primary) {
+		return ""
+	}
+	seen := map[string]struct{}{}
+	var parts []string
+	add := func(s string) {
+		s = strings.ToLower(strings.TrimSpace(s))
+		if s == "" || !domainSafe.MatchString(s) {
+			return
+		}
+		if _, ok := seen[s]; ok {
+			return
+		}
+		seen[s] = struct{}{}
+		parts = append(parts, s)
+	}
+	add(primary)
+	add("www." + primary)
+	for _, a := range aliases {
+		al := strings.ToLower(strings.TrimSpace(a))
+		if al == "" || al == primary {
+			continue
+		}
+		if !domainSafe.MatchString(al) {
+			continue
+		}
+		add(al)
+		if !strings.HasPrefix(al, "www.") {
+			add("www." + al)
+		}
+	}
+	return strings.Join(parts, " ")
+}
+
+const vhostTemplateSSL = `# Panelsar — {{.PrimaryLabel}} (HTTPS)
 server {
     listen 80;
     listen [::]:80;
-    server_name {{.Domain}} www.{{.Domain}};
+    server_name {{.ServerNames}};
     return 301 https://$host$request_uri;
 }
 
 server {
     listen 443 ssl http2;
     listen [::]:443 ssl http2;
-    server_name {{.Domain}} www.{{.Domain}};
+    server_name {{.ServerNames}};
 
     ssl_certificate {{.SSLFullChain}};
     ssl_certificate_key {{.SSLPrivKey}};
@@ -62,11 +99,11 @@ server {
 }
 `
 
-const vhostTemplateHTTP = `# Panelsar — {{.Domain}}
+const vhostTemplateHTTP = `# Panelsar — {{.PrimaryLabel}}
 server {
     listen 80;
     listen [::]:80;
-    server_name {{.Domain}} www.{{.Domain}};
+    server_name {{.ServerNames}};
     root {{.DocRoot}};
     index index.php index.html;
 
@@ -90,13 +127,14 @@ server {
 `
 
 type vhostVars struct {
-	Domain        string
-	DocRoot       string
-	AccessLog     string
-	ErrorLog      string
-	PHPSocket     string
-	SSLFullChain  string
-	SSLPrivKey    string
+	PrimaryLabel string
+	ServerNames  string
+	DocRoot      string
+	AccessLog    string
+	ErrorLog     string
+	PHPSocket    string
+	SSLFullChain string
+	SSLPrivKey   string
 }
 
 // PHPSocketPath üretir: override doluysa onu; değilse /run/php/php{version}-fpm.sock (örn. 8.2).
@@ -135,18 +173,29 @@ func confBaseName(domain string) string {
 }
 
 // ApplyVhost sites-available altına conf yazar ve istenirse sites-enabled’a sembolik bağ oluşturur.
+// confName: dosya adı / log öneki (örn. example.com veya blog.example.com).
+// serverNamesLine boşsa confName + www.confName kullanılır.
 // sslFullchain ve sslPrivkey doluysa 443 + 80’de HTTPS yönlendirmesi üretilir.
-func ApplyVhost(cfg *config.Config, domain, docRoot, phpSocket, sslFullchain, sslPrivkey string) error {
+func ApplyVhost(cfg *config.Config, confName, docRoot, phpSocket, sslFullchain, sslPrivkey, serverNamesLine string) error {
 	if !cfg.Hosting.NginxManageVhosts {
 		return nil
 	}
-	if !domainSafe.MatchString(domain) {
+	confName = strings.ToLower(strings.TrimSpace(confName))
+	if !domainSafe.MatchString(confName) {
 		return fmt.Errorf("invalid domain for vhost")
 	}
 	if strings.Contains(docRoot, "..") {
 		return fmt.Errorf("invalid document root")
 	}
 	docRoot = filepath.Clean(docRoot)
+
+	sn := strings.TrimSpace(serverNamesLine)
+	if sn == "" {
+		sn = BuildServerNamesLine(confName, nil)
+	}
+	if sn == "" {
+		return fmt.Errorf("invalid server_name")
+	}
 
 	if err := os.MkdirAll(cfg.Paths.LogDir, 0o755); err != nil {
 		return fmt.Errorf("log dir: %w", err)
@@ -174,10 +223,11 @@ func ApplyVhost(cfg *config.Config, domain, docRoot, phpSocket, sslFullchain, ss
 	}
 
 	vars := vhostVars{
-		Domain:       domain,
+		PrimaryLabel: confName,
+		ServerNames:  sn,
 		DocRoot:      docRoot,
-		AccessLog:    filepath.Join(cfg.Paths.LogDir, domain+"_access.log"),
-		ErrorLog:     filepath.Join(cfg.Paths.LogDir, domain+"_error.log"),
+		AccessLog:    filepath.Join(cfg.Paths.LogDir, confName+"_access.log"),
+		ErrorLog:     filepath.Join(cfg.Paths.LogDir, confName+"_error.log"),
 		PHPSocket:    sock,
 		SSLFullChain: chain,
 		SSLPrivKey:   key,
@@ -188,7 +238,7 @@ func ApplyVhost(cfg *config.Config, domain, docRoot, phpSocket, sslFullchain, ss
 		return err
 	}
 
-	base := confBaseName(domain)
+	base := confBaseName(confName)
 	avail := filepath.Join(cfg.Paths.VhostsDir, base)
 
 	if err := os.WriteFile(avail, buf.Bytes(), 0o644); err != nil {

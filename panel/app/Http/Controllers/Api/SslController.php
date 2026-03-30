@@ -8,6 +8,7 @@ use App\Models\Domain;
 use App\Models\SslCertificate;
 use App\Services\EngineApiService;
 use App\Services\HostingQuotaService;
+use App\Services\SslIssueService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -18,6 +19,7 @@ class SslController extends Controller
     public function __construct(
         private EngineApiService $engine,
         private HostingQuotaService $quota,
+        private SslIssueService $sslIssue,
     ) {}
 
     public function index(Request $request): JsonResponse
@@ -34,56 +36,29 @@ class SslController extends Controller
             abort(403);
         }
 
-        $this->quota->ensureSslAllowed($request->user());
-
         $validated = $request->validate([
             'email' => 'nullable|email',
         ]);
-        $email = $validated['email'] ?? null;
-        if ($email === null || $email === '') {
-            $email = config('panelsar.lets_encrypt_email') ?: null;
-        }
-        if ($email === null || $email === '') {
-            // Panelde email girmeden SSL başlatılabiliyor; fallback olarak kullanıcının e-posta adresini kullan.
-            $email = $request->user()?->email;
-        }
-        if ($email === null || $email === '') {
-            return response()->json([
-                'message' => __('ssl.email_required'),
-            ], 422);
-        }
 
-        $cert = SslCertificate::updateOrCreate(
-            ['domain_id' => $domain->id],
-            [
-                'provider' => 'letsencrypt',
-                'type' => 'dv',
-                'status' => 'pending',
-                'auto_renew' => true,
-            ]
+        $result = $this->sslIssue->issue(
+            $request->user(),
+            $domain,
+            $validated['email'] ?? null,
+            config('panelsar.lets_encrypt_email') ?: null
         );
 
-        $engine = $this->engine->issueSSL($domain->name, is_string($email) ? $email : null);
-        if (! empty($engine['error'])) {
-            $cert->update(['status' => 'failed']);
-            $domain->update(['ssl_enabled' => false, 'ssl_expiry' => null]);
-
-            return response()->json([
-                'message' => $engine['error'],
-                'certificate' => $cert->fresh(),
-            ], 503);
+        if (! $result['ok']) {
+            return response()->json(array_filter([
+                'message' => $result['message'] ?? null,
+                'certificate' => $result['certificate'] ?? null,
+                'engine' => $result['engine'] ?? null,
+            ], fn ($v) => $v !== null), $result['http_status']);
         }
 
-        $cert->update(['status' => 'active', 'issued_at' => now(), 'expires_at' => now()->addDays(90)]);
-        $domain->update([
-            'ssl_enabled' => true,
-            'ssl_expiry' => $cert->expires_at,
-        ]);
-
         return response()->json([
-            'message' => __('ssl.issued'),
-            'certificate' => $cert->fresh(),
-            'engine' => $engine,
+            'message' => $result['message'] ?? __('ssl.issued'),
+            'certificate' => $result['certificate'] ?? null,
+            'engine' => $result['engine'] ?? null,
         ]);
     }
 

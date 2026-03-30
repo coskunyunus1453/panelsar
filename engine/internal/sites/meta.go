@@ -9,10 +9,12 @@ import (
 
 // SiteMeta — alan adı başına engine tarafından saklanan küçük durum (silme / PHP değişimi / SSL için).
 type SiteMeta struct {
-	PHPVersion   string `json:"php_version"`
-	DocumentRoot string `json:"document_root"`
-	ServerType   string `json:"server_type"`
-	SSLEnabled   bool   `json:"ssl_enabled"`
+	PHPVersion   string   `json:"php_version"`
+	DocumentRoot string   `json:"document_root"`
+	ServerType   string   `json:"server_type"`
+	SSLEnabled   bool     `json:"ssl_enabled"`
+	Aliases      []string `json:"aliases,omitempty"` // Örn. example.net — aynı belge kökü, vhost server_name
+	Hostname     string   `json:"hostname,omitempty"` // Alt site meta dosyalarında FQDN (silme / vhost için)
 }
 
 func metaDir(webRoot, domain string) string {

@@ -20,6 +20,7 @@ use App\Http\Controllers\Api\LicenseController;
 use App\Http\Controllers\Api\MonitoringController;
 use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\SecurityController;
+use App\Http\Controllers\Api\SiteController;
 use App\Http\Controllers\Api\SiteToolsController;
 use App\Http\Controllers\Api\SslController;
 use App\Http\Controllers\Api\SystemController;
@@ -44,6 +45,16 @@ Route::middleware(['auth:sanctum', 'abilities:access:customer-panel'])->group(fu
 
     Route::get('dashboard', [SystemController::class, 'dashboard']);
     Route::get('config/ui-links', [UiLinksController::class, 'show']);
+
+    Route::prefix('sites')->group(function () {
+        Route::get('list', [SiteController::class, 'list']);
+        Route::post('create', [SiteController::class, 'create']);
+        Route::post('delete', [SiteController::class, 'delete']);
+        Route::post('subdomain/add', [SiteController::class, 'addSubdomain']);
+        Route::post('subdomain/remove', [SiteController::class, 'removeSubdomain']);
+        Route::post('domain-alias/add', [SiteController::class, 'addDomainAlias']);
+        Route::post('domain-alias/remove', [SiteController::class, 'removeDomainAlias']);
+    });
 
     Route::apiResource('domains', DomainController::class)->except(['update']);
     Route::post('domains/{domain}/php', [DomainController::class, 'switchPhp']);
@@ -109,7 +120,7 @@ Route::middleware(['auth:sanctum', 'abilities:access:customer-panel'])->group(fu
     Route::post('domains/{domain}/tools', [SiteToolsController::class, 'run']);
 
     Route::get('license', [LicenseController::class, 'status']);
-    Route::post('license/validate', [LicenseController::class, 'validate'])->middleware('role:admin');
+    Route::post('license/validate', [LicenseController::class, 'validateWithKey'])->middleware('role:admin');
 
     Route::get('billing/packages', [BillingController::class, 'packages']);
     Route::get('billing/subscriptions', [BillingController::class, 'subscriptions']);

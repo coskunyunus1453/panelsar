@@ -95,9 +95,10 @@ class FileManagerController extends Controller
         if (! $this->userOwnsDomain($request, $domain)) {
             abort(403);
         }
-        $validated = $request->validate(['path' => 'required|string']);
-
-        $from = $validated['path'];
+        $from = $this->resolveFileManagerPath($request);
+        if ($from === '') {
+            return response()->json(['message' => 'The path field is required.'], 422);
+        }
         try {
             $result = $this->engine->deleteFile($domain->name, $from);
             if (! empty($result['error'])) {
@@ -118,31 +119,7 @@ class FileManagerController extends Controller
         if (! $this->userOwnsDomain($request, $domain)) {
             abort(403);
         }
-        // Bazı proxy/istemci kombinasyonlarında query paramı farklı şekilde gelebiliyor.
-        $rawPath = $request->query('path');
-        if (is_array($rawPath)) {
-            $rawPath = $rawPath[0] ?? null;
-        }
-        if (! is_string($rawPath) || trim($rawPath) === '') {
-            $rawPath = $request->input('path');
-            if (is_array($rawPath)) {
-                $rawPath = $rawPath[0] ?? null;
-            }
-        }
-        if (! is_string($rawPath) || trim($rawPath) === '') {
-            $qs = (string) $request->server('QUERY_STRING', '');
-            if ($qs !== '') {
-                parse_str($qs, $parsed);
-                $fromQs = $parsed['path'] ?? null;
-                if (is_array($fromQs)) {
-                    $fromQs = $fromQs[0] ?? null;
-                }
-                if (is_string($fromQs)) {
-                    $rawPath = $fromQs;
-                }
-            }
-        }
-        $path = is_string($rawPath) ? trim($rawPath) : '';
+        $path = $this->resolveFileManagerPath($request);
         if ($path === '') {
             return response()->json(['message' => 'The path field is required.'], 422);
         }
@@ -292,11 +269,10 @@ class FileManagerController extends Controller
             abort(403);
         }
 
-        $validated = $request->validate([
-            'path' => 'required|string',
-        ]);
-
-        $path = $validated['path'];
+        $path = $this->resolveFileManagerPath($request);
+        if ($path === '') {
+            return response()->json(['message' => 'The path field is required.'], 422);
+        }
 
         $result = $this->engine->downloadFile($domain->name, $path);
         if (! empty($result['error'])) {
@@ -320,6 +296,45 @@ class FileManagerController extends Controller
             'Content-Type' => $mime,
             'Content-Disposition' => 'attachment; filename="'.$filename.'"',
         ]);
+    }
+
+    /**
+     * read / delete / download: path bazen yalnızca query stringde, bazen gövdede gelir;
+     * DELETE + axios + bazı proxy'lerde validate() query'yi görmeyebiliyor — QUERY_STRING ile yedeklenir.
+     */
+    private function resolveFileManagerPath(Request $request): string
+    {
+        $rawPath = $request->query('path');
+        if (is_array($rawPath)) {
+            $rawPath = $rawPath[0] ?? null;
+        }
+        if (! is_string($rawPath) || trim($rawPath) === '') {
+            $rawPath = $request->input('path');
+            if (is_array($rawPath)) {
+                $rawPath = $rawPath[0] ?? null;
+            }
+        }
+        if (! is_string($rawPath) || trim($rawPath) === '') {
+            $jp = $request->json('path');
+            if (is_string($jp) && trim($jp) !== '') {
+                $rawPath = $jp;
+            }
+        }
+        if (! is_string($rawPath) || trim($rawPath) === '') {
+            $qs = (string) $request->server('QUERY_STRING', '');
+            if ($qs !== '') {
+                parse_str($qs, $parsed);
+                $fromQs = $parsed['path'] ?? null;
+                if (is_array($fromQs)) {
+                    $fromQs = $fromQs[0] ?? null;
+                }
+                if (is_string($fromQs)) {
+                    $rawPath = $fromQs;
+                }
+            }
+        }
+
+        return is_string($rawPath) ? trim($rawPath) : '';
     }
 
     private function logFileAction(

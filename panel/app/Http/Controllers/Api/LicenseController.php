@@ -23,7 +23,7 @@ class LicenseController extends Controller
         ]);
     }
 
-    public function validate(Request $request): JsonResponse
+    public function validateWithKey(Request $request): JsonResponse
     {
         $validated = $request->validate(['key' => 'required|string']);
 

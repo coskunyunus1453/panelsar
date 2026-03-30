@@ -16,7 +16,7 @@ import (
 const tplHTTP = `# Panelsar — {{.Domain}} (Apache HTTP)
 <VirtualHost *:{{.HTTPPort}}>
     ServerName {{.Domain}}
-    ServerAlias www.{{.Domain}}
+    ServerAlias {{.ServerAliasLine}}
     DocumentRoot {{.DocRoot}}
 
     <Directory {{.DocRoot}}>
@@ -37,13 +37,13 @@ const tplHTTP = `# Panelsar — {{.Domain}} (Apache HTTP)
 const tplHTTPS = `# Panelsar — {{.Domain}} (Apache HTTPS)
 <VirtualHost *:{{.HTTPPort}}>
     ServerName {{.Domain}}
-    ServerAlias www.{{.Domain}}
+    ServerAlias {{.ServerAliasLine}}
     Redirect permanent / https://%{HTTP_HOST}%{REQUEST_URI}
 </VirtualHost>
 
 <VirtualHost *:443>
     ServerName {{.Domain}}
-    ServerAlias www.{{.Domain}}
+    ServerAlias {{.ServerAliasLine}}
     DocumentRoot {{.DocRoot}}
 
     SSLEngine on
@@ -68,12 +68,48 @@ const tplHTTPS = `# Panelsar — {{.Domain}} (Apache HTTPS)
 `
 
 type vhostVars struct {
-	HTTPPort     int
-	Domain       string
-	DocRoot      string
-	PHPSocket    string
-	SSLFullChain string
-	SSLPrivKey   string
+	HTTPPort       int
+	Domain         string
+	ServerAliasLine string
+	DocRoot        string
+	PHPSocket      string
+	SSLFullChain   string
+	SSLPrivKey     string
+}
+
+func buildApacheServerAliasLine(primary string, aliases []string) string {
+	primary = strings.ToLower(strings.TrimSpace(primary))
+	if primary == "" {
+		return ""
+	}
+	seen := map[string]struct{}{}
+	var parts []string
+	add := func(s string) {
+		s = strings.ToLower(strings.TrimSpace(s))
+		if s == "" {
+			return
+		}
+		if _, ok := seen[s]; ok {
+			return
+		}
+		seen[s] = struct{}{}
+		parts = append(parts, s)
+	}
+	add("www." + primary)
+	for _, a := range aliases {
+		al := strings.ToLower(strings.TrimSpace(a))
+		if al == "" || al == primary {
+			continue
+		}
+		if !nginx.DomainSafe(al) {
+			continue
+		}
+		add(al)
+		if !strings.HasPrefix(al, "www.") {
+			add("www." + al)
+		}
+	}
+	return strings.Join(parts, " ")
 }
 
 func confBaseName(domain string) string {
@@ -97,7 +133,7 @@ func sitesEnabled(cfg *config.Config) string {
 }
 
 // ApplyVhost Debian/Ubuntu sites-available + sites-enabled sembolik bağ.
-func ApplyVhost(cfg *config.Config, domain, docRoot, phpSocket, sslFullchain, sslPrivkey string) error {
+func ApplyVhost(cfg *config.Config, domain, docRoot, phpSocket, sslFullchain, sslPrivkey string, aliases []string) error {
 	if !cfg.Hosting.ApacheManageVhosts {
 		return nil
 	}
@@ -139,13 +175,18 @@ func ApplyVhost(cfg *config.Config, domain, docRoot, phpSocket, sslFullchain, ss
 	if httpPort <= 0 {
 		httpPort = 80
 	}
+	sal := buildApacheServerAliasLine(domain, aliases)
+	if sal == "" {
+		return fmt.Errorf("invalid server aliases")
+	}
 	vars := vhostVars{
-		HTTPPort:     httpPort,
-		Domain:       domain,
-		DocRoot:      docRoot,
-		PHPSocket:    sock,
-		SSLFullChain: chain,
-		SSLPrivKey:   key,
+		HTTPPort:        httpPort,
+		Domain:          domain,
+		ServerAliasLine: sal,
+		DocRoot:         docRoot,
+		PHPSocket:       sock,
+		SSLFullChain:    chain,
+		SSLPrivKey:      key,
 	}
 	var buf bytes.Buffer
 	if err := tpl.Execute(&buf, vars); err != nil {
