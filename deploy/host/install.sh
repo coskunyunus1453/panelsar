@@ -15,6 +15,11 @@
 # Ortam ile (ör. özel branch):
 #   sudo PANELSAR_BRANCH=release PANELSAR_REPO_URL=https://github.com/kodsar/panelsar.git bash -s <<< "$(curl -fsSL https://kodsar.com/panel/install.sh)"
 #
+# Varsayılan davranış (tek komut kurulum):
+#   RESET_PANEL_DB=1 ve PANELSAR_SEED_DEMO_USERS=0 ile çalışır.
+#   Yani panel veritabanı sıfır kurulur, demo kullanıcı seed edilmez,
+#   PANELSAR_ADMIN_PASSWORD verilmediyse admin şifresi rastgele üretilir.
+#
 # Zorunlu proxy/kırık sertifika (ÖNERİLMEZ): yalnızca geçici tanı veya iç ağda:
 #   PANELSAR_INSECURE_DOWNLOAD=1 curl -fsSL ...  → betik içinde curl -k kullanılır (sadece bu dosyayı indirirken anlamsız; pipe ile çalışmaz)
 #   Müşteri dosyayı önce indirip: curl -k -O ... && sudo bash install.sh
@@ -26,6 +31,14 @@ set -euo pipefail
 : "${PANELSAR_REPO_URL:=https://github.com/coskunyunus1453/panelsar.git}"
 : "${PANELSAR_BRANCH:=main}"
 : "${PANELSAR_HOME:=/var/www/panelsar}"
+# Tek komut kurulum varsayılanı:
+# - Panel veritabanını sıfırdan kur
+# - Demo kullanıcıları seed etme
+# - Admin şifresini script rastgele üretsin (PANELSAR_ADMIN_PASSWORD verilmezse)
+: "${RESET_PANEL_DB:=1}"
+: "${PANELSAR_SEED_DEMO_USERS:=0}"
+export RESET_PANEL_DB
+export PANELSAR_SEED_DEMO_USERS
 
 if [[ "$(uname -s)" != "Linux" ]]; then
   echo "Panelsar kurulumu yalnızca Linux (Debian/Ubuntu) sunucu içindir." >&2
