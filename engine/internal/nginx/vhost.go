@@ -297,3 +297,14 @@ func RemoveVhost(cfg *config.Config, domain string) error {
 	_ = os.Remove(avail)
 	return nil
 }
+
+// RemoveVhostBestEffort site silme yolu: NginxManageVhosts kapalı olsa bile panelsar conf dosyasını ve mümkünse disable dener; hatalar yoksayılır.
+func RemoveVhostBestEffort(cfg *config.Config, domain string) {
+	if domain == "" || strings.Contains(domain, "..") {
+		return
+	}
+	base := confBaseName(domain)
+	avail := filepath.Join(cfg.Paths.VhostsDir, base)
+	_ = runNginxVhostHelper("disable", base)
+	_ = os.Remove(avail)
+}

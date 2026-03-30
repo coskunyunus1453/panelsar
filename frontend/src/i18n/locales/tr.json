@@ -211,6 +211,8 @@
     "ssl_progress_error": "SSL adımı başarısız — yukarıdaki mesaja bakın.",
     "open_files": "Dosyalar (site kökü)",
     "delete_site": "Siteyi sil",
+    "delete_modal_title": "Alan adını ve siteyi kalıcı olarak kaldır",
+    "delete_modal_lead": "Bu pencereyi onaylamadan silme yapılmaz. Devam etmeden önce uyarıyı okuyun.",
     "delete_warning": "Web sunucusundan site kaldırılır, site dosyaları, panele bağlı veritabanları (MySQL/PostgreSQL), posta kutuları, paneldeki DNS kayıtları, FTP hesapları, yedek kayıtları ve alan adı satırı silinir. Geri alınamaz.",
     "delete_type_phrase": "Aşağıdaki metni aynen yazın (büyük/küçük harf duyarlı):",
     "delete_confirm_expected": "SILMEKİSTİYORUM",

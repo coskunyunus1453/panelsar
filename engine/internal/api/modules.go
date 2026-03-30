@@ -21,6 +21,7 @@ import (
 	"github.com/panelsar/engine/internal/monitoring"
 	"github.com/panelsar/engine/internal/panelmirror"
 	"github.com/panelsar/engine/internal/phpfpm"
+	"github.com/panelsar/engine/internal/phpini"
 	"github.com/panelsar/engine/internal/stack"
 	"github.com/panelsar/engine/internal/tools"
 	"github.com/sirupsen/logrus"
@@ -486,7 +487,7 @@ func registerModuleRoutes(cfg *config.Config, d *daemon.Daemon, api *gin.RouterG
 		}
 
 		path := phpIniPath(version)
-		b, err := os.ReadFile(path)
+		b, err := phpini.Read(path)
 		if err != nil {
 			c.JSON(http.StatusNotFound, gin.H{"error": err.Error(), "path": path})
 			return
@@ -520,7 +521,7 @@ func registerModuleRoutes(cfg *config.Config, d *daemon.Daemon, api *gin.RouterG
 		}
 
 		path := phpIniPath(version)
-		if err := os.WriteFile(path, []byte(req.Ini), 0o644); err != nil {
+		if err := phpini.Write(path, []byte(req.Ini), 0o644); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "path": path})
 			return
 		}
@@ -543,7 +544,7 @@ func registerModuleRoutes(cfg *config.Config, d *daemon.Daemon, api *gin.RouterG
 		}
 
 		path := phpIniPath(version)
-		b, err := os.ReadFile(path)
+		b, err := phpini.Read(path)
 		if err != nil {
 			c.JSON(http.StatusNotFound, gin.H{"error": err.Error(), "path": path})
 			return
@@ -629,7 +630,7 @@ func registerModuleRoutes(cfg *config.Config, d *daemon.Daemon, api *gin.RouterG
 		}
 
 		path := phpIniPath(version)
-		b, err := os.ReadFile(path)
+		b, err := phpini.Read(path)
 		if err != nil {
 			c.JSON(http.StatusNotFound, gin.H{"error": err.Error(), "path": path})
 			return
@@ -672,7 +673,7 @@ func registerModuleRoutes(cfg *config.Config, d *daemon.Daemon, api *gin.RouterG
 		}
 
 		newContent := strings.Join(lines, "\n")
-		if err := os.WriteFile(path, []byte(newContent), 0o644); err != nil {
+		if err := phpini.Write(path, []byte(newContent), 0o644); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "path": path})
 			return
 		}

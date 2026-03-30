@@ -161,5 +161,26 @@ func Delete(cfg *config.Config, domain string) error {
 		"--config-dir", cd, "--work-dir", wd, "--logs-dir", ld,
 	}
 	_, _ = exec.Command(certbotBin(cfg), args...).CombinedOutput()
+	PurgeLocalCertTree(cfg, domain)
 	return nil
+}
+
+// PurgeLocalCertTree certbot live/archive/renewal altındaki cert-name ile eşleşen kalıntıları siler (certbot başarısız kalsa bile).
+func PurgeLocalCertTree(cfg *config.Config, certName string) {
+	certName = strings.ToLower(strings.TrimSpace(certName))
+	if certName == "" {
+		return
+	}
+	cd, _, _ := LetsEncryptDirs(cfg.Paths.SSLDir)
+	_ = os.RemoveAll(filepath.Join(cd, "live", certName))
+	_ = os.Remove(filepath.Join(cd, "renewal", certName+".conf"))
+	ar := filepath.Join(cd, "archive")
+	if entries, err := os.ReadDir(ar); err == nil {
+		for _, e := range entries {
+			name := e.Name()
+			if name == certName || strings.HasPrefix(name, certName+"-") {
+				_ = os.RemoveAll(filepath.Join(ar, name))
+			}
+		}
+	}
 }

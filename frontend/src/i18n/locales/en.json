@@ -211,6 +211,8 @@
     "ssl_progress_error": "SSL step failed — see message above.",
     "open_files": "Files (site root)",
     "delete_site": "Delete site",
+    "delete_modal_title": "Permanently remove this domain and site",
+    "delete_modal_lead": "Nothing is deleted until you confirm in this dialog. Read the warning before continuing.",
     "delete_warning": "This removes the site from the web server, site files, linked databases (MySQL/PostgreSQL when provisioned through the panel), mailboxes, DNS records in the panel, FTP accounts, backup records, and the domain row. This cannot be undone.",
     "delete_type_phrase": "Type the following exactly (case-sensitive):",
     "delete_confirm_expected": "DELETEALLDATA",

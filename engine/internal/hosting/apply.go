@@ -1,6 +1,8 @@
 package hosting
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/panelsar/engine/internal/apache"
@@ -101,6 +103,29 @@ func RemoveWebServer(cfg *config.Config, domain string, meta *sites.SiteMeta) er
 	}
 }
 
+func removePanelSiteLogs(cfg *config.Config, domain string) {
+	d := strings.ToLower(strings.TrimSpace(domain))
+	if d == "" || strings.Contains(d, "..") {
+		return
+	}
+	if err := os.MkdirAll(cfg.Paths.LogDir, 0o755); err != nil {
+		return
+	}
+	base := filepath.Join(cfg.Paths.LogDir, d)
+	_ = os.Remove(base + "_access.log")
+	_ = os.Remove(base + "_error.log")
+}
+
+// RemoveWebServerForSiteDeletion ana siteyi sunucudan kaldırırken nginx ve apache kalıntılarını (yönetim bayrakları kapalı olsa bile) ve nginx log dosyalarını temizler.
+func RemoveWebServerForSiteDeletion(cfg *config.Config, domain string) {
+	if domain == "" || strings.Contains(domain, "..") {
+		return
+	}
+	nginx.RemoveVhostBestEffort(cfg, domain)
+	apache.RemoveVhostBestEffort(cfg, domain)
+	removePanelSiteLogs(cfg, domain)
+}
+
 // RemoveSubdomainVhost alt FQDN için yazılmış sanal hostu kaldırır.
 func RemoveSubdomainVhost(cfg *config.Config, hostname string, meta *sites.SiteMeta) error {
 	h := strings.ToLower(strings.TrimSpace(hostname))
@@ -109,8 +134,10 @@ func RemoveSubdomainVhost(cfg *config.Config, hostname string, meta *sites.SiteM
 	}
 	switch serverTypeOf(meta) {
 	case "apache":
-		return apache.RemoveVhost(cfg, h)
+		apache.RemoveVhostBestEffort(cfg, h)
 	default:
-		return nginx.RemoveVhost(cfg, h)
+		nginx.RemoveVhostBestEffort(cfg, h)
 	}
+	removePanelSiteLogs(cfg, h)
+	return nil
 }

@@ -228,6 +228,19 @@ func RemoveVhost(cfg *config.Config, domain string) error {
 	return nil
 }
 
+// RemoveVhostBestEffort site silme yolu: ApacheManageVhosts kapalı olsa bile panelsar vhost dosyasını kaldırır.
+func RemoveVhostBestEffort(cfg *config.Config, domain string) {
+	if domain == "" || strings.Contains(domain, "..") {
+		return
+	}
+	base := confBaseName(domain)
+	_ = os.Remove(filepath.Join(sitesEnabled(cfg), base))
+	_ = os.Remove(filepath.Join(sitesAvailable(cfg), base))
+	if cfg.Hosting.ApacheReloadAfterVhost {
+		reloadApache()
+	}
+}
+
 func reloadApache() {
 	if _, err := exec.LookPath("apache2ctl"); err == nil {
 		_ = exec.Command("apache2ctl", "graceful").Run()

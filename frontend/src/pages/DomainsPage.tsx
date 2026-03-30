@@ -13,7 +13,9 @@ import {
   Search,
   Shield,
   ShieldCheck,
+  Trash2,
 } from 'lucide-react'
+import DomainDeleteConfirmModal from '../components/domains/DomainDeleteConfirmModal'
 
 const PHP_OPTIONS = ['7.4', '8.0', '8.1', '8.2', '8.3', '8.4'] as const
 
@@ -42,6 +44,7 @@ export default function DomainsPage() {
   const qc = useQueryClient()
   const [search, setSearch] = useState('')
   const [showAdd, setShowAdd] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<DomainRow | null>(null)
   const [busy, setBusy] = useState<Record<number, Busy>>({})
   const [sslProgress, setSslProgress] = useState<Record<number, SslProgress>>({})
   const sslTimers = useRef<Record<number, number>>({})
@@ -199,6 +202,13 @@ export default function DomainsPage() {
           {t('domains.add')}
         </button>
       </div>
+
+      <DomainDeleteConfirmModal
+        open={!!deleteTarget}
+        domain={deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        onDeleted={() => setDeleteTarget(null)}
+      />
 
       {showAdd && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
@@ -462,14 +472,24 @@ export default function DomainsPage() {
                       </td>
 
                       <td className="px-6 py-4 text-right">
-                        <button
-                          type="button"
-                          title={t('domains.open_site')}
-                          className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500"
-                          onClick={() => window.open(`http://${domain.name}`, '_blank')}
-                        >
-                          <ExternalLink className="h-4 w-4" />
-                        </button>
+                        <div className="inline-flex items-center justify-end gap-1">
+                          <button
+                            type="button"
+                            title={t('domains.open_site')}
+                            className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500"
+                            onClick={() => window.open(`http://${domain.name}`, '_blank')}
+                          >
+                            <ExternalLink className="h-4 w-4" />
+                          </button>
+                          <button
+                            type="button"
+                            title={t('domains.delete_site')}
+                            className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/40 text-red-600 dark:text-red-400"
+                            onClick={() => setDeleteTarget(domain)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   )

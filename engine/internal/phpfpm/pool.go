@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 )
 
@@ -147,6 +148,34 @@ func RemovePool(h HostingPoolSettings, domain, phpVersion string) error {
 	}
 	p := poolConfPath(h, phpVersion, domain)
 	return os.Remove(p)
+}
+
+var debianPHPVersionDir = regexp.MustCompile(`^[0-9]+\.[0-9]+$`)
+
+// RemovePoolBestEffortAllVersions /etc/php altındaki X.Y sürüm dizinlerinde panelsar pool dosyasını arar, varsa siler.
+// meta eksik site silinirken soket çöplüğünü önlemek için kullanılır. Silinen sürümler (örn. reload için) döner.
+func RemovePoolBestEffortAllVersions(h HostingPoolSettings, domain string) []string {
+	if domain == "" || strings.Contains(domain, "..") {
+		return nil
+	}
+	entries, err := os.ReadDir("/etc/php")
+	if err != nil {
+		return nil
+	}
+	var removed []string
+	for _, e := range entries {
+		if !e.IsDir() || !debianPHPVersionDir.MatchString(e.Name()) {
+			continue
+		}
+		ver := e.Name()
+		p := poolConfPath(h, ver, domain)
+		if _, err := os.Stat(p); err != nil {
+			continue
+		}
+		_ = os.Remove(p)
+		removed = append(removed, ver)
+	}
+	return removed
 }
 
 // Reload debian/ubuntu: systemctl reload php8.2-fpm

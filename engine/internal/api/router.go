@@ -257,14 +257,19 @@ func handleDeleteSite(cfg *config.Config, d *daemon.Daemon) gin.HandlerFunc {
 		ps := phpfpmSettings(cfg)
 
 		_ = ssl.Delete(cfg, domain)
-		if err := hosting.RemoveWebServer(cfg, domain, meta); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-			return
-		}
-		if cfg.Hosting.PHPFPMmanagePools && meta != nil {
-			_ = phpfpm.RemovePool(ps, domain, meta.PHPVersion)
-			if cfg.Hosting.PHPFPMreloadAfterPool {
-				_ = phpfpm.Reload(meta.PHPVersion)
+		hosting.RemoveWebServerForSiteDeletion(cfg, domain)
+		if cfg.Hosting.PHPFPMmanagePools {
+			if meta != nil {
+				_ = phpfpm.RemovePool(ps, domain, meta.PHPVersion)
+				if cfg.Hosting.PHPFPMreloadAfterPool {
+					_ = phpfpm.Reload(meta.PHPVersion)
+				}
+			} else {
+				for _, ver := range phpfpm.RemovePoolBestEffortAllVersions(ps, domain) {
+					if cfg.Hosting.PHPFPMreloadAfterPool {
+						_ = phpfpm.Reload(ver)
+					}
+				}
 			}
 		}
 		if err := sites.Remove(cfg.Paths.WebRoot, domain); err != nil {
@@ -452,7 +457,9 @@ func handleRemoveSubdomain(cfg *config.Config, d *daemon.Daemon) gin.HandlerFunc
 		}
 		subMeta, _ := sites.ReadSubdomainMeta(cfg.Paths.WebRoot, parent, req.PathSegment)
 		if subMeta != nil && strings.TrimSpace(subMeta.Hostname) != "" {
-			_ = hosting.RemoveSubdomainVhost(cfg, subMeta.Hostname, subMeta)
+			h := strings.TrimSpace(subMeta.Hostname)
+			_ = ssl.Delete(cfg, h)
+			_ = hosting.RemoveSubdomainVhost(cfg, h, subMeta)
 		}
 		_, err := sites.RemoveSubdomain(cfg.Paths.WebRoot, parent, req.PathSegment)
 		if err != nil {

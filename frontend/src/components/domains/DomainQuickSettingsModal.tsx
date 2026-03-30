@@ -12,9 +12,9 @@ import {
   ShieldOff,
   Loader2,
   CheckCircle2,
-  AlertTriangle,
   Trash2,
 } from 'lucide-react'
+import DomainDeleteConfirmModal from './DomainDeleteConfirmModal'
 
 export type DomainQuickRow = {
   id: number
@@ -40,7 +40,6 @@ export default function DomainQuickSettingsModal({ domain, open, onClose }: Prop
   const [php, setPhp] = useState('')
   const [server, setServer] = useState<'nginx' | 'apache'>('nginx')
   const [showDelete, setShowDelete] = useState(false)
-  const [deletePhrase, setDeletePhrase] = useState('')
   const [sslPhase, setSslPhase] = useState<'idle' | 'running' | 'done' | 'error'>('idle')
   const [sslStep, setSslStep] = useState(0)
   const sslTimer = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -50,7 +49,6 @@ export default function DomainQuickSettingsModal({ domain, open, onClose }: Prop
       setPhp(domain.php_version)
       setServer((domain.server_type === 'apache' ? 'apache' : 'nginx') as 'nginx' | 'apache')
       setShowDelete(false)
-      setDeletePhrase('')
       setSslPhase('idle')
       setSslStep(0)
     }
@@ -106,25 +104,6 @@ export default function DomainQuickSettingsModal({ domain, open, onClose }: Prop
     onSuccess: () => {
       toast.success(t('domains.status_updated'))
       invalidate()
-      onClose()
-    },
-    onError: (err: unknown) => {
-      const ax = err as { response?: { data?: { message?: string } } }
-      toast.error(ax.response?.data?.message ?? String(err))
-    },
-  })
-
-  const deleteM = useMutation({
-    mutationFn: async () => {
-      if (!domain) return
-      await api.delete(`/domains/${domain.id}`, {
-        data: { confirmation: deletePhrase.trim() },
-      })
-    },
-    onSuccess: () => {
-      toast.success(t('domains.deleted'))
-      invalidate()
-      setShowDelete(false)
       onClose()
     },
     onError: (err: unknown) => {
@@ -192,9 +171,18 @@ export default function DomainQuickSettingsModal({ domain, open, onClose }: Prop
 
   if (!open || !domain) return null
 
-  const expectedPhrase = t('domains.delete_confirm_expected')
-
   return (
+    <>
+      <DomainDeleteConfirmModal
+        open={showDelete}
+        domain={domain}
+        onClose={() => setShowDelete(false)}
+        onDeleted={() => {
+          setShowDelete(false)
+          onClose()
+        }}
+      />
+
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <div
         className="card max-h-[90vh] w-full max-w-lg overflow-y-auto bg-white p-6 dark:bg-gray-900"
@@ -369,57 +357,18 @@ export default function DomainQuickSettingsModal({ domain, open, onClose }: Prop
           </div>
 
           <div className="border-t border-red-200 pt-4 dark:border-red-900/40">
-            {!showDelete ? (
-              <button
-                type="button"
-                className="btn-secondary inline-flex items-center gap-2 border-red-200 text-red-700 hover:bg-red-50 dark:border-red-900/50 dark:text-red-400 dark:hover:bg-red-950/40"
-                onClick={() => setShowDelete(true)}
-              >
-                <Trash2 className="h-4 w-4" />
-                {t('domains.delete_site')}
-              </button>
-            ) : (
-              <div className="space-y-3 rounded-lg border border-red-200 bg-red-50/50 p-3 dark:border-red-900/40 dark:bg-red-950/20">
-                <div className="flex gap-2 text-red-800 dark:text-red-200">
-                  <AlertTriangle className="h-5 w-5 shrink-0" />
-                  <p className="text-sm">{t('domains.delete_warning')}</p>
-                </div>
-                <p className="text-xs text-gray-600 dark:text-gray-400">{t('domains.delete_type_phrase')}</p>
-                <code className="block rounded bg-white px-2 py-1.5 text-sm font-mono dark:bg-gray-800">
-                  {expectedPhrase}
-                </code>
-                <input
-                  className="input w-full font-mono text-sm"
-                  value={deletePhrase}
-                  onChange={(e) => setDeletePhrase(e.target.value)}
-                  placeholder={expectedPhrase}
-                  autoComplete="off"
-                />
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    className="btn-secondary text-sm"
-                    onClick={() => {
-                      setShowDelete(false)
-                      setDeletePhrase('')
-                    }}
-                  >
-                    {t('common.cancel')}
-                  </button>
-                  <button
-                    type="button"
-                    className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
-                    disabled={deleteM.isPending}
-                    onClick={() => deleteM.mutate()}
-                  >
-                    {deleteM.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : t('domains.delete_forever')}
-                  </button>
-                </div>
-              </div>
-            )}
+            <button
+              type="button"
+              className="btn-secondary inline-flex items-center gap-2 border-red-200 text-red-700 hover:bg-red-50 dark:border-red-900/50 dark:text-red-400 dark:hover:bg-red-950/40"
+              onClick={() => setShowDelete(true)}
+            >
+              <Trash2 className="h-4 w-4" />
+              {t('domains.delete_site')}
+            </button>
           </div>
         </div>
       </div>
     </div>
+    </>
   )
 }
