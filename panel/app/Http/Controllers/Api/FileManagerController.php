@@ -65,7 +65,8 @@ class FileManagerController extends Controller
         if (! $this->userOwnsDomain($request, $domain)) {
             abort(403);
         }
-        $path = (string) $request->query('path', '');
+        // Dizin listesi: read/delete/download ile aynı çözümleme (bazı proxy/SAPI’lerde query('path') boş kalabiliyor).
+        $path = $this->resolveFileManagerPath($request);
         $engineRelPath = $this->panelRelToEngineRel($domain, $path);
 
         $limit = (int) $request->query('limit', 200);

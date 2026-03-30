@@ -243,16 +243,15 @@ class EngineApiService
         string $order = 'asc',
     ): array
     {
-        $q = http_build_query([
-            'domain' => $domain,
-            'path' => $path,
-            'limit' => $limit,
-            'offset' => $offset,
-            'sort' => $sort,
-            'order' => $order,
-        ]);
         try {
-            $response = $this->client()->get($this->baseUrl.'/api/v1/files?'.$q);
+            $response = $this->client()->get($this->baseUrl.'/api/v1/files', [
+                'domain' => $domain,
+                'path' => $path,
+                'limit' => $limit,
+                'offset' => $offset,
+                'sort' => $sort,
+                'order' => $order,
+            ]);
             $json = $response->json() ?? [];
             if (! $response->successful()) {
                 $msg = is_string($json['error'] ?? null) ? $json['error'] : ($response->body() ?: 'HTTP '.$response->status());

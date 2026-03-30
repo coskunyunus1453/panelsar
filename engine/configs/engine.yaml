@@ -73,6 +73,8 @@ hosting:
   certbot_path: ""
   lets_encrypt_email: ""
   lets_encrypt_staging: false
+  # www alt alanı DNS'te yoksa veya tek isim istiyorsanız false yapın (aksi halde SAN'a www eklenir)
+  lets_encrypt_include_www: true
   # Faz 2.4 — site belge kökünde composer / npm (prod: true + güvenilir PATH)
   manage_site_tools: false
   composer_path: "composer"

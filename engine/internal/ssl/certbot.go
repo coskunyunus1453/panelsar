@@ -38,7 +38,41 @@ func certbotBin(cfg *config.Config) string {
 	return s
 }
 
-// Issue webroot doğrulaması ile sertifika alır (domain + www.domain).
+// clearChallengeWorkDir — yarım kalmış HTTP-01 / webroot state.
+func clearChallengeWorkDir(workDir string) {
+	for _, sub := range []string{"http-01", "webroot", "manual", "standalone"} {
+		_ = os.RemoveAll(filepath.Join(workDir, sub))
+	}
+}
+
+// resetCertbotWorkDir — certbot work/ altındaki tüm geçici ACME durumunu siler.
+// Let's Encrypt "No such authorization" / malformed order kalıntılarında en güvenilir temizlik (config/ korunur).
+func resetCertbotWorkDir(workDir string) error {
+	if err := os.RemoveAll(workDir); err != nil {
+		return err
+	}
+	return os.MkdirAll(workDir, 0o700)
+}
+
+// certbotRecoverableStaleOrderError — logda bazen yalnızca urn:malformed görünür; retry şart.
+func certbotRecoverableStaleOrderError(out []byte) bool {
+	s := strings.ToLower(string(out))
+	if strings.Contains(s, "no such authorization") {
+		return true
+	}
+	if strings.Contains(s, "urn:ietf:params:acme:error:malformed") {
+		return true
+	}
+	return false
+}
+
+func runCertbot(cfg *config.Config, args []string) ([]byte, error) {
+	out, err := exec.Command(certbotBin(cfg), args...).CombinedOutput()
+	return out, err
+}
+
+// Issue webroot doğrulaması ile sertifika alır. İlk SAN birincil domain'dir.
+// Issue öncesi mevcut cert satırı silinir; böylece başarısız denemelerden kalan ACME durumu temizlenir.
 func Issue(cfg *config.Config, domain, webroot, email string) error {
 	if !cfg.Hosting.ManageSSL {
 		return fmt.Errorf("manage_ssl devre dışı")
@@ -56,22 +90,50 @@ func Issue(cfg *config.Config, domain, webroot, email string) error {
 			return fmt.Errorf("ssl dizini: %w", err)
 		}
 	}
+
+	// Canlı PEM yoksa: bozuk satır + eski ACME work state (malformed / no such authorization).
+	chain, key := LiveCertPaths(cfg, domain)
+	hasLive := CertsExist(chain, key)
+	if !hasLive {
+		_ = Delete(cfg, domain)
+		if err := resetCertbotWorkDir(wd); err != nil {
+			return fmt.Errorf("certbot work dizini sıfırlanamadı: %w", err)
+		}
+	} else {
+		clearChallengeWorkDir(wd)
+	}
+
 	args := []string{
 		"certonly", "--webroot", "-w", webroot,
 		"--preferred-challenges", "http",
-		"-d", domain, "-d", "www." + domain,
 		"--email", email,
 		"--agree-tos", "-n", "--non-interactive",
 		"--config-dir", cd, "--work-dir", wd, "--logs-dir", ld,
 	}
+	args = append(args, "-d", domain)
+	if cfg.Hosting.LetsEncryptIncludeWww {
+		args = append(args, "-d", "www."+domain)
+	}
 	if cfg.Hosting.LetsEncryptStaging {
 		args = append(args, "--staging")
 	}
-	out, err := exec.Command(certbotBin(cfg), args...).CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("certbot: %w — %s", err, strings.TrimSpace(string(out)))
+
+	out, err := runCertbot(cfg, args)
+	if err == nil {
+		return nil
 	}
-	return nil
+	if certbotRecoverableStaleOrderError(out) {
+		_ = Delete(cfg, domain)
+		if errW := resetCertbotWorkDir(wd); errW != nil {
+			return fmt.Errorf("certbot (retry öncesi work sıfırlama): %w — ilk çıktı: %s", errW, strings.TrimSpace(string(out)))
+		}
+		out2, err2 := runCertbot(cfg, args)
+		if err2 != nil {
+			return fmt.Errorf("certbot: %w — %s", err2, strings.TrimSpace(string(out2)))
+		}
+		return nil
+	}
+	return fmt.Errorf("certbot: %w — %s", err, strings.TrimSpace(string(out)))
 }
 
 // Renew mevcut sertifikayı yeniler (cert-name = birincil alan adı).

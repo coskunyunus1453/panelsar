@@ -92,10 +92,11 @@ type HostingConfig struct {
 	// ApacheHTTPPort — Nginx panel 80 kullanırken 8080 (çakışmasız). 0 veya yoksa 80.
 	ApacheHTTPPort int `mapstructure:"apache_http_port"`
 
-	ManageSSL          bool   `mapstructure:"manage_ssl"`
-	CertbotPath        string `mapstructure:"certbot_path"`
-	LetsEncryptEmail   string `mapstructure:"lets_encrypt_email"`
-	LetsEncryptStaging bool   `mapstructure:"lets_encrypt_staging"`
+	ManageSSL               bool   `mapstructure:"manage_ssl"`
+	CertbotPath             string `mapstructure:"certbot_path"`
+	LetsEncryptEmail        string `mapstructure:"lets_encrypt_email"`
+	LetsEncryptStaging      bool   `mapstructure:"lets_encrypt_staging"`
+	LetsEncryptIncludeWww bool `mapstructure:"lets_encrypt_include_www"`
 
 	ManageSiteTools bool   `mapstructure:"manage_site_tools"`
 	ComposerPath    string `mapstructure:"composer_path"`
@@ -212,6 +213,7 @@ func setDefaults() {
 	viper.SetDefault("hosting.certbot_path", "")
 	viper.SetDefault("hosting.lets_encrypt_email", "")
 	viper.SetDefault("hosting.lets_encrypt_staging", false)
+	viper.SetDefault("hosting.lets_encrypt_include_www", true)
 
 	viper.SetDefault("hosting.manage_site_tools", false)
 	viper.SetDefault("hosting.composer_path", "composer")

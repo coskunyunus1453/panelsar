@@ -7,12 +7,30 @@ use App\Models\PanelSetting;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class BrandingController extends Controller
 {
     public function showPublic(): JsonResponse
     {
         return response()->json($this->brandingPayload());
+    }
+
+    /**
+     * storage:link olmadan veya statik /storage kökü kapalı olsa bile logolara erişim.
+     */
+    public function serveFile(string $filename): StreamedResponse
+    {
+        if (! preg_match('/^[A-Za-z0-9._-]+$/', $filename)) {
+            abort(404);
+        }
+
+        $relative = 'branding/'.$filename;
+        if (! Storage::disk('public')->exists($relative)) {
+            abort(404);
+        }
+
+        return Storage::disk('public')->response($relative);
     }
 
     public function update(Request $request): JsonResponse
@@ -30,7 +48,8 @@ class BrandingController extends Controller
                 return;
             }
             $path = $file->store('branding', $disk);
-            $url = Storage::disk($disk)->url($path);
+            $basename = basename($path);
+            $url = $this->brandingFilePublicPath($basename);
             PanelSetting::query()->updateOrCreate(['key' => $key], ['value' => $url]);
         };
 
@@ -52,8 +71,32 @@ class BrandingController extends Controller
         $a = PanelSetting::query()->where('key', 'branding.logo_admin_url')->value('value');
 
         return [
-            'logo_customer_url' => is_string($c) && $c !== '' ? $c : null,
-            'logo_admin_url' => is_string($a) && $a !== '' ? $a : null,
+            'logo_customer_url' => $this->normalizeBrandingUrl($c),
+            'logo_admin_url' => $this->normalizeBrandingUrl($a),
         ];
+    }
+
+    private function normalizeBrandingUrl(mixed $value): ?string
+    {
+        if (! is_string($value) || $value === '') {
+            return null;
+        }
+
+        $basename = null;
+        if (preg_match('#/(?:storage/branding|api/branding/files)/([^/?#]+)$#', $value, $m)) {
+            $basename = $m[1];
+        }
+
+        if ($basename !== null && preg_match('/^[A-Za-z0-9._-]+$/', $basename)
+            && Storage::disk('public')->exists('branding/'.$basename)) {
+            return $this->brandingFilePublicPath($basename);
+        }
+
+        return $value;
+    }
+
+    private function brandingFilePublicPath(string $basename): string
+    {
+        return '/api/branding/files/'.$basename;
     }
 }

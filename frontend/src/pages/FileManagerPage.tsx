@@ -160,7 +160,41 @@ export default function FileManagerPage() {
     const n = domainParam ? Number(domainParam) : NaN
     return Number.isFinite(n) && n > 0 ? n : ''
   })
-  const [path, setPath] = useState('')
+
+  const pathParamRaw = searchParams.get('path') ?? ''
+  const path = useMemo(() => {
+    const t = pathParamRaw.trim().replace(/^\/+/g, '')
+    if (!isSafeRelativePath(t)) return ''
+    return t
+  }, [pathParamRaw])
+
+  const setFilePath = useCallback((next: string) => {
+    const t = next.trim().replace(/^\/+/g, '')
+    const normalized = isSafeRelativePath(t) ? t : ''
+    setSearchParams(
+      (prev) => {
+        const nextSp = new URLSearchParams(prev)
+        if (normalized) nextSp.set('path', normalized)
+        else nextSp.delete('path')
+        return nextSp
+      },
+      { replace: true },
+    )
+  }, [setSearchParams])
+
+  useEffect(() => {
+    const t = pathParamRaw.trim().replace(/^\/+/g, '')
+    if (t && !isSafeRelativePath(t)) {
+      setSearchParams(
+        (prev) => {
+          const nextSp = new URLSearchParams(prev)
+          nextSp.delete('path')
+          return nextSp
+        },
+        { replace: true },
+      )
+    }
+  }, [pathParamRaw, setSearchParams])
   const [selected, setSelected] = useState<string | null>(null)
   const [editorOpen, setEditorOpen] = useState(false)
   const [tabs, setTabs] = useState<EditorTab[]>([])
@@ -234,33 +268,60 @@ export default function FileManagerPage() {
   }, [domainId])
 
   const onDomainSelectChange = (value: string) => {
-    const next = new URLSearchParams(searchParams)
     if (!value) {
       setDomainId('')
-      next.delete('domain')
-      setSearchParams(next, { replace: true })
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev)
+          next.delete('domain')
+          next.delete('path')
+          return next
+        },
+        { replace: true },
+      )
       return
     }
     const n = Number(value)
     if (!Number.isFinite(n) || n <= 0) return
     setDomainId(n)
-    next.set('domain', String(n))
-    setSearchParams(next, { replace: true })
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev)
+        next.set('domain', String(n))
+        next.delete('path')
+        return next
+      },
+      { replace: true },
+    )
   }
 
   const filesQ = useQuery({
     queryKey: ['files', domainId, path, pageSize, offset, sortKey, sortOrder],
     enabled: domainId !== '',
     staleTime: 0,
-    queryFn: async () =>
-      (await api.get(`/domains/${domainId}/files`, { params: { path, limit: pageSize, offset, sort: sortKey, order: sortOrder } })).data as {
+    queryFn: async ({ queryKey }) => {
+      const [, domId, pathSeg, lim, off, sk, so] = queryKey as [
+        string,
+        number,
+        string,
+        number,
+        number,
+        'name' | 'size' | 'mtime',
+        'asc' | 'desc',
+      ]
+      return (
+        await api.get(`/domains/${domId}/files`, {
+          params: { path: pathSeg, limit: lim, offset: off, sort: sk, order: so },
+        })
+      ).data as {
         entries: ListEntry[]
         document_root_hint?: string
         total?: number
         limit?: number
         offset?: number
         message?: string
-      },
+      }
+    },
   })
 
   useEffect(() => {
@@ -268,11 +329,15 @@ export default function FileManagerPage() {
     setSelectedIds(new Set())
   }, [path, sortKey, sortOrder, domainId, pageSize])
 
-  const goIntoFolder = useCallback((folderName: string) => {
-    if (!folderName) return
-    setPath((prev) => (prev ? joinRel(prev, folderName) : folderName))
-    setSelected(null)
-  }, [])
+  const goIntoFolder = useCallback(
+    (folderName: string) => {
+      if (!folderName) return
+      const next = path ? joinRel(path, folderName) : folderName
+      setFilePath(next)
+      setSelected(null)
+    },
+    [path, setFilePath],
+  )
 
   const docHint = filesQ.data?.document_root_hint
 
@@ -637,7 +702,6 @@ export default function FileManagerPage() {
               value={domainId}
               onChange={(e) => {
                 onDomainSelectChange(e.target.value)
-                setPath('')
                 setSelected(null)
                 setSearchHits([])
               }}
@@ -678,7 +742,7 @@ export default function FileManagerPage() {
                 disabled={path === ''}
                 title="Geri"
                 onClick={() => {
-                  setPath(parentPath(path))
+                  setFilePath(parentPath(path))
                   setSelected(null)
                 }}
               >
@@ -689,7 +753,7 @@ export default function FileManagerPage() {
                   type="button"
                   className="max-w-[10rem] truncate rounded px-1.5 py-0.5 font-medium text-primary-600 hover:bg-gray-100 dark:text-primary-400 dark:hover:bg-gray-800 sm:max-w-none"
                   onClick={() => {
-                    setPath('')
+                    setFilePath('')
                     setSelected(null)
                   }}
                 >
@@ -702,7 +766,7 @@ export default function FileManagerPage() {
                       type="button"
                       className="max-w-[8rem] truncate rounded px-1.5 py-0.5 text-left font-medium text-primary-600 hover:bg-gray-100 dark:text-primary-400 dark:hover:bg-gray-800 sm:max-w-[14rem]"
                       onClick={() => {
-                        setPath(c.path)
+                        setFilePath(c.path)
                         setSelected(null)
                       }}
                     >
@@ -883,7 +947,7 @@ export default function FileManagerPage() {
                         className="text-left font-mono text-primary-600 hover:underline dark:text-primary-400"
                         onClick={() => {
                           const dir = parentPath(h.path)
-                          setPath(dir)
+                          setFilePath(dir)
                           setSelected(null)
                           void openFileWrapped(h.path)
                         }}
@@ -1009,7 +1073,7 @@ export default function FileManagerPage() {
                             type="button"
                             className="inline-flex items-center gap-2 font-medium text-primary-600 hover:underline dark:text-primary-400"
                             onClick={() => {
-                              setPath(parentPath(path))
+                              setFilePath(parentPath(path))
                               setSelected(null)
                             }}
                           >
@@ -1171,7 +1235,7 @@ export default function FileManagerPage() {
                       type="button"
                       className="flex flex-col items-center gap-1 rounded-lg border border-gray-200 bg-gray-50/80 p-3 text-sm hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-900/50 dark:hover:bg-gray-800"
                       onClick={() => {
-                        setPath(parentPath(path))
+                        setFilePath(parentPath(path))
                         setSelected(null)
                       }}
                     >

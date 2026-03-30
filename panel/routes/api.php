@@ -35,6 +35,8 @@ use App\Services\EngineApiService;
 use Illuminate\Support\Facades\Route;
 
 Route::get('branding', [BrandingController::class, 'showPublic']);
+Route::get('branding/files/{filename}', [BrandingController::class, 'serveFile'])
+    ->where('filename', '[A-Za-z0-9._-]+');
 
 Route::prefix('auth')->group(function () {
     Route::post('login', [AuthController::class, 'login'])->middleware('throttle:login');
