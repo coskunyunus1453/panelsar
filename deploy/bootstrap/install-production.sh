@@ -370,26 +370,35 @@ fi
 sudo -u www-data php "$PANEL_ROOT/artisan" panelsar:init-outbound-mail --no-interaction 2>/dev/null || true
 
 if [[ "${SKIP_DB_SEED:-}" != "1" ]]; then
+  RESET_DB_MODE=0
+  if [[ "${RESET_PANEL_DB:-0}" == "1" ]] || [[ "${RESET_PANEL_DB:-0}" == "yes" ]]; then
+    RESET_DB_MODE=1
+  fi
+
   HOST_FQDN="$(hostname -f 2>/dev/null || hostname || echo panelsar.local)"
   HOST_FQDN="${HOST_FQDN// /}"
   ADMIN_EMAIL="${PANELSAR_ADMIN_EMAIL:-admin@${HOST_FQDN}}"
   SEED_DEMO_USERS="${PANELSAR_SEED_DEMO_USERS:-0}"
   USER_COUNT=""
-  if [[ "${WITH_MARIADB}" == "1" ]] || [[ "${WITH_MARIADB}" == "yes" ]]; then
+  if [[ "$RESET_DB_MODE" == "0" ]] && { [[ "${WITH_MARIADB}" == "1" ]] || [[ "${WITH_MARIADB}" == "yes" ]]; }; then
     DB_PW=$(grep '^DB_PASSWORD=' "$ENV_FILE" | cut -d= -f2- | tr -d '\r')
     MARIADB_CMD=(mariadb)
     command -v mariadb >/dev/null 2>&1 || MARIADB_CMD=(mysql)
     if [[ -n "$DB_PW" ]]; then
       USER_COUNT=$(MYSQL_PWD="$DB_PW" "${MARIADB_CMD[@]}" -u panelsar -h 127.0.0.1 panelsar -Nse "SELECT COUNT(*)" 2>/dev/null || echo "")
     fi
-  elif grep -q '^DB_CONNECTION=sqlite' "$ENV_FILE" 2>/dev/null && [[ -f "$PANEL_ROOT/database/database.sqlite" ]]; then
+  elif [[ "$RESET_DB_MODE" == "0" ]] && grep -q '^DB_CONNECTION=sqlite' "$ENV_FILE" 2>/dev/null && [[ -f "$PANEL_ROOT/database/database.sqlite" ]]; then
     USER_COUNT=$(sqlite3 "$PANEL_ROOT/database/database.sqlite" "SELECT COUNT(*) FROM users;" 2>/dev/null || echo "")
   fi
   [[ -n "$USER_COUNT" ]] || USER_COUNT=0
 
   WRITE_LOGIN=0
   ADMIN_PASSWORD=""
-  if [[ -n "${PANELSAR_ADMIN_PASSWORD:-}" ]]; then
+  if [[ "$RESET_DB_MODE" == "1" ]]; then
+    # Fresh kurulum modunda her zaman yeni admin kimliği üret.
+    ADMIN_PASSWORD="${PANELSAR_ADMIN_PASSWORD:-$(openssl rand -hex 12)}"
+    WRITE_LOGIN=1
+  elif [[ -n "${PANELSAR_ADMIN_PASSWORD:-}" ]]; then
     ADMIN_PASSWORD="$PANELSAR_ADMIN_PASSWORD"
     WRITE_LOGIN=1
   elif [[ "$USER_COUNT" == "0" ]]; then
@@ -465,6 +474,9 @@ echo "  Panel kökü:     $PANELSAR_HOME"
 echo "  Engine API:     http://127.0.0.1:9090 (yalnızca sunucu içi — dışarıya açmayın)"
 echo "  ENGINE_INTERNAL_KEY panel .env ile eşleşiyor."
 echo "  Nginx site:     $NGX_DST"
+if [[ "${RESET_PANEL_DB:-0}" == "1" ]] || [[ "${RESET_PANEL_DB:-0}" == "yes" ]]; then
+  echo "  Fresh mode:     ON (RESET_PANEL_DB=1)"
+fi
 if [[ "${WITH_APACHE:-1}" == "1" ]] || [[ "${WITH_APACHE:-1}" == "yes" ]]; then
   echo "  Apache HTTP:    :8080 (alan adı Apache seçiliyse http://alan:8080 — SSL için Nginx veya ayrı plan)"
 fi
