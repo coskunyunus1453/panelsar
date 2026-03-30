@@ -6,16 +6,21 @@ import { useDropzone } from 'react-dropzone'
 import api from '../services/api'
 import { useThemeStore } from '../store/themeStore'
 import {
+  ArrowLeft,
+  ChevronDown,
   ChevronRight,
   FileCode,
   FileText,
   Folder,
   FolderOpen,
-  Home,
+  HelpCircle,
+  LayoutGrid,
+  List as ListIcon,
   RefreshCw,
   Save,
   Search,
   Trash2,
+  Unlock,
   Upload,
   FilePlus,
   X,
@@ -132,14 +137,18 @@ function formatSize(n: number): string {
   return `${(n / (1024 * 1024)).toFixed(1)} MB`
 }
 
-function formatMtime(sec?: number): string {
+function formatMtimeIso(sec?: number): string {
   if (!sec) return '—'
   try {
-    return new Date(sec * 1000).toLocaleString()
+    const d = new Date(sec * 1000)
+    const p = (n: number) => String(n).padStart(2, '0')
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`
   } catch {
     return '—'
   }
 }
+
+const FILEMGR_HELP_KEY = 'panelsar_filemgr_help_seen'
 
 export default function FileManagerPage() {
   const { t } = useTranslation()
@@ -158,8 +167,13 @@ export default function FileManagerPage() {
   const [activeTab, setActiveTab] = useState(0)
   const [searchQ, setSearchQ] = useState('')
   const [searchHits, setSearchHits] = useState<{ path: string; line: number; preview: string }[]>([])
-  const [pathJump, setPathJump] = useState('')
   const [imagePreview, setImagePreview] = useState<{ url: string; filename: string } | null>(null)
+  const [helpModalOpen, setHelpModalOpen] = useState(false)
+  const [searchIncludeSubdirs, setSearchIncludeSubdirs] = useState(false)
+  const [viewMode, setViewMode] = useState<'list' | 'grid'>('list')
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set())
+  const [fileOpsOpen, setFileOpsOpen] = useState(false)
+  const [goPageInput, setGoPageInput] = useState('1')
 
   // Listeleme performansı için pagination ve sıralama
   const [pageSize, setPageSize] = useState(50)
@@ -167,10 +181,22 @@ export default function FileManagerPage() {
   const [sortKey, setSortKey] = useState<'name' | 'size' | 'mtime'>('name')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
 
-  // Virtual/infinite list hissi için sayfaları birleştiriyoruz.
+  // Sunucu sayfalaması: yalnızca geçerli sayfa girdileri.
   const [mergedEntries, setMergedEntries] = useState<ListEntry[]>([])
   const [totalCount, setTotalCount] = useState(0)
   const listScrollRef = useRef<HTMLDivElement | null>(null)
+  const fileOpsRef = useRef<HTMLDivElement | null>(null)
+
+  useEffect(() => {
+    if (!fileOpsOpen) return
+    const fn = (e: MouseEvent) => {
+      if (fileOpsRef.current && !fileOpsRef.current.contains(e.target as Node)) {
+        setFileOpsOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', fn)
+    return () => document.removeEventListener('mousedown', fn)
+  }, [fileOpsOpen])
 
   // Rename/Move modal state
   const [renameDialog, setRenameDialog] = useState<{ from: string; newName: string } | null>(null)
@@ -198,6 +224,17 @@ export default function FileManagerPage() {
       setDomainId(n)
     }
   }, [domainParam])
+
+  useEffect(() => {
+    if (domainId === '') return
+    try {
+      if (!localStorage.getItem(FILEMGR_HELP_KEY)) {
+        setHelpModalOpen(true)
+      }
+    } catch {
+      setHelpModalOpen(true)
+    }
+  }, [domainId])
 
   const onDomainSelectChange = (value: string) => {
     const next = new URLSearchParams(searchParams)
@@ -230,10 +267,10 @@ export default function FileManagerPage() {
   })
 
   useEffect(() => {
-    setPathJump(path)
     setOffset(0)
     setMergedEntries([])
     setTotalCount(0)
+    setSelectedIds(new Set())
   }, [path, sortKey, sortOrder, domainId, pageSize])
 
   useEffect(() => {
@@ -241,25 +278,8 @@ export default function FileManagerPage() {
     const pageEntries = filesQ.data.entries ?? []
     const tot = filesQ.data.total ?? 0
     setTotalCount(tot)
-
-    if (offset === 0) {
-      setMergedEntries(pageEntries)
-      return
-    }
-
-    setMergedEntries((prev) => {
-      const seen = new Set(prev.map((x) => `${x.name}|${x.is_dir}`))
-      const next = [...prev]
-      for (const e of pageEntries) {
-        const key = `${e.name}|${e.is_dir}`
-        if (!seen.has(key)) {
-          seen.add(key)
-          next.push(e)
-        }
-      }
-      return next
-    })
-  }, [filesQ.data, offset])
+    setMergedEntries(pageEntries)
+  }, [filesQ.data])
 
   const goIntoFolder = useCallback(
     (folderName: string) => {
@@ -486,9 +506,10 @@ export default function FileManagerPage() {
 
   const searchM = useMutation({
     mutationFn: async (q: string) => {
+      const basePath = searchIncludeSubdirs ? '' : path
       const { data } = await api.get<{ hits: { path: string; line: number; preview: string }[] }>(
         `/domains/${domainId}/files/search`,
-        { params: { path, q } },
+        { params: { path: basePath, q } },
       )
       return data?.hits ?? []
     },
@@ -560,7 +581,6 @@ export default function FileManagerPage() {
 
   const entries = mergedEntries
   const total = totalCount
-  const hasMore = offset + pageSize < totalCount
   const crumbs = splitBreadcrumbs(path)
   const currentTab = tabs[activeTab]
 
@@ -570,6 +590,29 @@ export default function FileManagerPage() {
     return ax.response?.data?.message ?? ''
   }, [filesQ.isError, filesQ.error])
 
+  const entryStats = useMemo(() => {
+    let dirs = 0
+    let files = 0
+    let bytes = 0
+    for (const e of entries) {
+      if (e.is_dir) dirs++
+      else {
+        files++
+        bytes += e.size || 0
+      }
+    }
+    return { dirs, files, bytes }
+  }, [entries])
+
+  const totalPages = Math.max(1, total > 0 ? Math.ceil(total / pageSize) : 1)
+  const currentPageNum = Math.min(totalPages, Math.floor(offset / pageSize) + 1)
+
+  useEffect(() => {
+    setGoPageInput(String(currentPageNum))
+  }, [currentPageNum])
+
+  const rowKey = (e: ListEntry) => `${e.name}|${e.is_dir}`
+
   const dirtyCount = tabs.filter((x) => !x.loading && x.content !== x.original).length
   const activeReadOnly = !!(currentTab && isExecutionRiskFilePath(currentTab.path))
   const hasDirtyReadOnly = tabs.some(
@@ -578,171 +621,22 @@ export default function FileManagerPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-3">
-        <FolderOpen className="h-8 w-8 text-primary-500" />
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{t('nav.files')}</h1>
-          <p className="text-gray-500 dark:text-gray-400 text-sm">{t('files.subtitle')}</p>
-        </div>
-      </div>
-
-      <div className="card p-4 flex flex-wrap gap-4 items-end">
-        <div>
-          <label className="label">{t('domains.name')}</label>
-          <select
-            className="input min-w-[200px]"
-            value={domainId}
-            onChange={(e) => {
-              onDomainSelectChange(e.target.value)
-              setPath('')
-              setSelected(null)
-              setSearchHits([])
-            }}
-          >
-            <option value="">{t('common.select')}</option>
-            {domainOptions.map((d) => (
-              <option key={d.id} value={d.id}>
-                {d.name}
-              </option>
-            ))}
-          </select>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <FolderOpen className="h-8 w-8 text-primary-500" />
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{t('nav.files')}</h1>
+            <p className="text-gray-500 dark:text-gray-400 text-sm">{t('files.subtitle')}</p>
+          </div>
         </div>
         <button
           type="button"
-          className="btn-secondary flex items-center gap-2"
-          onClick={() => {
-            void domainsQ.refetch()
-            void filesQ.refetch()
-          }}
+          className="btn-secondary inline-flex items-center gap-2 text-sm"
+          onClick={() => setHelpModalOpen(true)}
         >
-          <RefreshCw className="h-4 w-4" />
-          {t('common.refresh')}
+          <HelpCircle className="h-4 w-4" />
+          {t('files.help_open')}
         </button>
-        <button
-          type="button"
-          className="btn-primary flex items-center gap-2"
-          disabled={domainId === '' || uploadM.isPending}
-          onClick={() => open()}
-        >
-          <Upload className="h-4 w-4" />
-          {t('files.upload')}
-        </button>
-      </div>
-
-      {domainId !== '' && (
-        <div className="card p-4 space-y-3">
-          <div className="flex flex-wrap items-center gap-1 text-sm">
-            <span className="text-gray-500 dark:text-gray-400 shrink-0">{t('files.full_path')}:</span>
-            <code className="break-all rounded bg-gray-100 px-2 py-1 text-xs text-gray-800 dark:bg-gray-800 dark:text-gray-200">
-              {fullPathDisplay}
-            </code>
-          </div>
-          <nav className="flex flex-wrap items-center gap-1 text-sm" aria-label="breadcrumb">
-            <button
-              type="button"
-              className="inline-flex items-center gap-1 rounded-md px-2 py-1 font-medium text-primary-600 hover:bg-primary-50 dark:text-primary-400 dark:hover:bg-primary-900/20"
-              onClick={() => {
-                setPath('')
-                setSelected(null)
-              }}
-            >
-              <Home className="h-4 w-4" />
-              {t('files.root_segment')}
-            </button>
-            {crumbs.map((c) => (
-              <span key={c.path} className="inline-flex items-center gap-1">
-                <ChevronRight className="h-4 w-4 text-gray-400" />
-                <button
-                  type="button"
-                  className="rounded-md px-2 py-1 font-medium text-primary-600 hover:bg-primary-50 dark:text-primary-400 dark:hover:bg-primary-900/20"
-                  onClick={() => {
-                    setPath(c.path)
-                    setSelected(null)
-                  }}
-                >
-                  {c.label}
-                </button>
-              </span>
-            ))}
-          </nav>
-          <form
-            className="mt-3 flex flex-wrap items-end gap-2"
-            onSubmit={(ev) => {
-              ev.preventDefault()
-              const next = pathJump.replace(/\\/g, '/').replace(/^\/+|\/+$/g, '')
-              setPath(next)
-              setSelected(null)
-            }}
-          >
-            <div className="min-w-[200px] flex-1">
-              <label className="label text-xs">{t('files.path_editor')}</label>
-              <input
-                className="input font-mono text-sm"
-                value={pathJump}
-                onChange={(e) => setPathJump(e.target.value)}
-                placeholder="public_html/wp-content"
-                spellCheck={false}
-              />
-            </div>
-            <button type="submit" className="btn-secondary" disabled={filesQ.isFetching}>
-              {t('files.path_go')}
-            </button>
-          </form>
-          <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">{t('files.folder_dblclick_hint')}</p>
-        </div>
-      )}
-
-      <div className="card p-4 space-y-3">
-        <div className="flex flex-wrap gap-2 items-end">
-          <div className="flex-1 min-w-[200px]">
-            <label className="label">{t('files.search_in_files')}</label>
-            <input
-              className="input"
-              value={searchQ}
-              onChange={(e) => setSearchQ(e.target.value)}
-              placeholder={t('files.search_placeholder')}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && domainId && searchQ.trim().length >= 2) {
-                  searchM.mutate(searchQ.trim())
-                }
-              }}
-            />
-          </div>
-          <button
-            type="button"
-            className="btn-secondary flex items-center gap-2"
-            disabled={!domainId || searchQ.trim().length < 2 || searchM.isPending}
-            onClick={() => searchM.mutate(searchQ.trim())}
-          >
-            <Search className="h-4 w-4" />
-            {t('files.search_run')}
-          </button>
-        </div>
-        {searchHits.length > 0 && (
-          <ul className="max-h-48 overflow-auto rounded-lg border border-gray-200 dark:border-gray-700 text-sm">
-            {searchHits.map((h, i) => (
-              <li
-                key={`${h.path}-${h.line}-${i}`}
-                className="border-b border-gray-100 px-3 py-2 last:border-0 dark:border-gray-800"
-              >
-                <button
-                  type="button"
-                  className="w-full text-left hover:bg-gray-50 dark:hover:bg-gray-800/80"
-                  onClick={() => {
-                    const dir = parentPath(h.path)
-                    setPath(dir)
-                    setSelected(null)
-                    void openFileWrapped(h.path)
-                  }}
-                >
-                  <span className="font-mono text-primary-600 dark:text-primary-400">{h.path}</span>
-                  <span className="text-gray-500"> :{h.line}</span>
-                  <p className="truncate text-gray-600 dark:text-gray-400">{h.preview}</p>
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
       </div>
 
       <div
@@ -755,342 +649,733 @@ export default function FileManagerPage() {
         )}
       >
         <input {...getInputProps()} />
-        {domainId !== '' && (
-          <p
-            className={clsx(
-              'border-b border-gray-100 px-4 py-2 text-center text-sm dark:border-gray-800',
-              isDragActive
-                ? 'bg-primary-100 text-primary-900 dark:bg-primary-900/40 dark:text-primary-100'
-                : 'bg-gray-50/80 text-gray-600 dark:bg-gray-800/50 dark:text-gray-300',
-            )}
+        <div className="flex flex-wrap items-end gap-3 border-b border-gray-100 dark:border-gray-800 px-4 py-3">
+          <div>
+            <label className="label text-xs">{t('domains.name')}</label>
+            <select
+              className="input min-w-[200px] text-sm"
+              value={domainId}
+              onChange={(e) => {
+                onDomainSelectChange(e.target.value)
+                setPath('')
+                setSelected(null)
+                setSearchHits([])
+              }}
+            >
+              <option value="">{t('common.select')}</option>
+              {domainOptions.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <button
+            type="button"
+            className="btn-secondary inline-flex items-center gap-2 text-sm"
+            onClick={() => {
+              void domainsQ.refetch()
+              void filesQ.refetch()
+            }}
           >
-            {isDragActive ? t('files.drop_here') : t('files.drop_zone_hint')}
+            <RefreshCw className="h-4 w-4" />
+            {t('common.refresh')}
+          </button>
+        </div>
+
+        {domainId === '' && (
+          <p className="p-8 text-center text-sm text-gray-500 dark:text-gray-400">
+            {t('files.select_domain_hint')}
           </p>
         )}
-        {filesQ.isError && (
-          <p className="border-b border-red-100 bg-red-50 px-4 py-3 text-sm text-red-800 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-200">
-            {t('files.list_error')}
-            {listErrDetail ? ` — ${listErrDetail}` : ''}
-          </p>
-        )}
-        <div
-          ref={listScrollRef}
-          onScroll={() => {
-            const el = listScrollRef.current
-            if (!el) return
-            if (filesQ.isFetching) return
-            if (!hasMore) return
-            if (el.scrollHeight - el.scrollTop - el.clientHeight < 140) {
-              setOffset((o) => {
-                const next = o + pageSize
-                return next < totalCount ? next : o
-              })
-            }
-          }}
-          className="overflow-x-auto overflow-y-auto max-h-[62vh]"
-        >
-          <table className="w-full min-w-[640px] text-sm">
-            <thead className="bg-gray-50 dark:bg-gray-800/80">
-              <tr>
-                <th className="text-left px-4 py-2">
-                  <button
-                    type="button"
-                    className="inline-flex items-center gap-1"
-                    onClick={() => {
-                      if (sortKey === 'name') setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')
-                      else {
-                        setSortKey('name')
-                        setSortOrder('asc')
-                      }
-                    }}
-                  >
-                    {t('files.name')}
-                    {sortKey === 'name' ? (sortOrder === 'asc' ? '▲' : '▼') : null}
-                  </button>
-                </th>
-                <th className="text-left px-4 py-2">
-                  <button
-                    type="button"
-                    className="inline-flex items-center gap-1"
-                    onClick={() => {
-                      if (sortKey === 'size') setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')
-                      else {
-                        setSortKey('size')
-                        setSortOrder('asc')
-                      }
-                    }}
-                  >
-                    {t('files.size')}
-                    {sortKey === 'size' ? (sortOrder === 'asc' ? '▲' : '▼') : null}
-                  </button>
-                </th>
-                <th className="text-left px-4 py-2">
-                  <button
-                    type="button"
-                    className="inline-flex items-center gap-1"
-                    onClick={() => {
-                      if (sortKey === 'mtime') setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')
-                      else {
-                        setSortKey('mtime')
-                        setSortOrder('asc')
-                      }
-                    }}
-                  >
-                    Modified
-                    {sortKey === 'mtime' ? (sortOrder === 'asc' ? '▲' : '▼') : null}
-                  </button>
-                </th>
-                <th className="text-right px-4 py-2 w-40">{t('files.actions')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {path !== '' && (
-                <tr className="border-t border-gray-100 dark:border-gray-800 bg-gray-50/80 dark:bg-gray-900/40">
-                  <td className="px-4 py-2" colSpan={4}>
+
+        {domainId !== '' && (
+          <>
+            <div className="flex flex-wrap items-center gap-2 border-b border-gray-100 dark:border-gray-800 px-3 py-2 text-sm">
+              <button
+                type="button"
+                className="rounded-md p-1.5 text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800 disabled:opacity-40"
+                disabled={path === ''}
+                title="Geri"
+                onClick={() => {
+                  setPath(parentPath(path))
+                  setSelected(null)
+                }}
+              >
+                <ArrowLeft className="h-5 w-5" />
+              </button>
+              <nav className="flex min-w-0 flex-1 flex-wrap items-center gap-0.5" aria-label="breadcrumb">
+                <button
+                  type="button"
+                  className="max-w-[10rem] truncate rounded px-1.5 py-0.5 font-medium text-primary-600 hover:bg-gray-100 dark:text-primary-400 dark:hover:bg-gray-800 sm:max-w-none"
+                  onClick={() => {
+                    setPath('')
+                    setSelected(null)
+                  }}
+                >
+                  {t('files.root_segment')}
+                </button>
+                {crumbs.map((c) => (
+                  <span key={c.path} className="inline-flex min-w-0 items-center gap-0.5">
+                    <ChevronRight className="h-4 w-4 shrink-0 text-gray-400" />
                     <button
                       type="button"
-                      className="inline-flex items-center gap-2 font-medium text-primary-600 hover:underline dark:text-primary-400"
+                      className="max-w-[8rem] truncate rounded px-1.5 py-0.5 text-left font-medium text-primary-600 hover:bg-gray-100 dark:text-primary-400 dark:hover:bg-gray-800 sm:max-w-[14rem]"
+                      onClick={() => {
+                        setPath(c.path)
+                        setSelected(null)
+                      }}
+                    >
+                      {c.label}
+                    </button>
+                  </span>
+                ))}
+              </nav>
+              <button
+                type="button"
+                className="shrink-0 rounded-md p-1.5 text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800"
+                onClick={() => void filesQ.refetch()}
+                title={t('files.op_refresh')}
+              >
+                <RefreshCw className={clsx('h-4 w-4', filesQ.isFetching && 'animate-spin')} />
+              </button>
+              <div className="flex w-full flex-wrap items-center gap-2 sm:ml-auto sm:w-auto">
+                <input
+                  className="input min-w-[140px] flex-1 py-1.5 text-sm sm:flex-none sm:min-w-[180px]"
+                  value={searchQ}
+                  onChange={(e) => setSearchQ(e.target.value)}
+                  placeholder={t('files.toolbar_search_placeholder')}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && searchQ.trim().length >= 2) {
+                      searchM.mutate(searchQ.trim())
+                    }
+                  }}
+                />
+                <label className="inline-flex items-center gap-1.5 whitespace-nowrap text-xs text-gray-600 dark:text-gray-400">
+                  <input
+                    type="checkbox"
+                    checked={searchIncludeSubdirs}
+                    onChange={(e) => setSearchIncludeSubdirs(e.target.checked)}
+                  />
+                  {t('files.search_include_subdirs')}
+                </label>
+                <button
+                  type="button"
+                  className="btn-primary inline-flex items-center justify-center p-2 sm:px-3"
+                  disabled={searchQ.trim().length < 2 || searchM.isPending}
+                  onClick={() => searchM.mutate(searchQ.trim())}
+                  title={t('files.search_run')}
+                >
+                  <Search className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2 border-b border-gray-100 dark:border-gray-800 px-3 py-2">
+              <div className="relative" ref={fileOpsRef}>
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-2 rounded-md border border-gray-200 bg-gray-50 px-3 py-1.5 text-sm font-medium text-gray-800 hover:bg-gray-100 dark:border-gray-600 dark:bg-gray-800/80 dark:text-gray-100 dark:hover:bg-gray-800"
+                  onClick={() => setFileOpsOpen((o) => !o)}
+                >
+                  <Folder className="h-4 w-4 text-amber-500" />
+                  {t('files.file_operations')}
+                  <ChevronDown className="h-4 w-4 opacity-70" />
+                </button>
+                {fileOpsOpen && (
+                  <div className="absolute left-0 top-full z-30 mt-1 min-w-[220px] rounded-lg border border-gray-200 bg-white py-1 shadow-lg dark:border-gray-700 dark:bg-gray-900">
+                    <button
+                      type="button"
+                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-800"
+                      onClick={() => {
+                        setFileOpsOpen(false)
+                        open()
+                      }}
+                    >
+                      <Upload className="h-4 w-4" />
+                      {t('files.op_upload')}
+                    </button>
+                    <button
+                      type="button"
+                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-800"
+                      onClick={() => {
+                        setFileOpsOpen(false)
+                        const name = window.prompt(t('files.op_new_folder'), '')
+                        if (name?.trim()) mkdirM.mutate(name.trim())
+                      }}
+                    >
+                      <Folder className="h-4 w-4 text-amber-500" />
+                      {t('files.op_new_folder')}
+                    </button>
+                    <button
+                      type="button"
+                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-800"
+                      onClick={() => {
+                        setFileOpsOpen(false)
+                        const name = window.prompt(t('files.op_new_file'), '')
+                        if (!name?.trim()) return
+                        const base = name.trim()
+                        if (!isSafeNewFileName(base)) {
+                          toast.error(t('files.invalid_filename'))
+                          return
+                        }
+                        if (entries.some((e) => e.name === base && !e.is_dir)) {
+                          toast.error(t('files.file_exists'))
+                          return
+                        }
+                        createFileM.mutate(base)
+                      }}
+                    >
+                      <FilePlus className="h-4 w-4" />
+                      {t('files.op_new_file')}
+                    </button>
+                    <button
+                      type="button"
+                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-800"
+                      onClick={() => {
+                        setFileOpsOpen(false)
+                        void filesQ.refetch()
+                      }}
+                    >
+                      <RefreshCw className="h-4 w-4" />
+                      {t('files.op_refresh')}
+                    </button>
+                  </div>
+                )}
+              </div>
+              <div className="ml-auto flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  className="btn-secondary py-1.5 text-sm"
+                  onClick={() => toast(t('files.perm_backup_na'))}
+                >
+                  {t('files.perm_backup')}
+                </button>
+                <button
+                  type="button"
+                  className="btn-secondary inline-flex items-center gap-1.5 py-1.5 text-sm"
+                  onClick={() => toast(t('files.recycle_na'))}
+                >
+                  <Trash2 className="h-4 w-4" />
+                  {t('files.recycle_bin')}
+                </button>
+                <div className="inline-flex overflow-hidden rounded-md border border-gray-200 dark:border-gray-600">
+                  <button
+                    type="button"
+                    className={clsx(
+                      'p-2',
+                      viewMode === 'grid'
+                        ? 'bg-primary-100 text-primary-800 dark:bg-primary-900/40 dark:text-primary-200'
+                        : 'bg-white text-gray-500 hover:bg-gray-50 dark:bg-gray-900 dark:hover:bg-gray-800',
+                    )}
+                    title={t('files.view_grid')}
+                    onClick={() => setViewMode('grid')}
+                  >
+                    <LayoutGrid className="h-4 w-4" />
+                  </button>
+                  <button
+                    type="button"
+                    className={clsx(
+                      'border-l border-gray-200 p-2 dark:border-gray-600',
+                      viewMode === 'list'
+                        ? 'bg-primary-100 text-primary-800 dark:bg-primary-900/40 dark:text-primary-200'
+                        : 'bg-white text-gray-500 hover:bg-gray-50 dark:bg-gray-900 dark:hover:bg-gray-800',
+                    )}
+                    title={t('files.view_list')}
+                    onClick={() => setViewMode('list')}
+                  >
+                    <ListIcon className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {searchHits.length > 0 && (
+              <div className="max-h-36 overflow-y-auto border-b border-gray-100 px-3 py-2 dark:border-gray-800">
+                <p className="mb-1 text-xs text-gray-500">
+                  {t('files.search_done', { count: searchHits.length })}
+                </p>
+                <ul className="space-y-1 text-xs">
+                  {searchHits.slice(0, 20).map((h, i) => (
+                    <li key={`${h.path}-${h.line}-${i}`}>
+                      <button
+                        type="button"
+                        className="text-left font-mono text-primary-600 hover:underline dark:text-primary-400"
+                        onClick={() => {
+                          const dir = parentPath(h.path)
+                          setPath(dir)
+                          setSelected(null)
+                          void openFileWrapped(h.path)
+                        }}
+                      >
+                        {h.path}:{h.line}
+                      </button>
+                      <span className="ml-1 text-gray-500">{h.preview}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            <p
+              className={clsx(
+                'border-b border-gray-100 px-3 py-2 text-center text-xs dark:border-gray-800',
+                isDragActive
+                  ? 'bg-primary-100 text-primary-900 dark:bg-primary-900/40 dark:text-primary-100'
+                  : 'bg-gray-50/80 text-gray-600 dark:bg-gray-800/50 dark:text-gray-300',
+              )}
+            >
+              {isDragActive ? t('files.drop_here') : t('files.drop_zone_hint')}
+            </p>
+            {filesQ.isError && (
+              <p className="border-b border-red-100 bg-red-50 px-3 py-2 text-sm text-red-800 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-200">
+                {t('files.list_error')}
+                {listErrDetail ? ` — ${listErrDetail}` : ''}
+              </p>
+            )}
+
+            <div
+              ref={listScrollRef}
+              className="max-h-[min(62vh,560px)] overflow-x-auto overflow-y-auto"
+            >
+              {viewMode === 'list' ? (
+                <table className="w-full min-w-[960px] text-sm">
+                  <thead className="bg-gray-50 text-gray-700 dark:bg-gray-800/80 dark:text-gray-300">
+                    <tr className="border-b border-gray-200 dark:border-gray-700">
+                      <th className="w-10 px-2 py-2 text-left">
+                        <input
+                          type="checkbox"
+                          checked={
+                            entries.length > 0 &&
+                            entries.every((e) => selectedIds.has(rowKey(e)))
+                          }
+                          onChange={() => {
+                            const all = entries.every((e) => selectedIds.has(rowKey(e)))
+                            if (all) {
+                              setSelectedIds(new Set())
+                            } else {
+                              setSelectedIds(new Set(entries.map((e) => rowKey(e))))
+                            }
+                          }}
+                          aria-label="select all"
+                        />
+                      </th>
+                      <th className="px-3 py-2 text-left">
+                        <button
+                          type="button"
+                          className="inline-flex items-center gap-1 font-medium"
+                          onClick={() => {
+                            if (sortKey === 'name') setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')
+                            else {
+                              setSortKey('name')
+                              setSortOrder('asc')
+                            }
+                          }}
+                        >
+                          {t('files.name')}
+                          {sortKey === 'name' ? (sortOrder === 'asc' ? '▲' : '▼') : <span className="text-gray-400">⇅</span>}
+                        </button>
+                      </th>
+                      <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide">
+                        {t('files.col_protected')}
+                      </th>
+                      <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide">
+                        {t('files.col_perm_owner')}
+                      </th>
+                      <th className="px-3 py-2 text-left">
+                        <button
+                          type="button"
+                          className="inline-flex items-center gap-1 font-medium"
+                          onClick={() => {
+                            if (sortKey === 'size') setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')
+                            else {
+                              setSortKey('size')
+                              setSortOrder('asc')
+                            }
+                          }}
+                        >
+                          {t('files.size')}
+                          {sortKey === 'size' ? (sortOrder === 'asc' ? '▲' : '▼') : <span className="text-gray-400">⇅</span>}
+                        </button>
+                      </th>
+                      <th className="px-3 py-2 text-left">
+                        <button
+                          type="button"
+                          className="inline-flex items-center gap-1 font-medium"
+                          onClick={() => {
+                            if (sortKey === 'mtime') setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')
+                            else {
+                              setSortKey('mtime')
+                              setSortOrder('asc')
+                            }
+                          }}
+                        >
+                          {t('files.col_modified')}
+                          {sortKey === 'mtime' ? (sortOrder === 'asc' ? '▲' : '▼') : <span className="text-gray-400">⇅</span>}
+                        </button>
+                      </th>
+                      <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide">
+                        {t('files.col_note')}
+                      </th>
+                      <th className="w-44 px-3 py-2 text-right">{t('files.col_action')}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {path !== '' && (
+                      <tr className="border-t border-gray-100 bg-gray-50/80 dark:border-gray-800 dark:bg-gray-900/40">
+                        <td className="px-2 py-2" />
+                        <td className="px-3 py-2" colSpan={7}>
+                          <button
+                            type="button"
+                            className="inline-flex items-center gap-2 font-medium text-primary-600 hover:underline dark:text-primary-400"
+                            onClick={() => {
+                              setPath(parentPath(path))
+                              setSelected(null)
+                            }}
+                          >
+                            <Folder className="h-4 w-4" />
+                            ..
+                          </button>
+                        </td>
+                      </tr>
+                    )}
+                    {entries.map((e) => {
+                      const rel = joinRel(path, e.name)
+                      const isSel = selected === e.name
+                      const rk = rowKey(e)
+                      return (
+                        <tr
+                          key={rk}
+                          className={clsx(
+                            'border-t border-gray-100 dark:border-gray-800',
+                            isSel && 'bg-primary-50/50 dark:bg-primary-900/15',
+                          )}
+                        >
+                          <td className="px-2 py-2 align-top">
+                            <input
+                              type="checkbox"
+                              checked={selectedIds.has(rk)}
+                              onChange={() => {
+                                setSelectedIds((prev) => {
+                                  const next = new Set(prev)
+                                  if (next.has(rk)) next.delete(rk)
+                                  else next.add(rk)
+                                  return next
+                                })
+                              }}
+                            />
+                          </td>
+                          <td className="px-3 py-2 align-top">
+                            {e.is_dir ? (
+                              <button
+                                type="button"
+                                className={clsx(
+                                  'inline-flex max-w-md items-center gap-2 rounded-md px-1 py-0.5 text-left font-mono text-gray-900 hover:bg-gray-100 dark:text-gray-100 dark:hover:bg-gray-800',
+                                  isSel && 'bg-primary-100 ring-1 ring-primary-300 dark:bg-primary-900/30 dark:ring-primary-700',
+                                )}
+                                onClick={() => setSelected(e.name)}
+                                onDoubleClick={(ev) => {
+                                  ev.preventDefault()
+                                  goIntoFolder(e.name)
+                                }}
+                              >
+                                <Folder className="h-4 w-4 shrink-0 text-amber-500" />
+                                {e.name}
+                              </button>
+                            ) : (
+                              <div
+                                role="button"
+                                tabIndex={0}
+                                className="inline-flex cursor-pointer items-center gap-2 font-mono text-gray-900 dark:text-gray-100"
+                                onClick={() => setSelected(e.name)}
+                                onDoubleClick={() => {
+                                  if (isImageFile(rel)) void previewImage(rel)
+                                  else void openFileWrapped(rel)
+                                }}
+                                onKeyDown={(ev) => {
+                                  if (ev.key === 'Enter') {
+                                    if (isImageFile(rel)) void previewImage(rel)
+                                    else void openFileWrapped(rel)
+                                  }
+                                }}
+                              >
+                                <FileText className="h-4 w-4 shrink-0 text-gray-400" />
+                                {e.name}
+                              </div>
+                            )}
+                          </td>
+                          <td className="px-3 py-2 align-top text-gray-600 dark:text-gray-400">
+                            <span className="inline-flex items-center gap-1">
+                              <Unlock className="h-3.5 w-3.5" />
+                              {t('files.unprotected')}
+                            </span>
+                          </td>
+                          <td className="px-3 py-2 align-top font-mono text-xs text-gray-600 dark:text-gray-400">
+                            {t('files.perm_na')}
+                          </td>
+                          <td className="px-3 py-2 align-top">
+                            {e.is_dir ? (
+                              <button
+                                type="button"
+                                className="text-sm font-medium text-primary-600 hover:underline dark:text-primary-400"
+                                onClick={() => toast(t('files.calc_folder_na'))}
+                              >
+                                {t('files.calc')}
+                              </button>
+                            ) : (
+                              <span className="font-medium text-primary-600 dark:text-primary-400">
+                                {formatSize(e.size)}
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-3 py-2 align-top font-mono text-xs text-gray-700 dark:text-gray-300">
+                            {e.is_dir ? '—' : formatMtimeIso(e.mtime)}
+                          </td>
+                          <td className="px-3 py-2 align-top text-gray-400">—</td>
+                          <td className="px-3 py-2 text-right align-top">
+                            {!e.is_dir && isEditableFile(e.name) && (
+                              <button
+                                type="button"
+                                className="mr-2 text-xs font-medium text-primary-600 hover:underline dark:text-primary-400"
+                                onClick={() => void openFileWrapped(rel)}
+                              >
+                                {t('files.open_editor')}
+                              </button>
+                            )}
+                            {!e.is_dir && (
+                              <button
+                                type="button"
+                                className="mr-1 text-xs font-medium text-primary-600 hover:underline dark:text-primary-400"
+                                onClick={() => void downloadAsFile(rel)}
+                              >
+                                İndir
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              className="mr-1 text-xs font-medium text-primary-600 hover:underline dark:text-primary-400"
+                              onClick={() => setRenameDialog({ from: rel, newName: e.name })}
+                            >
+                              Ad
+                            </button>
+                            <button
+                              type="button"
+                              className="mr-1 text-xs font-medium text-primary-600 hover:underline dark:text-primary-400"
+                              onClick={() =>
+                                setMoveDialog({ from: rel, targetDir: path, baseName: e.name })
+                              }
+                            >
+                              Taşı
+                            </button>
+                            <button
+                              type="button"
+                              className="inline-flex items-center gap-1 rounded-md p-1 text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/40"
+                              title={t('common.delete')}
+                              onClick={() => {
+                                if (window.confirm(t('common.confirm_delete'))) {
+                                  deleteM.mutate(rel)
+                                }
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              ) : (
+                <div className="grid grid-cols-2 gap-2 p-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+                  {path !== '' && (
+                    <button
+                      type="button"
+                      className="flex flex-col items-center gap-1 rounded-lg border border-gray-200 bg-gray-50/80 p-3 text-sm hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-900/50 dark:hover:bg-gray-800"
                       onClick={() => {
                         setPath(parentPath(path))
                         setSelected(null)
                       }}
                     >
-                      <Folder className="h-4 w-4" />
-                      ..
+                      <Folder className="h-8 w-8 text-amber-500" />
+                      <span>..</span>
                     </button>
-                  </td>
-                </tr>
-              )}
-              {entries.map((e) => {
-                const rel = joinRel(path, e.name)
-                const isSel = selected === e.name
-                return (
-                  <tr
-                    key={e.name}
-                    className={clsx(
-                      'border-t border-gray-100 dark:border-gray-800',
-                      isSel && 'bg-primary-50/50 dark:bg-primary-900/15',
-                    )}
-                  >
-                    <td className="px-4 py-2">
-                      {e.is_dir ? (
-                        <button
-                          type="button"
-                          className={clsx(
-                            'inline-flex w-full max-w-md items-center gap-2 rounded-md px-1 py-0.5 text-left font-mono text-gray-900 hover:bg-gray-100 dark:text-gray-100 dark:hover:bg-gray-800',
-                            isSel && 'bg-primary-100 ring-1 ring-primary-300 dark:bg-primary-900/30 dark:ring-primary-700',
-                          )}
-                          onClick={() => setSelected(e.name)}
-                          onDoubleClick={(ev) => {
-                            ev.preventDefault()
-                            goIntoFolder(e.name)
-                          }}
-                        >
-                          <Folder className="h-4 w-4 shrink-0 text-amber-500" />
-                          {e.name}
-                        </button>
-                      ) : (
-                        <div
-                          role="button"
-                          tabIndex={0}
-                          className="inline-flex items-center gap-2 font-mono text-gray-900 dark:text-gray-100 cursor-pointer"
-                          onClick={() => setSelected(e.name)}
-                          onDoubleClick={() => {
-                            if (isImageFile(rel)) void previewImage(rel)
+                  )}
+                  {entries.map((e) => {
+                    const rel = joinRel(path, e.name)
+                    const rk = rowKey(e)
+                    return (
+                      <div
+                        key={rk}
+                        role="button"
+                        tabIndex={0}
+                        className={clsx(
+                          'flex flex-col items-center gap-1 rounded-lg border p-3 text-center text-sm outline-none',
+                          selected === e.name
+                            ? 'border-primary-400 bg-primary-50/80 dark:bg-primary-900/20'
+                            : 'border-gray-200 bg-white hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900/40 dark:hover:bg-gray-800',
+                        )}
+                        onClick={() => setSelected(e.name)}
+                        onDoubleClick={() => {
+                          if (e.is_dir) goIntoFolder(e.name)
+                          else if (isImageFile(rel)) void previewImage(rel)
+                          else void openFileWrapped(rel)
+                        }}
+                        onKeyDown={(ev) => {
+                          if (ev.key === 'Enter') {
+                            if (e.is_dir) goIntoFolder(e.name)
+                            else if (isImageFile(rel)) void previewImage(rel)
                             else void openFileWrapped(rel)
-                          }}
-                          onKeyDown={(ev) => {
-                            if (ev.key === 'Enter') {
-                              if (isImageFile(rel)) void previewImage(rel)
-                              else void openFileWrapped(rel)
-                            }
-                          }}
-                        >
-                          <FileText className="h-4 w-4 shrink-0 text-gray-400" />
-                          {e.name}
-                          {isEditableFile(e.name) && (
-                            <span className="text-xs text-gray-400">({t('files.dblclick_edit')})</span>
-                          )}
-                        </div>
-                      )}
-                    </td>
-                    <td className="px-4 py-2">{e.is_dir ? '—' : formatSize(e.size)}</td>
-                    <td className="px-4 py-2">{e.is_dir ? '—' : formatMtime(e.mtime)}</td>
-                    <td className="px-4 py-2 text-right">
-                      {!e.is_dir && isEditableFile(e.name) && (
-                        <button
-                          type="button"
-                          className="mr-2 text-xs font-medium text-primary-600 hover:underline dark:text-primary-400"
-                          onClick={() => void openFileWrapped(rel)}
-                        >
-                          {t('files.open_editor')}
-                        </button>
-                      )}
-
-                      {!e.is_dir && (
-                        <button
-                          type="button"
-                          className="mr-1 text-xs font-medium text-primary-600 hover:underline dark:text-primary-400"
-                          onClick={() => void downloadAsFile(rel)}
-                          title="İndir"
-                        >
-                          İndir
-                        </button>
-                      )}
-
-                      <button
-                        type="button"
-                        className="mr-1 text-xs font-medium text-primary-600 hover:underline dark:text-primary-400"
-                        onClick={() => {
-                          setRenameDialog({ from: rel, newName: e.name })
-                        }}
-                        title="Yeniden adlandır"
-                      >
-                        Ad
-                      </button>
-
-                      <button
-                        type="button"
-                        className="mr-1 text-xs font-medium text-primary-600 hover:underline dark:text-primary-400"
-                        onClick={() => {
-                          setMoveDialog({ from: rel, targetDir: path, baseName: e.name })
-                        }}
-                        title="Taşı"
-                      >
-                        Taşı
-                      </button>
-                      <button
-                        type="button"
-                        className="inline-flex items-center gap-1 rounded-md p-1 text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/40"
-                        title={t('common.delete')}
-                        onClick={() => {
-                          if (window.confirm(t('common.confirm_delete'))) {
-                            deleteM.mutate(rel)
                           }
                         }}
                       >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
-        {domainId && !filesQ.isLoading && entries.length === 0 && path === '' && (
-          <p className="p-6 text-center text-gray-500">{t('common.no_data')}</p>
+                        {e.is_dir ? (
+                          <Folder className="h-8 w-8 text-amber-500" />
+                        ) : (
+                          <FileText className="h-8 w-8 text-gray-400" />
+                        )}
+                        <span className="w-full truncate font-mono text-xs">{e.name}</span>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+
+            {domainId && !filesQ.isLoading && entries.length === 0 && path === '' && (
+              <p className="p-6 text-center text-gray-500">{t('common.no_data')}</p>
+            )}
+
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 px-3 py-2 text-xs dark:border-gray-800">
+              <div className="text-gray-600 dark:text-gray-400">
+                <span>
+                  {t('files.footer_dirs_files', {
+                    dirs: entryStats.dirs,
+                    files: entryStats.files,
+                  })}
+                </span>
+                <span className="mx-1">·</span>
+                <span>{t('files.footer_size_label')}:</span>{' '}
+                <button
+                  type="button"
+                  className="font-medium text-primary-600 hover:underline dark:text-primary-400"
+                  onClick={() => toast(t('files.calc_folder_na'))}
+                >
+                  {t('files.calc')}
+                </button>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  className="rounded border border-gray-200 p-1.5 dark:border-gray-600"
+                  disabled={currentPageNum <= 1 || filesQ.isFetching}
+                  onClick={() => setOffset((o) => Math.max(0, o - pageSize))}
+                  aria-label="prev"
+                >
+                  <ChevronRight className="h-4 w-4 rotate-180" />
+                </button>
+                <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-primary-100 text-sm font-semibold text-primary-800 dark:bg-primary-900/50 dark:text-primary-200">
+                  {currentPageNum}
+                </span>
+                <button
+                  type="button"
+                  className="rounded border border-gray-200 p-1.5 dark:border-gray-600"
+                  disabled={currentPageNum >= totalPages || filesQ.isFetching}
+                  onClick={() => setOffset((o) => o + pageSize)}
+                  aria-label="next"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+                <select
+                  className="input py-1 text-xs"
+                  value={pageSize}
+                  onChange={(e) => {
+                    const n = Number(e.target.value) || 50
+                    setPageSize(n)
+                    setOffset(0)
+                  }}
+                >
+                  <option value={25}>25</option>
+                  <option value={50}>50</option>
+                  <option value={100}>100</option>
+                </select>
+                <form
+                  className="flex items-center gap-1"
+                  onSubmit={(ev) => {
+                    ev.preventDefault()
+                    const p = Number.parseInt(goPageInput, 10)
+                    const page = Number.isFinite(p) ? Math.min(totalPages, Math.max(1, p)) : 1
+                    setOffset((page - 1) * pageSize)
+                  }}
+                >
+                  <span className="text-gray-500">{t('files.go_page')}</span>
+                  <input
+                    className="input w-10 px-1 py-1 text-center text-xs"
+                    value={goPageInput}
+                    onChange={(e) => setGoPageInput(e.target.value)}
+                  />
+                  <button type="submit" className="btn-secondary py-1 text-xs">
+                    OK
+                  </button>
+                </form>
+                <span className="text-gray-500">{t('files.total_count', { n: total })}</span>
+              </div>
+            </div>
+          </>
         )}
       </div>
 
-      {domainId !== '' && (
-        <div className="card px-4 py-3">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="text-xs text-gray-500 dark:text-gray-400">
-              {total > 0 ? (
-                <>
-                  {offset + 1}-{Math.min(offset + pageSize, total)} / {total}
-                </>
-              ) : (
-                t('common.no_data')
-              )}
+      {helpModalOpen && (
+        <div
+          className="fixed inset-0 z-[59] flex items-center justify-center bg-black/50 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="filemgr-help-title"
+        >
+          <div className="w-full max-w-lg rounded-xl border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-900">
+            <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3 dark:border-gray-800">
+              <h2 id="filemgr-help-title" className="text-lg font-semibold text-gray-900 dark:text-white">
+                {t('files.help_title')}
+              </h2>
+              <button
+                type="button"
+                className="rounded-lg p-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800"
+                aria-label="Kapat"
+                onClick={() => setHelpModalOpen(false)}
+              >
+                <X className="h-5 w-5" />
+              </button>
             </div>
-            <div className="flex items-center gap-2">
-              <select
-                className="input text-sm py-1.5"
-                value={pageSize}
-                onChange={(e) => {
-                  const n = Number(e.target.value) || 50
-                  setPageSize(n)
-                  setOffset(0)
+            <div className="space-y-3 px-4 py-4 text-sm text-gray-600 dark:text-gray-300">
+              <p>{t('files.help_intro')}</p>
+              <p>{t('files.help_upload_hint')}</p>
+              <div className="rounded-lg bg-gray-50 p-3 text-xs dark:bg-gray-800/80">
+                <div className="mb-1 font-medium text-gray-700 dark:text-gray-200">
+                  {t('files.full_path')}
+                </div>
+                <code className="break-all text-gray-800 dark:text-gray-100">{fullPathDisplay}</code>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 border-t border-gray-200 px-4 py-3 dark:border-gray-800">
+              <button
+                type="button"
+                className="btn-primary"
+                onClick={() => {
+                  setHelpModalOpen(false)
+                  try {
+                    localStorage.setItem(FILEMGR_HELP_KEY, '1')
+                  } catch {
+                    /* ignore */
+                  }
                 }}
               >
-                <option value={25}>25</option>
-                <option value={50}>50</option>
-                <option value={100}>100</option>
-              </select>
-              <button
-                type="button"
-                className="btn-secondary text-sm py-1.5"
-                disabled={offset === 0 || filesQ.isFetching}
-                onClick={() => setOffset((o) => Math.max(0, o - pageSize))}
-              >
-                Önceki
-              </button>
-              <button
-                type="button"
-                className="btn-secondary text-sm py-1.5"
-                disabled={!hasMore || filesQ.isFetching}
-                onClick={() => setOffset((o) => o + pageSize)}
-              >
-                Sonraki
+                {t('files.help_understood')}
               </button>
             </div>
           </div>
         </div>
       )}
 
-      <div className="card p-4 space-y-4">
-        <div>
-          <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">{t('files.quick_mkdir')}</p>
-          <form
-            className="flex flex-wrap gap-2"
-            onSubmit={(ev) => {
-              ev.preventDefault()
-              const fd = new FormData(ev.currentTarget)
-              const name = String(fd.get('folder') || '').trim()
-              if (name && domainId !== '') mkdirM.mutate(name)
-              ev.currentTarget.reset()
-            }}
-          >
-            <input name="folder" className="input flex-1 min-w-[160px]" placeholder="new-folder" />
-            <button
-              type="submit"
-              className="btn-primary"
-              disabled={domainId === '' || mkdirM.isPending}
-            >
-              {t('files.mkdir')}
-            </button>
-          </form>
-        </div>
-        <div>
-          <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">{t('files.quick_new_file')}</p>
-          <form
-            className="flex flex-wrap gap-2"
-            onSubmit={(ev) => {
-              ev.preventDefault()
-              const fd = new FormData(ev.currentTarget)
-              const name = String(fd.get('newfile') || '').trim()
-              if (domainId === '') return
-              if (!isSafeNewFileName(name)) {
-                toast.error(t('files.invalid_filename'))
-                return
-              }
-              const list = entries
-              if (list.some((e) => e.name === name && !e.is_dir)) {
-                toast.error(t('files.file_exists'))
-                return
-              }
-              createFileM.mutate(name)
-              ev.currentTarget.reset()
-            }}
-          >
-            <input
-              name="newfile"
-              className="input flex-1 min-w-[180px] font-mono text-sm"
-              placeholder="ornek.php, style.css, not.txt"
-            />
-            <button
-              type="submit"
-              className="btn-secondary inline-flex items-center gap-2"
-              disabled={domainId === '' || createFileM.isPending}
-            >
-              <FilePlus className="h-4 w-4" />
-              {t('files.create_file')}
-            </button>
-          </form>
-        </div>
-      </div>
+
 
       {imagePreview && (
         <div className="fixed inset-0 z-[55] flex items-center justify-center bg-black/60 p-2 sm:p-4">
