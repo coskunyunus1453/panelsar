@@ -322,6 +322,28 @@ if [[ "${WITH_MARIADB}" == "1" ]] || [[ "${WITH_MARIADB}" == "yes" ]]; then
   update_env "DB_DATABASE" "panelsar"
   update_env "DB_USERNAME" "panelsar"
   update_env "DB_PASSWORD" "$PANEL_DB_PASS"
+
+  # Hosting panelinden DB oluşturma için root yerine ayrı bir servis kullanıcısı.
+  if [[ -s /root/panelsar-mysql-provision.secret ]]; then
+    MYSQL_PROVISION_PASS="$(cat /root/panelsar-mysql-provision.secret)"
+  else
+    MYSQL_PROVISION_PASS="$(openssl rand -hex 18)"
+  fi
+  "${MARIADB_CMD[@]}" -e "CREATE USER IF NOT EXISTS 'panelsar_provision'@'localhost' IDENTIFIED BY '$MYSQL_PROVISION_PASS';" || true
+  "${MARIADB_CMD[@]}" -e "ALTER USER 'panelsar_provision'@'localhost' IDENTIFIED BY '$MYSQL_PROVISION_PASS';" || true
+  "${MARIADB_CMD[@]}" -e "GRANT CREATE, DROP ON *.* TO 'panelsar_provision'@'localhost';" || true
+  "${MARIADB_CMD[@]}" -e "GRANT CREATE USER ON *.* TO 'panelsar_provision'@'localhost';" || true
+  "${MARIADB_CMD[@]}" -e "GRANT SELECT ON mysql.* TO 'panelsar_provision'@'localhost';" || true
+  "${MARIADB_CMD[@]}" -e "FLUSH PRIVILEGES;" || true
+  update_env "MYSQL_PROVISION_ENABLED" "true"
+  update_env "MYSQL_PROVISION_HOST" "127.0.0.1"
+  update_env "MYSQL_PROVISION_PORT" "3306"
+  update_env "MYSQL_PROVISION_USERNAME" "panelsar_provision"
+  update_env "MYSQL_PROVISION_PASSWORD" "$MYSQL_PROVISION_PASS"
+  echo "$MYSQL_PROVISION_PASS" > /root/panelsar-mysql-provision.secret
+  chmod 600 /root/panelsar-mysql-provision.secret
+  echo "MySQL provision şifresi: /root/panelsar-mysql-provision.secret"
+
   echo "$PANEL_DB_PASS" > /root/panelsar-panel-mysql.secret
   chmod 600 /root/panelsar-panel-mysql.secret
   echo "Panel MySQL şifresi: /root/panelsar-panel-mysql.secret"

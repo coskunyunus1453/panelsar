@@ -118,11 +118,29 @@ class FileManagerController extends Controller
         if (! $this->userOwnsDomain($request, $domain)) {
             abort(403);
         }
-        // Bazı istemcilerde `Request::validate()` query’yi beklediği şekilde
-        // görmeyebiliyor; bu yüzden `path` değerini manuel alıp normalize ediyoruz.
+        // Bazı proxy/istemci kombinasyonlarında query paramı farklı şekilde gelebiliyor.
         $rawPath = $request->query('path');
-        if (! is_string($rawPath)) {
+        if (is_array($rawPath)) {
+            $rawPath = $rawPath[0] ?? null;
+        }
+        if (! is_string($rawPath) || trim($rawPath) === '') {
             $rawPath = $request->input('path');
+            if (is_array($rawPath)) {
+                $rawPath = $rawPath[0] ?? null;
+            }
+        }
+        if (! is_string($rawPath) || trim($rawPath) === '') {
+            $qs = (string) $request->server('QUERY_STRING', '');
+            if ($qs !== '') {
+                parse_str($qs, $parsed);
+                $fromQs = $parsed['path'] ?? null;
+                if (is_array($fromQs)) {
+                    $fromQs = $fromQs[0] ?? null;
+                }
+                if (is_string($fromQs)) {
+                    $rawPath = $fromQs;
+                }
+            }
         }
         $path = is_string($rawPath) ? trim($rawPath) : '';
         if ($path === '') {

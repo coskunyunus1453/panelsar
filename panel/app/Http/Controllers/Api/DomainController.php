@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Domain;
 use App\Services\DomainService;
+use App\Services\EngineApiService;
 use App\Services\HostingQuotaService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -119,9 +120,13 @@ class DomainController extends Controller
             report($e);
             $code = method_exists($e, 'getStatusCode') ? $e->getStatusCode() : 503;
             if (! is_int($code) || $code < 400 || $code > 599) $code = 503;
+            $msg = $e->getMessage() ?: __('domains.server_switched');
+            if (EngineApiService::isLikelyConnectionFailure($msg)) {
+                $msg = 'Engine servisine ulasilamiyor. ENGINE_API_URL, ENGINE_INTERNAL_KEY ve panelsar-engine servisini kontrol edin.';
+            }
 
             return response()->json([
-                'message' => $e->getMessage() ?: __('domains.server_switched'),
+                'message' => $msg,
             ], $code);
         }
 
@@ -145,9 +150,13 @@ class DomainController extends Controller
             report($e);
             $code = method_exists($e, 'getStatusCode') ? $e->getStatusCode() : 503;
             if (! is_int($code) || $code < 400 || $code > 599) $code = 503;
+            $msg = $e->getMessage() ?: __('domains.php_switched');
+            if (EngineApiService::isLikelyConnectionFailure($msg)) {
+                $msg = 'Engine servisine ulasilamiyor. ENGINE_API_URL, ENGINE_INTERNAL_KEY ve panelsar-engine servisini kontrol edin.';
+            }
 
             return response()->json([
-                'message' => $e->getMessage() ?: __('domains.php_switched'),
+                'message' => $msg,
             ], $code);
         }
 
