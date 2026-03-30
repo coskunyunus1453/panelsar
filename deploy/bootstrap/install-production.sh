@@ -30,8 +30,9 @@
 #   WITH_LOCAL_POSTFIX=1        # Postfix + mailutils (panel giden posta: sendmail; Admin → Giden posta’dan SMTP’ye geçilebilir)
 #   SKIP_DB_SEED=1              # migrate sonrası db:seed atla
 #   RESET_PANEL_DB=1            # DİKKAT: Panel veritabanını her çalıştırmada sıfırlar (kullanıcı/domain vb. silinir)
+#   PANELSAR_SEED_DEMO_USERS=1  # Demo reseller/user hesaplarını da seed et (varsayılan: 0)
 #   (engine systemd drop-in) PANELSAR_TERMINAL_NO_ROOT=1  # web terminali www-data kabuğunda (varsayılan: root sudo)
-#   PANELSAR_ADMIN_EMAIL=...    # ilk admin e-posta (varsayılan admin@panelsar.com)
+#   PANELSAR_ADMIN_EMAIL=...    # ilk admin e-posta (varsayılan: admin@<sunucu-hostname>)
 #   PANELSAR_ADMIN_PASSWORD=... # sabit şifre; verilmezse kurulumda rastgele üretilir
 #
 set -euo pipefail
@@ -369,7 +370,10 @@ fi
 sudo -u www-data php "$PANEL_ROOT/artisan" panelsar:init-outbound-mail --no-interaction 2>/dev/null || true
 
 if [[ "${SKIP_DB_SEED:-}" != "1" ]]; then
-  ADMIN_EMAIL="${PANELSAR_ADMIN_EMAIL:-admin@panelsar.com}"
+  HOST_FQDN="$(hostname -f 2>/dev/null || hostname || echo panelsar.local)"
+  HOST_FQDN="${HOST_FQDN// /}"
+  ADMIN_EMAIL="${PANELSAR_ADMIN_EMAIL:-admin@${HOST_FQDN}}"
+  SEED_DEMO_USERS="${PANELSAR_SEED_DEMO_USERS:-0}"
   USER_COUNT=""
   if [[ "${WITH_MARIADB}" == "1" ]] || [[ "${WITH_MARIADB}" == "yes" ]]; then
     DB_PW=$(grep '^DB_PASSWORD=' "$ENV_FILE" | cut -d= -f2- | tr -d '\r')
@@ -412,10 +416,12 @@ if [[ "${SKIP_DB_SEED:-}" != "1" ]]; then
     sudo -u www-data env \
       PANELSAR_ADMIN_EMAIL="$ADMIN_EMAIL" \
       PANELSAR_ADMIN_PASSWORD="$ADMIN_PASSWORD" \
+      PANELSAR_SEED_DEMO_USERS="$SEED_DEMO_USERS" \
       php "$PANEL_ROOT/artisan" db:seed --force
   else
     sudo -u www-data env \
       PANELSAR_ADMIN_EMAIL="$ADMIN_EMAIL" \
+      PANELSAR_SEED_DEMO_USERS="$SEED_DEMO_USERS" \
       php "$PANEL_ROOT/artisan" db:seed --force
   fi
 fi

@@ -102,29 +102,34 @@ class DatabaseSeeder extends Seeder
         );
         $admin->syncRoles(['admin']);
 
-        $reseller = User::firstOrCreate(
-            ['email' => 'reseller@panelsar.com'],
-            [
-                'name' => 'Demo Reseller',
-                'password' => Hash::make('password'),
-                'locale' => 'en',
-                'status' => 'active',
-                'email_verified_at' => now(),
-            ]
-        );
-        $reseller->syncRoles(['reseller']);
+        // Production default: only admin user.
+        // Demo accounts are opt-in via PANELSAR_SEED_DEMO_USERS=1.
+        $seedDemoUsers = filter_var((string) env('PANELSAR_SEED_DEMO_USERS', false), FILTER_VALIDATE_BOOLEAN);
+        if ($seedDemoUsers) {
+            $reseller = User::firstOrCreate(
+                ['email' => 'reseller@panelsar.com'],
+                [
+                    'name' => 'Demo Reseller',
+                    'password' => Hash::make('password'),
+                    'locale' => 'en',
+                    'status' => 'active',
+                    'email_verified_at' => now(),
+                ]
+            );
+            $reseller->syncRoles(['reseller']);
 
-        $user = User::firstOrCreate(
-            ['email' => 'user@panelsar.com'],
-            [
-                'name' => 'Demo User',
-                'password' => Hash::make('password'),
-                'locale' => 'tr',
-                'status' => 'active',
-                'hosting_package_id' => $starter->id,
-                'email_verified_at' => now(),
-            ]
-        );
-        $user->syncRoles(['user']);
+            $user = User::firstOrCreate(
+                ['email' => 'user@panelsar.com'],
+                [
+                    'name' => 'Demo User',
+                    'password' => Hash::make('password'),
+                    'locale' => 'tr',
+                    'status' => 'active',
+                    'hosting_package_id' => $starter->id,
+                    'email_verified_at' => now(),
+                ]
+            );
+            $user->syncRoles(['user']);
+        }
     }
 }
