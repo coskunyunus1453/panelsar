@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Navigate } from 'react-router-dom'
+import { Navigate, useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { useAuthStore } from '../store/authStore'
 import api from '../services/api'
@@ -28,6 +28,9 @@ export default function AdminPhpSettingsPage() {
   const canWrite = tokenHasAbility(abilities, 'php:write')
   const canView = canRead || canWrite
 
+  const [searchParams, setSearchParams] = useSearchParams()
+  const versionFromUrl = (searchParams.get('v') ?? '').trim()
+
   const versionsQ = useQuery({
     queryKey: ['admin-php-versions'],
     queryFn: async () => (await api.get('/admin/settings/php/versions')).data as VersionsResponse,
@@ -38,9 +41,29 @@ export default function AdminPhpSettingsPage() {
   useEffect(() => {
     const list = versionsQ.data?.versions ?? []
     if (!list.length) return
-    if (version && list.includes(version)) return
-    setVersion(list[0])
-  }, [versionsQ.data, version])
+    const preferred =
+      versionFromUrl && list.includes(versionFromUrl)
+        ? versionFromUrl
+        : version && list.includes(version)
+          ? version
+          : list[list.length - 1]
+    if (preferred !== version) {
+      setVersion(preferred)
+    }
+  }, [versionsQ.data, versionFromUrl, version])
+
+  const setVersionInUiAndUrl = (next: string) => {
+    setVersion(next)
+    setSearchParams(
+      (prev) => {
+        const sp = new URLSearchParams(prev)
+        if (next) sp.set('v', next)
+        else sp.delete('v')
+        return sp
+      },
+      { replace: true },
+    )
+  }
 
   const iniQ = useQuery({
     queryKey: ['admin-php-ini', version],
@@ -167,7 +190,7 @@ export default function AdminPhpSettingsPage() {
             className="input"
             value={version}
             disabled={!canView || versionsQ.isLoading || disabled}
-            onChange={(e) => setVersion(e.target.value)}
+            onChange={(e) => setVersionInUiAndUrl(e.target.value)}
           >
             {(versionsQ.data?.versions ?? []).map((v) => (
               <option key={v} value={v}>

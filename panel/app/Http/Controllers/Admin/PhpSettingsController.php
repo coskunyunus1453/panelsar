@@ -42,6 +42,9 @@ class PhpSettingsController extends Controller
         }
 
         $res = $this->engine->updatePhpIni($version, $payload);
+        if (! empty($res['error'])) {
+            return response()->json(['message' => $res['error']], 502);
+        }
 
         return response()->json($res);
     }
@@ -76,6 +79,9 @@ class PhpSettingsController extends Controller
         }
 
         $res = $this->engine->updatePhpModules($version, $payload);
+        if (! empty($res['error'])) {
+            return response()->json(['message' => $res['error']], 502);
+        }
 
         return response()->json($res);
     }

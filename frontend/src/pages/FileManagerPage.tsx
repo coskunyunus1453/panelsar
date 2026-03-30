@@ -95,14 +95,16 @@ function isSafeNewFileName(name: string): boolean {
   return /^[\w.\-]+$/.test(t)
 }
 
+/** Klasör/dosya göreli yolu — segment başına sadece . .. \ ve kontrolsüz uzunluk engellenir (UTF-8 dosya adları OK). */
 function isSafeRelativePath(path: string): boolean {
-  const t = path.trim()
-  if (!t) return true // '' => root
+  const t = path.trim().replace(/^\/+/g, '')
+  if (!t) return true
   if (t.includes('\\')) return false
   const segs = t.split('/').filter(Boolean)
   if (segs.length === 0) return true
   if (segs.some((s) => s === '.' || s === '..')) return false
-  return segs.every((s) => isSafeNewFileName(s))
+  if (segs.some((s) => s.length > 255)) return false
+  return true
 }
 
 function joinRel(dir: string, name: string): string {
@@ -168,19 +170,28 @@ export default function FileManagerPage() {
     return t
   }, [pathParamRaw])
 
-  const setFilePath = useCallback((next: string) => {
-    const t = next.trim().replace(/^\/+/g, '')
-    const normalized = isSafeRelativePath(t) ? t : ''
-    setSearchParams(
-      (prev) => {
-        const nextSp = new URLSearchParams(prev)
-        if (normalized) nextSp.set('path', normalized)
-        else nextSp.delete('path')
-        return nextSp
-      },
-      { replace: true },
-    )
-  }, [setSearchParams])
+  const setFilePath = useCallback(
+    (next: string) => {
+      const t = next.trim().replace(/^\/+/g, '')
+      const normalized = isSafeRelativePath(t) ? t : ''
+      setSearchParams(
+        (prev) => {
+          const nextSp = new URLSearchParams(prev)
+          if (normalized) nextSp.set('path', normalized)
+          else nextSp.delete('path')
+          return nextSp
+        },
+        { replace: true },
+      )
+      // Path değişince önbellekte kalmış eski dizin listesini zorla temizle
+      if (domainId !== '') {
+        queueMicrotask(() => {
+          void qc.invalidateQueries({ queryKey: ['files', domainId] })
+        })
+      }
+    },
+    [setSearchParams, domainId, qc],
+  )
 
   useEffect(() => {
     const t = pathParamRaw.trim().replace(/^\/+/g, '')
@@ -299,6 +310,7 @@ export default function FileManagerPage() {
     queryKey: ['files', domainId, path, pageSize, offset, sortKey, sortOrder],
     enabled: domainId !== '',
     staleTime: 0,
+    refetchOnMount: 'always',
     queryFn: async ({ queryKey }) => {
       const [, domId, pathSeg, lim, off, sk, so] = queryKey as [
         string,
@@ -309,11 +321,16 @@ export default function FileManagerPage() {
         'name' | 'size' | 'mtime',
         'asc' | 'desc',
       ]
-      return (
-        await api.get(`/domains/${domId}/files`, {
-          params: { path: pathSeg, limit: lim, offset: off, sort: sk, order: so },
-        })
-      ).data as {
+      const u = new URLSearchParams()
+      u.set('limit', String(lim))
+      u.set('offset', String(off))
+      u.set('sort', sk)
+      u.set('order', so)
+      if (pathSeg !== '') {
+        u.set('path', pathSeg)
+      }
+      const { data } = await api.get(`/domains/${domId}/files?${u.toString()}`)
+      return data as {
         entries: ListEntry[]
         document_root_hint?: string
         total?: number
@@ -979,6 +996,7 @@ export default function FileManagerPage() {
             )}
 
             <div
+              key={`files-${domainId}-${path || 'root'}`}
               ref={listScrollRef}
               className="max-h-[min(62vh,560px)] overflow-x-auto overflow-y-auto"
             >
