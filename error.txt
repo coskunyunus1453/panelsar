@@ -1,161 +1,199 @@
-root@vmi2616585:~# curl -fsSL "https://raw.githubusercontent.com/coskunyunus1453/panelsar/main/deploy/host/install.sh" | bash
-==> Güncelleniyor: /var/www/panelsar
-remote: Enumerating objects: 21, done.
-remote: Counting objects: 100% (21/21), done.
-remote: Compressing objects: 100% (1/1), done.
-remote: Total 11 (delta 8), reused 11 (delta 8), pack-reused 0 (from 0)
-Unpacking objects: 100% (11/11), 2.48 KiB | 362.00 KiB/s, done.
-From https://github.com/coskunyunus1453/panelsar
- * branch            main       -> FETCH_HEAD
- + a27b19b...5747c37 main       -> origin/main  (forced update)
-M	panel/bootstrap/cache/.gitignore
-D	panel/public/favicon.ico
-D	panel/public/robots.txt
-M	panel/storage/app/.gitignore
-M	panel/storage/app/private/.gitignore
-M	panel/storage/app/public/.gitignore
-M	panel/storage/framework/.gitignore
-M	panel/storage/framework/cache/.gitignore
-M	panel/storage/framework/cache/data/.gitignore
-M	panel/storage/framework/sessions/.gitignore
-M	panel/storage/framework/testing/.gitignore
-M	panel/storage/framework/views/.gitignore
-Already on 'main'
-Your branch and 'origin/main' have diverged,
-and have 1 and 1 different commits each, respectively.
-  (use "git pull" to merge the remote branch into yours)
-HEAD is now at 5747c37 Kısa açıklama
-Removing panel/public/assets/
-Removing panel/public/index.html
-==> Kurulum (install-production.sh) başlıyor...
-Synchronizing state of php8.4-fpm.service with SysV service script with /lib/systemd/systemd-sysv-install.
-Executing: /lib/systemd/systemd-sysv-install enable php8.4-fpm
-==> PHP hazır: PHP 8.4.18 (cli) (built: Feb 13 2026 15:59:43) (NTS)
-2026-03-29 17:53:18 - Installing pre-requisites
-Hit:1 http://archive.ubuntu.com/ubuntu jammy InRelease
-Hit:2 http://archive.ubuntu.com/ubuntu jammy-updates InRelease                                                         
-Hit:3 https://deb.nodesource.com/node_20.x nodistro InRelease                                                          
-Hit:4 http://archive.ubuntu.com/ubuntu jammy-backports InRelease                                 
-Hit:5 https://ppa.launchpadcontent.net/ondrej/php/ubuntu jammy InRelease                         
-Hit:6 http://security.ubuntu.com/ubuntu jammy-security InRelease
-Reading package lists... Done
-Building dependency tree... Done
-Reading state information... Done
-29 packages can be upgraded. Run 'apt list --upgradable' to see them.
-Reading package lists... Done
-Building dependency tree... Done
-Reading state information... Done
-ca-certificates is already the newest version (20240203~22.04.1).
-curl is already the newest version (7.81.0-1ubuntu1.23).
-gnupg is already the newest version (2.2.27-3ubuntu2.5).
-apt-transport-https is already the newest version (2.4.14).
-0 upgraded, 0 newly installed, 0 to remove and 29 not upgraded.
-Hit:1 http://security.ubuntu.com/ubuntu jammy-security InRelease
-Hit:2 http://archive.ubuntu.com/ubuntu jammy InRelease                                                                 
-Hit:3 https://deb.nodesource.com/node_20.x nodistro InRelease                                                          
-Hit:4 http://archive.ubuntu.com/ubuntu jammy-updates InRelease
-Hit:5 http://archive.ubuntu.com/ubuntu jammy-backports InRelease
-Hit:6 https://ppa.launchpadcontent.net/ondrej/php/ubuntu jammy InRelease
-Reading package lists... Done
-Building dependency tree... Done
-Reading state information... Done
-29 packages can be upgraded. Run 'apt list --upgradable' to see them.
-2026-03-29 17:53:29 - Repository configured successfully.
-2026-03-29 17:53:29 - To install Node.js, run: apt install nodejs -y
-2026-03-29 17:53:29 - You can use N|solid Runtime as a node.js alternative
-2026-03-29 17:53:29 - To install N|solid Runtime, run: apt install nsolid -y 
-
-Synchronizing state of mariadb.service with SysV service script with /lib/systemd/systemd-sysv-install.
-Executing: /lib/systemd/systemd-sysv-install enable mariadb
-
-   INFO  Application key set successfully.  
-
-Panel MySQL şifresi: /root/panelsar-panel-mysql.secret
-Installing dependencies from lock file
-Verifying lock file contents can be installed on current platform.
-Nothing to install, update or remove
-Generating optimized autoload files
-> Illuminate\Foundation\ComposerScripts::postAutoloadDump
-> @php artisan package:discover --ansi
-
-   INFO  Discovering packages.  
-
-  laravel/sanctum ....................................................... DONE
-  laravel/tinker ........................................................ DONE
-  nesbot/carbon ......................................................... DONE
-  nunomaduro/termwind ................................................... DONE
-  spatie/laravel-activitylog ............................................ DONE
-  spatie/laravel-backup ................................................. DONE
-  spatie/laravel-permission ............................................. DONE
-  spatie/laravel-signal-aware-command ................................... DONE
-  spatie/laravel-translatable ........................................... DONE
-
-62 packages you are using are looking for funding.
-Use the `composer fund` command to find out more!
-npm warn deprecated inflight@1.0.6: This module is not supported, and leaks memory. Do not use it. Check out lru-cache if you want a good and tested way to coalesce async requests by a key value, which is much more comprehensive and powerful.
-npm warn deprecated @humanwhocodes/config-array@0.13.0: Use @eslint/config-array instead
-npm warn deprecated rimraf@3.0.2: Rimraf versions prior to v4 are no longer supported
-npm warn deprecated glob@7.2.3: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
-npm warn deprecated @humanwhocodes/object-schema@2.0.3: Use @eslint/object-schema instead
-npm warn deprecated eslint@8.57.1: This version is no longer supported. Please see https://eslint.org/version-support for other options.
-
-added 388 packages, and audited 389 packages in 8s
-
-89 packages are looking for funding
-  run `npm fund` for details
-
-4 moderate severity vulnerabilities
-
-To address all issues (including breaking changes), run:
-  npm audit fix --force
-
-Run `npm audit` for details.
-
-> panelsar-frontend@0.1.0 build
-> tsc && vite build
-
-vite v5.4.21 building for production...
-✓ 1638 modules transformed.
-dist/index.html                   0.85 kB │ gzip:   0.46 kB
-dist/assets/index-mr3ZQfHd.css   36.51 kB │ gzip:   6.50 kB
-dist/assets/index-CdtgjCfw.js   501.70 kB │ gzip: 141.47 kB
-
-(!) Some chunks are larger than 500 kB after minification. Consider:
-- Using dynamic import() to code-split the application
-- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
-- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
-✓ built in 6.84s
-
-   INFO  Nothing to migrate.  
-
-
-   INFO  Seeding database.  
-
-
-   INFO  Configuration cached successfully.  
-
-
-   INFO  Routes cached successfully.  
-
-
-
-   INFO  Blade templates cached successfully.  
-
-nginx: the configuration file /etc/nginx/nginx.conf syntax is ok
-nginx: configuration file /etc/nginx/nginx.conf test is successful
-Synchronizing state of nginx.service with SysV service script with /lib/systemd/systemd-sysv-install.
-Executing: /lib/systemd/systemd-sysv-install enable nginx
-Firewall is active and enabled on system startup
-
-=== Panelsar kurulum özeti ===
-  Panel kökü:     /var/www/panelsar
-  Engine API:     http://127.0.0.1:9090 (yalnızca sunucu içi — dışarıya açmayın)
-  ENGINE_INTERNAL_KEY panel .env ile eşleşiyor.
-  Nginx site:     /etc/nginx/sites-available/panelsar.conf
-
-  Veritabanında kullanıcı zaten vardı; yeni şifre dosyası yazılmadı. Giriş bilgisi bilinen admin ile veya şifre sıfırlama ile.
-
-Sonraki adımlar:
-  1) DNS ile alan adını bu sunucuya yönlendirin; SSL: certbot --nginx -d ornek.com
-  2) APP_URL değerini .env içinde gerçek URL ile güncelleyin: nano /var/www/panelsar/panel/.env
-  3) php artisan panelsar:install-check
+tail -n 200 storage/logs/laravel.log
+#39 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/InvokeDeferredCallbacks.php(22): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():184}:185}()
+#40 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Foundation\\Http\\Middleware\\InvokeDeferredCallbacks->handle()
+#41 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(127): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():184}:185}()
+#42 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Foundation/Http/Kernel.php(176): Illuminate\\Pipeline\\Pipeline->then()
+#43 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Foundation/Http/Kernel.php(145): Illuminate\\Foundation\\Http\\Kernel->sendRequestThroughRouter()
+#44 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Foundation/Application.php(1220): Illuminate\\Foundation\\Http\\Kernel->handle()
+#45 /var/www/panelsar/panel/public/index.php(22): Illuminate\\Foundation\\Application->handleRequest()
+#46 {main}
+"} 
+[2026-03-30 15:24:48] production.ERROR: SQLSTATE[42000]: Syntax error or access violation: 1044 Access denied for user 'panelsar_provision'@'localhost' to database 'ps_1_sssss' {"userId":1,"exception":"[object] (PDOException(code: 42000): SQLSTATE[42000]: Syntax error or access violation: 1044 Access denied for user 'panelsar_provision'@'localhost' to database 'ps_1_sssss' at /var/www/panelsar/panel/app/Services/MysqlProvisioner.php:37)
+[stacktrace]
+#0 /var/www/panelsar/panel/app/Services/MysqlProvisioner.php(37): PDO->exec()
+#1 /var/www/panelsar/panel/app/Services/DatabaseService.php(44): App\\Services\\MysqlProvisioner->provision()
+#2 /var/www/panelsar/panel/app/Http/Controllers/Api/DatabaseController.php(39): App\\Services\\DatabaseService->create()
+#3 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Routing/ControllerDispatcher.php(47): App\\Http\\Controllers\\Api\\DatabaseController->store()
+#4 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Routing/Route.php(266): Illuminate\\Routing\\ControllerDispatcher->dispatch()
+#5 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Routing/Route.php(212): Illuminate\\Routing\\Route->runController()
+#6 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Routing/Router.php(808): Illuminate\\Routing\\Route->run()
+#7 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(170): Illuminate\\Routing\\Router->{closure:Illuminate\\Routing\\Router::runRouteWithinStack():807}()
+#8 /var/www/panelsar/panel/vendor/laravel/sanctum/src/Http/Middleware/CheckAbilities.php(32): Illuminate\\Pipeline\\Pipeline->{closure:Illuminate\\Pipeline\\Pipeline::prepareDestination():168}()
+#9 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Laravel\\Sanctum\\Http\\Middleware\\CheckAbilities->handle()
+#10 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Routing/Middleware/SubstituteBindings.php(51): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():184}:185}()
+#11 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Routing\\Middleware\\SubstituteBindings->handle()
+#12 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Routing/Middleware/ThrottleRequests.php(161): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():184}:185}()
+#13 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Routing/Middleware/ThrottleRequests.php(127): Illuminate\\Routing\\Middleware\\ThrottleRequests->handleRequest()
+#14 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Routing/Middleware/ThrottleRequests.php(89): Illuminate\\Routing\\Middleware\\ThrottleRequests->handleRequestUsingNamedLimiter()
+#15 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Routing\\Middleware\\ThrottleRequests->handle()
+#16 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Auth/Middleware/Authenticate.php(64): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():184}:185}()
+#17 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Auth\\Middleware\\Authenticate->handle()
+#18 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(127): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():184}:185}()
+#19 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Routing/Router.php(807): Illuminate\\Pipeline\\Pipeline->then()
+#20 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Routing/Router.php(786): Illuminate\\Routing\\Router->runRouteWithinStack()
+#21 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Routing/Router.php(750): Illuminate\\Routing\\Router->runRoute()
+#22 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Routing/Router.php(739): Illuminate\\Routing\\Router->dispatchToRoute()
+#23 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Foundation/Http/Kernel.php(201): Illuminate\\Routing\\Router->dispatch()
+#24 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(170): Illuminate\\Foundation\\Http\\Kernel->{closure:Illuminate\\Foundation\\Http\\Kernel::dispatchToRouter():198}()
+#25 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/TransformsRequest.php(21): Illuminate\\Pipeline\\Pipeline->{closure:Illuminate\\Pipeline\\Pipeline::prepareDestination():168}()
+#26 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/ConvertEmptyStringsToNull.php(31): Illuminate\\Foundation\\Http\\Middleware\\TransformsRequest->handle()
+#27 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Foundation\\Http\\Middleware\\ConvertEmptyStringsToNull->handle()
+#28 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/TransformsRequest.php(21): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():184}:185}()
+#29 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/TrimStrings.php(51): Illuminate\\Foundation\\Http\\Middleware\\TransformsRequest->handle()
+#30 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Foundation\\Http\\Middleware\\TrimStrings->handle()
+#31 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Http/Middleware/ValidatePostSize.php(27): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():184}:185}()
+#32 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Http\\Middleware\\ValidatePostSize->handle()
+#33 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/PreventRequestsDuringMaintenance.php(110): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():184}:185}()
+#34 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Foundation\\Http\\Middleware\\PreventRequestsDuringMaintenance->handle()
+#35 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Http/Middleware/HandleCors.php(62): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():184}:185}()
+#36 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Http\\Middleware\\HandleCors->handle()
+#37 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Http/Middleware/TrustProxies.php(58): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():184}:185}()
+#38 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Http\\Middleware\\TrustProxies->handle()
+#39 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/InvokeDeferredCallbacks.php(22): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():184}:185}()
+#40 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Foundation\\Http\\Middleware\\InvokeDeferredCallbacks->handle()
+#41 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(127): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():184}:185}()
+#42 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Foundation/Http/Kernel.php(176): Illuminate\\Pipeline\\Pipeline->then()
+#43 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Foundation/Http/Kernel.php(145): Illuminate\\Foundation\\Http\\Kernel->sendRequestThroughRouter()
+#44 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Foundation/Application.php(1220): Illuminate\\Foundation\\Http\\Kernel->handle()
+#45 /var/www/panelsar/panel/public/index.php(22): Illuminate\\Foundation\\Application->handleRequest()
+#46 {main}
+"} 
+[2026-03-30 15:28:50] production.ERROR: Call to undefined method App\Http\Controllers\Api\DomainController::authorize() {"userId":1,"exception":"[object] (Error(code: 0): Call to undefined method App\\Http\\Controllers\\Api\\DomainController::authorize() at /var/www/panelsar/panel/app/Http/Controllers/Api/DomainController.php:155)
+[stacktrace]
+#0 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Routing/ControllerDispatcher.php(47): App\\Http\\Controllers\\Api\\DomainController->switchPhp()
+#1 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Routing/Route.php(266): Illuminate\\Routing\\ControllerDispatcher->dispatch()
+#2 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Routing/Route.php(212): Illuminate\\Routing\\Route->runController()
+#3 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Routing/Router.php(808): Illuminate\\Routing\\Route->run()
+#4 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(170): Illuminate\\Routing\\Router->{closure:Illuminate\\Routing\\Router::runRouteWithinStack():807}()
+#5 /var/www/panelsar/panel/vendor/laravel/sanctum/src/Http/Middleware/CheckAbilities.php(32): Illuminate\\Pipeline\\Pipeline->{closure:Illuminate\\Pipeline\\Pipeline::prepareDestination():168}()
+#6 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Laravel\\Sanctum\\Http\\Middleware\\CheckAbilities->handle()
+#7 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Routing/Middleware/SubstituteBindings.php(51): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():184}:185}()
+#8 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Routing\\Middleware\\SubstituteBindings->handle()
+#9 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Routing/Middleware/ThrottleRequests.php(161): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():184}:185}()
+#10 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Routing/Middleware/ThrottleRequests.php(127): Illuminate\\Routing\\Middleware\\ThrottleRequests->handleRequest()
+#11 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Routing/Middleware/ThrottleRequests.php(89): Illuminate\\Routing\\Middleware\\ThrottleRequests->handleRequestUsingNamedLimiter()
+#12 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Routing\\Middleware\\ThrottleRequests->handle()
+#13 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Auth/Middleware/Authenticate.php(64): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():184}:185}()
+#14 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Auth\\Middleware\\Authenticate->handle()
+#15 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(127): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():184}:185}()
+#16 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Routing/Router.php(807): Illuminate\\Pipeline\\Pipeline->then()
+#17 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Routing/Router.php(786): Illuminate\\Routing\\Router->runRouteWithinStack()
+#18 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Routing/Router.php(750): Illuminate\\Routing\\Router->runRoute()
+#19 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Routing/Router.php(739): Illuminate\\Routing\\Router->dispatchToRoute()
+#20 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Foundation/Http/Kernel.php(201): Illuminate\\Routing\\Router->dispatch()
+#21 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(170): Illuminate\\Foundation\\Http\\Kernel->{closure:Illuminate\\Foundation\\Http\\Kernel::dispatchToRouter():198}()
+#22 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/TransformsRequest.php(21): Illuminate\\Pipeline\\Pipeline->{closure:Illuminate\\Pipeline\\Pipeline::prepareDestination():168}()
+#23 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/ConvertEmptyStringsToNull.php(31): Illuminate\\Foundation\\Http\\Middleware\\TransformsRequest->handle()
+#24 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Foundation\\Http\\Middleware\\ConvertEmptyStringsToNull->handle()
+#25 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/TransformsRequest.php(21): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():184}:185}()
+#26 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/TrimStrings.php(51): Illuminate\\Foundation\\Http\\Middleware\\TransformsRequest->handle()
+#27 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Foundation\\Http\\Middleware\\TrimStrings->handle()
+#28 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Http/Middleware/ValidatePostSize.php(27): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():184}:185}()
+#29 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Http\\Middleware\\ValidatePostSize->handle()
+#30 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/PreventRequestsDuringMaintenance.php(110): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():184}:185}()
+#31 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Foundation\\Http\\Middleware\\PreventRequestsDuringMaintenance->handle()
+#32 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Http/Middleware/HandleCors.php(62): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():184}:185}()
+#33 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Http\\Middleware\\HandleCors->handle()
+#34 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Http/Middleware/TrustProxies.php(58): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():184}:185}()
+#35 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Http\\Middleware\\TrustProxies->handle()
+#36 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/InvokeDeferredCallbacks.php(22): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():184}:185}()
+#37 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Foundation\\Http\\Middleware\\InvokeDeferredCallbacks->handle()
+#38 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(127): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():184}:185}()
+#39 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Foundation/Http/Kernel.php(176): Illuminate\\Pipeline\\Pipeline->then()
+#40 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Foundation/Http/Kernel.php(145): Illuminate\\Foundation\\Http\\Kernel->sendRequestThroughRouter()
+#41 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Foundation/Application.php(1220): Illuminate\\Foundation\\Http\\Kernel->handle()
+#42 /var/www/panelsar/panel/public/index.php(22): Illuminate\\Foundation\\Application->handleRequest()
+#43 {main}
+"} 
+[2026-03-30 15:28:54] production.ERROR: Call to undefined method App\Http\Controllers\Api\DomainController::authorize() {"userId":1,"exception":"[object] (Error(code: 0): Call to undefined method App\\Http\\Controllers\\Api\\DomainController::authorize() at /var/www/panelsar/panel/app/Http/Controllers/Api/DomainController.php:125)
+[stacktrace]
+#0 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Routing/ControllerDispatcher.php(47): App\\Http\\Controllers\\Api\\DomainController->switchServer()
+#1 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Routing/Route.php(266): Illuminate\\Routing\\ControllerDispatcher->dispatch()
+#2 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Routing/Route.php(212): Illuminate\\Routing\\Route->runController()
+#3 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Routing/Router.php(808): Illuminate\\Routing\\Route->run()
+#4 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(170): Illuminate\\Routing\\Router->{closure:Illuminate\\Routing\\Router::runRouteWithinStack():807}()
+#5 /var/www/panelsar/panel/vendor/laravel/sanctum/src/Http/Middleware/CheckAbilities.php(32): Illuminate\\Pipeline\\Pipeline->{closure:Illuminate\\Pipeline\\Pipeline::prepareDestination():168}()
+#6 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Laravel\\Sanctum\\Http\\Middleware\\CheckAbilities->handle()
+#7 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Routing/Middleware/SubstituteBindings.php(51): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():184}:185}()
+#8 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Routing\\Middleware\\SubstituteBindings->handle()
+#9 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Routing/Middleware/ThrottleRequests.php(161): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():184}:185}()
+#10 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Routing/Middleware/ThrottleRequests.php(127): Illuminate\\Routing\\Middleware\\ThrottleRequests->handleRequest()
+#11 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Routing/Middleware/ThrottleRequests.php(89): Illuminate\\Routing\\Middleware\\ThrottleRequests->handleRequestUsingNamedLimiter()
+#12 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Routing\\Middleware\\ThrottleRequests->handle()
+#13 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Auth/Middleware/Authenticate.php(64): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():184}:185}()
+#14 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Auth\\Middleware\\Authenticate->handle()
+#15 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(127): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():184}:185}()
+#16 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Routing/Router.php(807): Illuminate\\Pipeline\\Pipeline->then()
+#17 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Routing/Router.php(786): Illuminate\\Routing\\Router->runRouteWithinStack()
+#18 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Routing/Router.php(750): Illuminate\\Routing\\Router->runRoute()
+#19 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Routing/Router.php(739): Illuminate\\Routing\\Router->dispatchToRoute()
+#20 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Foundation/Http/Kernel.php(201): Illuminate\\Routing\\Router->dispatch()
+#21 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(170): Illuminate\\Foundation\\Http\\Kernel->{closure:Illuminate\\Foundation\\Http\\Kernel::dispatchToRouter():198}()
+#22 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/TransformsRequest.php(21): Illuminate\\Pipeline\\Pipeline->{closure:Illuminate\\Pipeline\\Pipeline::prepareDestination():168}()
+#23 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/ConvertEmptyStringsToNull.php(31): Illuminate\\Foundation\\Http\\Middleware\\TransformsRequest->handle()
+#24 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Foundation\\Http\\Middleware\\ConvertEmptyStringsToNull->handle()
+#25 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/TransformsRequest.php(21): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():184}:185}()
+#26 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/TrimStrings.php(51): Illuminate\\Foundation\\Http\\Middleware\\TransformsRequest->handle()
+#27 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Foundation\\Http\\Middleware\\TrimStrings->handle()
+#28 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Http/Middleware/ValidatePostSize.php(27): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():184}:185}()
+#29 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Http\\Middleware\\ValidatePostSize->handle()
+#30 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/PreventRequestsDuringMaintenance.php(110): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():184}:185}()
+#31 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Foundation\\Http\\Middleware\\PreventRequestsDuringMaintenance->handle()
+#32 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Http/Middleware/HandleCors.php(62): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():184}:185}()
+#33 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Http\\Middleware\\HandleCors->handle()
+#34 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Http/Middleware/TrustProxies.php(58): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():184}:185}()
+#35 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Http\\Middleware\\TrustProxies->handle()
+#36 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/InvokeDeferredCallbacks.php(22): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():184}:185}()
+#37 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Foundation\\Http\\Middleware\\InvokeDeferredCallbacks->handle()
+#38 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(127): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():184}:185}()
+#39 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Foundation/Http/Kernel.php(176): Illuminate\\Pipeline\\Pipeline->then()
+#40 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Foundation/Http/Kernel.php(145): Illuminate\\Foundation\\Http\\Kernel->sendRequestThroughRouter()
+#41 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Foundation/Application.php(1220): Illuminate\\Foundation\\Http\\Kernel->handle()
+#42 /var/www/panelsar/panel/public/index.php(22): Illuminate\\Foundation\\Application->handleRequest()
+#43 {main}
+"} 
+[2026-03-30 15:29:20] production.ERROR: Call to undefined method App\Http\Controllers\Api\DatabaseController::authorize() {"userId":1,"exception":"[object] (Error(code: 0): Call to undefined method App\\Http\\Controllers\\Api\\DatabaseController::authorize() at /var/www/panelsar/panel/app/Http/Controllers/Api/DatabaseController.php:105)
+[stacktrace]
+#0 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Routing/ControllerDispatcher.php(47): App\\Http\\Controllers\\Api\\DatabaseController->rotatePassword()
+#1 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Routing/Route.php(266): Illuminate\\Routing\\ControllerDispatcher->dispatch()
+#2 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Routing/Route.php(212): Illuminate\\Routing\\Route->runController()
+#3 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Routing/Router.php(808): Illuminate\\Routing\\Route->run()
+#4 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(170): Illuminate\\Routing\\Router->{closure:Illuminate\\Routing\\Router::runRouteWithinStack():807}()
+#5 /var/www/panelsar/panel/vendor/laravel/sanctum/src/Http/Middleware/CheckAbilities.php(32): Illuminate\\Pipeline\\Pipeline->{closure:Illuminate\\Pipeline\\Pipeline::prepareDestination():168}()
+#6 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Laravel\\Sanctum\\Http\\Middleware\\CheckAbilities->handle()
+#7 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Routing/Middleware/SubstituteBindings.php(51): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():184}:185}()
+#8 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Routing\\Middleware\\SubstituteBindings->handle()
+#9 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Routing/Middleware/ThrottleRequests.php(161): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():184}:185}()
+#10 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Routing/Middleware/ThrottleRequests.php(127): Illuminate\\Routing\\Middleware\\ThrottleRequests->handleRequest()
+#11 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Routing/Middleware/ThrottleRequests.php(89): Illuminate\\Routing\\Middleware\\ThrottleRequests->handleRequestUsingNamedLimiter()
+#12 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Routing\\Middleware\\ThrottleRequests->handle()
+#13 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Auth/Middleware/Authenticate.php(64): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():184}:185}()
+#14 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Auth\\Middleware\\Authenticate->handle()
+#15 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(127): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():184}:185}()
+#16 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Routing/Router.php(807): Illuminate\\Pipeline\\Pipeline->then()
+#17 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Routing/Router.php(786): Illuminate\\Routing\\Router->runRouteWithinStack()
+#18 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Routing/Router.php(750): Illuminate\\Routing\\Router->runRoute()
+#19 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Routing/Router.php(739): Illuminate\\Routing\\Router->dispatchToRoute()
+#20 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Foundation/Http/Kernel.php(201): Illuminate\\Routing\\Router->dispatch()
+#21 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(170): Illuminate\\Foundation\\Http\\Kernel->{closure:Illuminate\\Foundation\\Http\\Kernel::dispatchToRouter():198}()
+#22 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/TransformsRequest.php(21): Illuminate\\Pipeline\\Pipeline->{closure:Illuminate\\Pipeline\\Pipeline::prepareDestination():168}()
+#23 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/ConvertEmptyStringsToNull.php(31): Illuminate\\Foundation\\Http\\Middleware\\TransformsRequest->handle()
+#24 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Foundation\\Http\\Middleware\\ConvertEmptyStringsToNull->handle()
+#25 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/TransformsRequest.php(21): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():184}:185}()
+#26 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/TrimStrings.php(51): Illuminate\\Foundation\\Http\\Middleware\\TransformsRequest->handle()
+#27 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Foundation\\Http\\Middleware\\TrimStrings->handle()
+#28 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Http/Middleware/ValidatePostSize.php(27): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():184}:185}()
+#29 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Http\\Middleware\\ValidatePostSize->handle()
+#30 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/PreventRequestsDuringMaintenance.php(110): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():184}:185}()
+#31 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Foundation\\Http\\Middleware\\PreventRequestsDuringMaintenance->handle()
+#32 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Http/Middleware/HandleCors.php(62): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():184}:185}()
+#33 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Http\\Middleware\\HandleCors->handle()
+#34 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Http/Middleware/TrustProxies.php(58): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():184}:185}()
+#35 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Http\\Middleware\\TrustProxies->handle()
+#36 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/InvokeDeferredCallbacks.php(22): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():184}:185}()
+#37 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Foundation\\Http\\Middleware\\InvokeDeferredCallbacks->handle()
+#38 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(127): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():184}:185}()
+#39 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Foundation/Http/Kernel.php(176): Illuminate\\Pipeline\\Pipeline->then()
+#40 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Foundation/Http/Kernel.php(145): Illuminate\\Foundation\\Http\\Kernel->sendRequestThroughRouter()
+#41 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Foundation/Application.php(1220): Illuminate\\Foundation\\Http\\Kernel->handle()
+#42 /var/www/panelsar/panel/public/index.php(22): Illuminate\\Foundation\\Application->handleRequest()
