@@ -118,10 +118,19 @@ class FileManagerController extends Controller
         if (! $this->userOwnsDomain($request, $domain)) {
             abort(403);
         }
-        $validated = $request->validate(['path' => 'required|string']);
+        // Bazı istemcilerde `Request::validate()` query’yi beklediği şekilde
+        // görmeyebiliyor; bu yüzden `path` değerini manuel alıp normalize ediyoruz.
+        $rawPath = $request->query('path');
+        if (! is_string($rawPath)) {
+            $rawPath = $request->input('path');
+        }
+        $path = is_string($rawPath) ? trim($rawPath) : '';
+        if ($path === '') {
+            return response()->json(['message' => 'The path field is required.'], 422);
+        }
 
         return response()->json([
-            'content' => $this->engine->readFile($domain->name, $validated['path']),
+            'content' => $this->engine->readFile($domain->name, $path),
         ]);
     }
 

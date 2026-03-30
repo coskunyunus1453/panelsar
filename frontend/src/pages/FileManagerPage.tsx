@@ -314,8 +314,9 @@ export default function FileManagerPage() {
         })
         setActiveTab(newIndex)
       } catch (e: unknown) {
-        const ax = e as { response?: { data?: { message?: string } } }
-        toast.error(ax.response?.data?.message ?? t('files.read_error'))
+        const ax = e as { response?: { data?: { message?: string; errors?: Record<string, string[]> } } }
+        const msg = ax.response?.data?.errors?.path?.[0] ?? ax.response?.data?.message ?? t('files.read_error')
+        toast.error(msg)
         setTabs((prev) => {
           const next = prev.filter((x) => !(x.path === relPath && x.loading))
           if (next.length === 0) {
