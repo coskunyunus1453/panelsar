@@ -98,7 +98,21 @@ class DomainController extends Controller
             'status' => 'required|string|in:active,suspended',
         ]);
 
-        $this->domainService->setPanelStatus($domain, $validated['status']);
+        try {
+            $this->domainService->setPanelStatus($domain, $validated['status']);
+        } catch (\Throwable $e) {
+            report($e);
+            $code = method_exists($e, 'getStatusCode') ? $e->getStatusCode() : 503;
+            if (! is_int($code) || $code < 400 || $code > 599) $code = 503;
+            $msg = $e->getMessage() ?: __('domains.status_updated');
+            if (EngineApiService::isLikelyConnectionFailure($msg)) {
+                $msg = 'Engine servisine ulasilamiyor. ENGINE_API_URL, ENGINE_INTERNAL_KEY ve panelsar-engine servisini kontrol edin.';
+            }
+
+            return response()->json([
+                'message' => $msg,
+            ], $code);
+        }
 
         return response()->json([
             'message' => __('domains.status_updated'),

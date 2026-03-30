@@ -330,13 +330,14 @@ if [[ "${WITH_MARIADB}" == "1" ]] || [[ "${WITH_MARIADB}" == "yes" ]]; then
     MYSQL_PROVISION_PASS="$(openssl rand -hex 18)"
   fi
   "${MARIADB_CMD[@]}" -e "CREATE USER IF NOT EXISTS 'panelsar_provision'@'localhost' IDENTIFIED BY '$MYSQL_PROVISION_PASS';" || true
+  "${MARIADB_CMD[@]}" -e "CREATE USER IF NOT EXISTS 'panelsar_provision'@'127.0.0.1' IDENTIFIED BY '$MYSQL_PROVISION_PASS';" || true
   "${MARIADB_CMD[@]}" -e "ALTER USER 'panelsar_provision'@'localhost' IDENTIFIED BY '$MYSQL_PROVISION_PASS';" || true
-  "${MARIADB_CMD[@]}" -e "GRANT CREATE, DROP ON *.* TO 'panelsar_provision'@'localhost';" || true
-  "${MARIADB_CMD[@]}" -e "GRANT CREATE USER ON *.* TO 'panelsar_provision'@'localhost';" || true
-  "${MARIADB_CMD[@]}" -e "GRANT SELECT ON mysql.* TO 'panelsar_provision'@'localhost';" || true
+  "${MARIADB_CMD[@]}" -e "ALTER USER 'panelsar_provision'@'127.0.0.1' IDENTIFIED BY '$MYSQL_PROVISION_PASS';" || true
+  "${MARIADB_CMD[@]}" -e "GRANT ALL PRIVILEGES ON *.* TO 'panelsar_provision'@'localhost' WITH GRANT OPTION;" || true
+  "${MARIADB_CMD[@]}" -e "GRANT ALL PRIVILEGES ON *.* TO 'panelsar_provision'@'127.0.0.1' WITH GRANT OPTION;" || true
   "${MARIADB_CMD[@]}" -e "FLUSH PRIVILEGES;" || true
   update_env "MYSQL_PROVISION_ENABLED" "true"
-  update_env "MYSQL_PROVISION_HOST" "127.0.0.1"
+  update_env "MYSQL_PROVISION_HOST" "localhost"
   update_env "MYSQL_PROVISION_PORT" "3306"
   update_env "MYSQL_PROVISION_USERNAME" "panelsar_provision"
   update_env "MYSQL_PROVISION_PASSWORD" "$MYSQL_PROVISION_PASS"
