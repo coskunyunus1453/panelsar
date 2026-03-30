@@ -42,7 +42,7 @@ func resolvePHPSocket(cfg *config.Config, domain string, meta *sites.SiteMeta, e
 	if cfg.Hosting.PHPFPMmanagePools {
 		return poolSettings(cfg).SocketForDomain(domain)
 	}
-	return nginx.PHPSocketPath(v, cfg.Hosting.PHPFPMsocket)
+	return nginx.EffectivePHPSocket(v, cfg.Hosting.PHPFPMsocket)
 }
 
 func sslPathsIfEnabled(cfg *config.Config, domain string, meta *sites.SiteMeta) (chain, key string) {

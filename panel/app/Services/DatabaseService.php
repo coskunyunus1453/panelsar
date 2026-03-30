@@ -98,8 +98,12 @@ class DatabaseService
                 }
             }
 
-            $database->password = $newPass;
-            $database->save();
+            // Eski kayıtlarda APP_KEY değişimi sonrası encrypted cast çözülmeyebilir
+            // (The MAC is invalid). Model->save() dirty-check sırasında decrypt dener.
+            // Query update bu kontrolü bypass eder ve yeni şifreyi güvenle yazar.
+            Database::query()
+                ->whereKey($database->getKey())
+                ->update(['password' => $newPass]);
 
             return ['password_plain' => $newPass];
         });

@@ -301,8 +301,8 @@ export default function FileManagerPage() {
       const newIndex = tabs.length
       setActiveTab(newIndex)
       try {
-        const { data } = await api.get<{ content: string }>(`/domains/${domainId}/files/read`, {
-          params: { path: relPath },
+        const { data } = await api.post<{ content: string }>(`/domains/${domainId}/files/read`, {
+          path: relPath,
         })
         const c = data?.content ?? ''
         setTabs((prev) => {

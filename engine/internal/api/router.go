@@ -149,7 +149,7 @@ func handleCreateSite(cfg *config.Config, d *daemon.Daemon) gin.HandlerFunc {
 		}
 
 		ps := phpfpmSettings(cfg)
-		phpSocket := nginx.PHPSocketPath(phpV, cfg.Hosting.PHPFPMsocket)
+		phpSocket := nginx.EffectivePHPSocket(phpV, cfg.Hosting.PHPFPMsocket)
 		if cfg.Hosting.PHPFPMmanagePools {
 			sock, perr := phpfpm.WritePool(ps, req.Domain, phpV, docRoot)
 			if perr != nil {
@@ -236,7 +236,7 @@ func handleActivateSite(cfg *config.Config, d *daemon.Daemon) gin.HandlerFunc {
 		if cfg.Hosting.PHPFPMmanagePools {
 			phpSocket = ps.SocketForDomain(domain)
 		} else {
-			phpSocket = nginx.PHPSocketPath(meta.PHPVersion, cfg.Hosting.PHPFPMsocket)
+			phpSocket = nginx.EffectivePHPSocket(meta.PHPVersion, cfg.Hosting.PHPFPMsocket)
 		}
 		if err := hosting.ApplyWebServer(cfg, domain, meta.DocumentRoot, meta, phpSocket); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -310,7 +310,7 @@ func handleIssueSSL(cfg *config.Config) gin.HandlerFunc {
 		if cfg.Hosting.PHPFPMmanagePools {
 			phpSock = phpfpmSettings(cfg).SocketForDomain(req.Domain)
 		} else {
-			phpSock = nginx.PHPSocketPath(meta.PHPVersion, cfg.Hosting.PHPFPMsocket)
+			phpSock = nginx.EffectivePHPSocket(meta.PHPVersion, cfg.Hosting.PHPFPMsocket)
 		}
 		if err := hosting.ApplyWebServer(cfg, req.Domain, meta.DocumentRoot, meta, phpSock); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -346,7 +346,7 @@ func handleRenewSSL(cfg *config.Config) gin.HandlerFunc {
 		if cfg.Hosting.PHPFPMmanagePools {
 			phpSock = phpfpmSettings(cfg).SocketForDomain(req.Domain)
 		} else {
-			phpSock = nginx.PHPSocketPath(meta.PHPVersion, cfg.Hosting.PHPFPMsocket)
+			phpSock = nginx.EffectivePHPSocket(meta.PHPVersion, cfg.Hosting.PHPFPMsocket)
 		}
 		if err := hosting.ApplyWebServer(cfg, req.Domain, meta.DocumentRoot, meta, phpSock); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -376,7 +376,7 @@ func handleRevokeSSL(cfg *config.Config) gin.HandlerFunc {
 			if cfg.Hosting.PHPFPMmanagePools {
 				phpSock = phpfpmSettings(cfg).SocketForDomain(req.Domain)
 			} else {
-				phpSock = nginx.PHPSocketPath(meta.PHPVersion, cfg.Hosting.PHPFPMsocket)
+				phpSock = nginx.EffectivePHPSocket(meta.PHPVersion, cfg.Hosting.PHPFPMsocket)
 			}
 			if err := hosting.ApplyWebServer(cfg, req.Domain, meta.DocumentRoot, meta, phpSock); err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})

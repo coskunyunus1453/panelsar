@@ -111,6 +111,25 @@ func PHPSocketPath(phpVersion, override string) string {
 	return fmt.Sprintf("/run/php/php%s-fpm.sock", v)
 }
 
+// EffectivePHPSocket panelde seçilen PHP sürümü için gerçekten kullanılacak FPM soketini seçer.
+// Kurulumda engine.yaml içine yazılan php_fpm_socket tek bir sokete kilitlenir; bu durumda
+// PHPSocketPath sürüm değişimini yok sayar. Sunucuda /run/php/php{X.Y}-fpm.sock mevcutsa
+// önce onu kullanır, böylece nginx/apache vhost gerçekten yeni FPM sürümüne yönlendirilir.
+func EffectivePHPSocket(phpVersion, socketOverride string) string {
+	verPath := PHPSocketPath(phpVersion, "")
+	o := strings.TrimSpace(socketOverride)
+	if o == "" {
+		return verPath
+	}
+	if verPath == o {
+		return o
+	}
+	if fi, err := os.Stat(verPath); err == nil && !fi.IsDir() {
+		return verPath
+	}
+	return PHPSocketPath(phpVersion, socketOverride)
+}
+
 func confBaseName(domain string) string {
 	return "panelsar-" + strings.ToLower(domain) + ".conf"
 }

@@ -59,6 +59,7 @@ Route::middleware(['auth:sanctum', 'abilities:access:customer-panel'])->group(fu
         Route::post('mkdir', [FileManagerController::class, 'mkdir'])->middleware('throttle:files-write');
         Route::delete('/', [FileManagerController::class, 'destroy'])->middleware('throttle:files-write');
         Route::get('read', [FileManagerController::class, 'read'])->middleware('throttle:files-read');
+        Route::post('read', [FileManagerController::class, 'read'])->middleware('throttle:files-read');
         Route::post('write', [FileManagerController::class, 'write'])->middleware('throttle:files-write');
         Route::post('create', [FileManagerController::class, 'create'])->middleware('throttle:files-write');
         Route::post('upload', [FileManagerController::class, 'upload'])->middleware('throttle:files-upload');

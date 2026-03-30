@@ -472,21 +472,34 @@ class EngineApiService
 
     private function postLongChecked(string $path, array $data = [], int $timeout = 600): array
     {
-        try {
-            $response = $this->clientLong($timeout)->post($this->baseUrl.$path, $data);
-            $json = $response->json() ?? [];
-            if (! $response->successful()) {
-                $msg = is_string($json['error'] ?? null) ? $json['error'] : ($response->body() ?: 'HTTP '.$response->status());
+        $attempts = 2;
+        for ($i = 0; $i < $attempts; $i++) {
+            try {
+                $response = $this->clientLong($timeout)->post($this->baseUrl.$path, $data);
+                $json = $response->json() ?? [];
+                if (! $response->successful()) {
+                    $msg = is_string($json['error'] ?? null) ? $json['error'] : ($response->body() ?: 'HTTP '.$response->status());
 
-                return ['error' => $msg, 'output' => is_string($json['output'] ?? null) ? $json['output'] : null];
+                    return ['error' => $msg, 'output' => is_string($json['output'] ?? null) ? $json['output'] : null];
+                }
+
+                return $json;
+            } catch (\Exception $e) {
+                $msg = $e->getMessage();
+                Log::error("Engine API POST {$path} failed: {$msg}");
+
+                $canRetry = $i < $attempts - 1 && self::isLikelyConnectionFailure($msg);
+                if ($canRetry) {
+                    // Geçici engine restart/bağlantı reset durumlarında bir kez daha deneyelim.
+                    usleep(350000);
+                    continue;
+                }
+
+                return ['error' => $msg];
             }
-
-            return $json;
-        } catch (\Exception $e) {
-            Log::error("Engine API POST {$path} failed: {$e->getMessage()}");
-
-            return ['error' => $e->getMessage()];
         }
+
+        return ['error' => 'Engine API request failed'];
     }
 
     private function deleteChecked(string $path): array
@@ -613,6 +626,7 @@ class EngineApiService
         $m = strtolower($message);
 
         return str_contains($m, 'curl error')
+            || str_contains($m, 'empty reply from server')
             || str_contains($m, 'connection refused')
             || str_contains($m, 'could not connect')
             || str_contains($m, 'failed to connect')
