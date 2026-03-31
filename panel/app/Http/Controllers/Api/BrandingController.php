@@ -315,7 +315,7 @@ class BrandingController extends Controller
         }
 
         $basename = null;
-        if (preg_match('#/(?:storage/branding|api/branding/files)/([^/?#]+)$#', $value, $m)) {
+        if (preg_match('#/(?:storage/branding|api/branding/files)/([^/?\#]+)$#', $value, $m)) {
             $basename = $m[1];
         }
 

@@ -38,6 +38,14 @@ type DomainLogEntry = {
   error?: string
 }
 
+type DomainHealthRow = {
+  domain_id: number
+  name: string
+  score: number
+  grade: 'excellent' | 'good' | 'warning' | 'critical'
+  reasons: string[]
+}
+
 type Busy = {
   php?: boolean
   server?: boolean
@@ -64,6 +72,15 @@ export default function DomainsPage() {
   const domainsQ = useQuery({
     queryKey: ['domains', 'paginated'],
     queryFn: async () => (await api.get('/domains')).data,
+  })
+  const healthSitesQ = useQuery({
+    queryKey: ['monitoring-health-sites', 50],
+    queryFn: async () =>
+      (await api.get('/monitoring/health/sites', { params: { limit: 50 } })).data as {
+        items: DomainHealthRow[]
+      },
+    staleTime: 20_000,
+    refetchInterval: 30_000,
   })
 
   const setBusyFlag = (domainId: number, key: keyof Busy, value: boolean) => {
@@ -195,6 +212,9 @@ export default function DomainsPage() {
   const list: DomainRow[] = domainsQ.data?.data ?? []
   const total = (domainsQ.data?.total as number | undefined) ?? list.length
   const filtered = list.filter((d) => d.name.toLowerCase().includes(search.toLowerCase()))
+  const healthByDomain = new Map<number, DomainHealthRow>(
+    (healthSitesQ.data?.items ?? []).map((it) => [it.domain_id, it]),
+  )
   const logsQ = useQuery({
     queryKey: ['domain-logs', logTarget?.id ?? 0, logLines],
     enabled: !!logTarget?.id,
@@ -390,6 +410,21 @@ export default function DomainsPage() {
                   const b = busy[domain.id] ?? {}
                   const sslEnabled = !!domain.ssl_enabled
                   const canToggle = domain.status === 'active' || domain.status === 'suspended'
+                  const health = healthByDomain.get(domain.id)
+                  const score = Math.max(0, Math.min(100, health?.score ?? 0))
+                  const grade = health?.grade ?? 'critical'
+                  const ringClass =
+                    grade === 'excellent'
+                      ? 'text-emerald-500'
+                      : grade === 'good'
+                        ? 'text-sky-500'
+                        : grade === 'warning'
+                          ? 'text-amber-500'
+                          : 'text-rose-500'
+                  const healthHint =
+                    health && health.reasons.length > 0
+                      ? `Health ${score}/100 - ${health.reasons.join(' | ')}`
+                      : `Health ${score}/100`
 
                   const statusBadge = clsx(
                     'px-2.5 py-1 text-xs font-medium rounded-full',
@@ -414,11 +449,40 @@ export default function DomainsPage() {
                         <Link
                           to={`/files?domain=${domain.id}`}
                           className="flex items-center gap-3"
+                          title={healthHint}
                         >
                           <Globe className="h-5 w-5 text-primary-500" />
-                          <span className="font-medium text-gray-900 dark:text-white">
-                            {domain.name}
-                          </span>
+                          <div className="flex min-w-0 items-center gap-2">
+                            <span className="truncate font-medium text-gray-900 dark:text-white">
+                              {domain.name}
+                            </span>
+                            <span
+                              className={clsx(
+                                'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold',
+                                grade === 'excellent' &&
+                                  'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-700/40 dark:bg-emerald-900/20 dark:text-emerald-300',
+                                grade === 'good' &&
+                                  'border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-700/40 dark:bg-sky-900/20 dark:text-sky-300',
+                                grade === 'warning' &&
+                                  'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-700/40 dark:bg-amber-900/20 dark:text-amber-300',
+                                grade === 'critical' &&
+                                  'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-700/40 dark:bg-rose-900/20 dark:text-rose-300',
+                              )}
+                              title={healthHint}
+                            >
+                              <span
+                                className={clsx(
+                                  'h-4 w-4 rounded-full',
+                                  ringClass,
+                                )}
+                                style={{
+                                  background: `conic-gradient(currentColor ${Math.round((score / 100) * 360)}deg, rgba(156, 163, 175, 0.25) 0deg)`,
+                                }}
+                                aria-hidden
+                              />
+                              {score}
+                            </span>
+                          </div>
                         </Link>
                       </td>
 
