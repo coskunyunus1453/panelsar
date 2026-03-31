@@ -35,6 +35,7 @@ export default function Header() {
   const { items, markAllRead, clear, remove, mergeFromServer } = useNotificationsStore()
   const [levelFilter, setLevelFilter] = useState<'all' | 'error' | 'info' | 'success'>('all')
   const [unreadOnly, setUnreadOnly] = useState(false)
+  const isSafeInternalPath = (p: string): boolean => /^\/[a-zA-Z0-9/_-]*$/.test(p)
   const feedQ = useQuery({
     queryKey: ['notifications-feed'],
     queryFn: async () => (await api.get('/notifications/feed')).data as { items: Array<{ id: string; title: string; message?: string; path?: string; level: 'info' | 'success' | 'error'; created_at?: string }> },
@@ -168,7 +169,7 @@ export default function Header() {
                           type="button"
                           className="text-xs font-medium text-gray-800 dark:text-gray-100 hover:underline text-left"
                           onClick={() => {
-                            if (n.path) {
+                            if (n.path && isSafeInternalPath(n.path)) {
                               navigate(n.path)
                               setShowNotifMenu(false)
                             }

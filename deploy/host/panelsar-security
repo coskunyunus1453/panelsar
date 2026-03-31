@@ -7,6 +7,11 @@ ARG1="${2:-}"
 ARG2="${3:-}"
 ARG3="${4:-}"
 
+service_exists() {
+  local svc="$1"
+  systemctl list-unit-files --type=service 2>/dev/null | awk '{print $1}' | grep -qx "${svc}.service"
+}
+
 service_active() {
   local svc="$1"
   if systemctl is-active --quiet "$svc"; then
@@ -61,6 +66,7 @@ EOF
     ;;
   fail2ban-set)
     [[ "$ARG1" == "on" || "$ARG1" == "off" ]] || { echo "invalid state" >&2; exit 1; }
+    service_exists "fail2ban" || { echo "fail2ban service not installed" >&2; exit 1; }
     if [[ "$ARG1" == "on" ]]; then
       systemctl enable --now fail2ban
     else
@@ -77,6 +83,10 @@ EOF
     ;;
   clamav-set)
     [[ "$ARG1" == "on" || "$ARG1" == "off" ]] || { echo "invalid state" >&2; exit 1; }
+    if ! service_exists "clamav-daemon" && ! service_exists "clamav-freshclam"; then
+      echo "clamav services not installed" >&2
+      exit 1
+    fi
     if [[ "$ARG1" == "on" ]]; then
       systemctl enable --now clamav-freshclam || true
       systemctl enable --now clamav-daemon || true
@@ -97,8 +107,11 @@ EOF
     clamscan -ri --stdout "$TARGET"
     ;;
   modsec-status)
-    CONF="/etc/modsecurity/modsecurity.conf"
-    if [[ -f "$CONF" ]] && grep -Eq '^\s*SecRuleEngine\s+On\b' "$CONF"; then
+    CONF=""
+    for C in /etc/modsecurity/modsecurity.conf /etc/apache2/mods-available/security2.conf /etc/httpd/conf.d/mod_security.conf; do
+      if [[ -f "$C" ]]; then CONF="$C"; break; fi
+    done
+    if [[ -n "$CONF" ]] && grep -Eq '^\s*SecRuleEngine\s+On\b' "$CONF"; then
       echo "enabled"
     else
       echo "disabled"
@@ -106,8 +119,11 @@ EOF
     ;;
   modsec-set)
     [[ "$ARG1" == "on" || "$ARG1" == "off" ]] || { echo "invalid state" >&2; exit 1; }
-    CONF="/etc/modsecurity/modsecurity.conf"
-    [[ -f "$CONF" ]] || { echo "missing $CONF" >&2; exit 1; }
+    CONF=""
+    for C in /etc/modsecurity/modsecurity.conf /etc/apache2/mods-available/security2.conf /etc/httpd/conf.d/mod_security.conf; do
+      if [[ -f "$C" ]]; then CONF="$C"; break; fi
+    done
+    [[ -n "$CONF" ]] || { echo "missing modsecurity config file" >&2; exit 1; }
     if [[ "$ARG1" == "on" ]]; then
       sed -i -E 's/^\s*SecRuleEngine\s+.*/SecRuleEngine On/' "$CONF"
     else

@@ -36,25 +36,25 @@ func registerModuleRoutes(cfg *config.Config, d *daemon.Daemon, api *gin.RouterG
 		ext := monitoring.CollectExtended(cfg.Paths.WebRoot)
 		c.JSON(http.StatusOK, gin.H{
 			"data": gin.H{
-				"cpu_usage":      ext.CPUUsagePercent,
-				"memory_total":   ext.MemoryTotal,
-				"memory_used":    ext.MemoryUsed,
-				"memory_percent": ext.MemoryPercent,
-				"disk_total":     ext.DiskTotal,
-				"disk_used":      ext.DiskUsed,
-				"disk_percent":   ext.DiskPercent,
-				"uptime":         ext.Uptime,
-				"hostname":       ext.Hostname,
-				"os":             ext.OS,
-				"cpu_model":      ext.CPUModel,
-				"cpu_cores_logical": ext.CPUCoresLogical,
-				"memory_available":  ext.MemoryAvailable,
-				"swap_total":        ext.SwapTotal,
-				"swap_used":         ext.SwapUsed,
-				"swap_percent":      ext.SwapPercent,
-				"top_cpu_processes":     ext.TopCPUProcesses,
-				"top_memory_processes":  ext.TopMemoryProcesses,
-				"top_disk_mounts":       ext.TopDiskMounts,
+				"cpu_usage":            ext.CPUUsagePercent,
+				"memory_total":         ext.MemoryTotal,
+				"memory_used":          ext.MemoryUsed,
+				"memory_percent":       ext.MemoryPercent,
+				"disk_total":           ext.DiskTotal,
+				"disk_used":            ext.DiskUsed,
+				"disk_percent":         ext.DiskPercent,
+				"uptime":               ext.Uptime,
+				"hostname":             ext.Hostname,
+				"os":                   ext.OS,
+				"cpu_model":            ext.CPUModel,
+				"cpu_cores_logical":    ext.CPUCoresLogical,
+				"memory_available":     ext.MemoryAvailable,
+				"swap_total":           ext.SwapTotal,
+				"swap_used":            ext.SwapUsed,
+				"swap_percent":         ext.SwapPercent,
+				"top_cpu_processes":    ext.TopCPUProcesses,
+				"top_memory_processes": ext.TopMemoryProcesses,
+				"top_disk_mounts":      ext.TopDiskMounts,
 			},
 		})
 	})
@@ -85,9 +85,9 @@ func registerModuleRoutes(cfg *config.Config, d *daemon.Daemon, api *gin.RouterG
 	})
 	api.POST("/backups", func(c *gin.Context) {
 		var req struct {
-			Domain          string  `json:"domain" binding:"required"`
-			Type            string  `json:"type"`
-			PanelBackupID   float64 `json:"panel_backup_id"`
+			Domain        string  `json:"domain" binding:"required"`
+			Type          string  `json:"type"`
+			PanelBackupID float64 `json:"panel_backup_id"`
 		}
 		if err := c.ShouldBindJSON(&req); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -273,7 +273,7 @@ func registerModuleRoutes(cfg *config.Config, d *daemon.Daemon, api *gin.RouterG
 						"error":    errMsg(e),
 					}
 				}(),
-				"error":   errMsg(fail2banErr),
+				"error": errMsg(fail2banErr),
 			},
 			"firewall": gin.H{"backend": "iptables", "default_policy": "DROP", "recent_rules": rules},
 			"modsecurity": gin.H{
@@ -491,35 +491,35 @@ func registerModuleRoutes(cfg *config.Config, d *daemon.Daemon, api *gin.RouterG
 	api.GET("/webserver/settings", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
 			"settings": gin.H{
-				"nginx_manage_vhosts": cfg.Hosting.NginxManageVhosts,
-				"nginx_reload_after_vhost": cfg.Hosting.NginxReloadAfterVhost,
-				"apache_manage_vhosts": cfg.Hosting.ApacheManageVhosts,
+				"nginx_manage_vhosts":       cfg.Hosting.NginxManageVhosts,
+				"nginx_reload_after_vhost":  cfg.Hosting.NginxReloadAfterVhost,
+				"apache_manage_vhosts":      cfg.Hosting.ApacheManageVhosts,
 				"apache_reload_after_vhost": cfg.Hosting.ApacheReloadAfterVhost,
-				"php_fpm_manage_pools": cfg.Hosting.PHPFPMmanagePools,
+				"php_fpm_manage_pools":      cfg.Hosting.PHPFPMmanagePools,
 				"php_fpm_reload_after_pool": cfg.Hosting.PHPFPMreloadAfterPool,
-				"php_fpm_socket": cfg.Hosting.PHPFPMsocket,
-				"php_fpm_listen_dir": cfg.Hosting.PHPFPMlistenDir,
+				"php_fpm_socket":            cfg.Hosting.PHPFPMsocket,
+				"php_fpm_listen_dir":        cfg.Hosting.PHPFPMlistenDir,
 				"php_fpm_pool_dir_template": cfg.Hosting.PHPFPMpoolDirTemplate,
-				"php_fpm_pool_user": cfg.Hosting.PHPFPMpoolUser,
-				"php_fpm_pool_group": cfg.Hosting.PHPFPMpoolGroup,
+				"php_fpm_pool_user":         cfg.Hosting.PHPFPMpoolUser,
+				"php_fpm_pool_group":        cfg.Hosting.PHPFPMpoolGroup,
 			},
 		})
 	})
 
 	api.PATCH("/webserver/settings", func(c *gin.Context) {
 		var req struct {
-			NginxManageVhosts         *bool  `json:"nginx_manage_vhosts"`
-			NginxReloadAfterVhost     *bool  `json:"nginx_reload_after_vhost"`
-			ApacheManageVhosts        *bool  `json:"apache_manage_vhosts"`
-			ApacheReloadAfterVhost    *bool  `json:"apache_reload_after_vhost"`
-			PhpFpmManagePools         *bool  `json:"php_fpm_manage_pools"`
-			PhpFpmReloadAfterPool     *bool  `json:"php_fpm_reload_after_pool"`
-			PhpFpmSocket              *string `json:"php_fpm_socket"`
-			PhpFpmListenDir           *string `json:"php_fpm_listen_dir"`
-			PhpFpmPoolDirTemplate     *string `json:"php_fpm_pool_dir_template"`
-			PhpFpmPoolUser            *string `json:"php_fpm_pool_user"`
-			PhpFpmPoolGroup          *string `json:"php_fpm_pool_group"`
-			Reload                    *bool  `json:"reload"`
+			NginxManageVhosts      *bool   `json:"nginx_manage_vhosts"`
+			NginxReloadAfterVhost  *bool   `json:"nginx_reload_after_vhost"`
+			ApacheManageVhosts     *bool   `json:"apache_manage_vhosts"`
+			ApacheReloadAfterVhost *bool   `json:"apache_reload_after_vhost"`
+			PhpFpmManagePools      *bool   `json:"php_fpm_manage_pools"`
+			PhpFpmReloadAfterPool  *bool   `json:"php_fpm_reload_after_pool"`
+			PhpFpmSocket           *string `json:"php_fpm_socket"`
+			PhpFpmListenDir        *string `json:"php_fpm_listen_dir"`
+			PhpFpmPoolDirTemplate  *string `json:"php_fpm_pool_dir_template"`
+			PhpFpmPoolUser         *string `json:"php_fpm_pool_user"`
+			PhpFpmPoolGroup        *string `json:"php_fpm_pool_group"`
+			Reload                 *bool   `json:"reload"`
 		}
 		if err := c.ShouldBindJSON(&req); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -605,17 +605,17 @@ func registerModuleRoutes(cfg *config.Config, d *daemon.Daemon, api *gin.RouterG
 		c.JSON(http.StatusOK, gin.H{
 			"message": "webserver settings updated",
 			"settings": gin.H{
-				"nginx_manage_vhosts": cfg.Hosting.NginxManageVhosts,
-				"nginx_reload_after_vhost": cfg.Hosting.NginxReloadAfterVhost,
-				"apache_manage_vhosts": cfg.Hosting.ApacheManageVhosts,
+				"nginx_manage_vhosts":       cfg.Hosting.NginxManageVhosts,
+				"nginx_reload_after_vhost":  cfg.Hosting.NginxReloadAfterVhost,
+				"apache_manage_vhosts":      cfg.Hosting.ApacheManageVhosts,
 				"apache_reload_after_vhost": cfg.Hosting.ApacheReloadAfterVhost,
-				"php_fpm_manage_pools": cfg.Hosting.PHPFPMmanagePools,
+				"php_fpm_manage_pools":      cfg.Hosting.PHPFPMmanagePools,
 				"php_fpm_reload_after_pool": cfg.Hosting.PHPFPMreloadAfterPool,
-				"php_fpm_socket": cfg.Hosting.PHPFPMsocket,
-				"php_fpm_listen_dir": cfg.Hosting.PHPFPMlistenDir,
+				"php_fpm_socket":            cfg.Hosting.PHPFPMsocket,
+				"php_fpm_listen_dir":        cfg.Hosting.PHPFPMlistenDir,
 				"php_fpm_pool_dir_template": cfg.Hosting.PHPFPMpoolDirTemplate,
-				"php_fpm_pool_user": cfg.Hosting.PHPFPMpoolUser,
-				"php_fpm_pool_group": cfg.Hosting.PHPFPMpoolGroup,
+				"php_fpm_pool_user":         cfg.Hosting.PHPFPMpoolUser,
+				"php_fpm_pool_group":        cfg.Hosting.PHPFPMpoolGroup,
 			},
 			"reload": reloadResult,
 		})
@@ -1054,7 +1054,11 @@ func handleFileSearch(cfg *config.Config) gin.HandlerFunc {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "domain required"})
 			return
 		}
-		root := cfg.Paths.WebRoot + "/" + domain
+		root, err := resolveFileManagerRoot(cfg, domain)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
 		hits, err := files.SearchText(root, path, q, 200, 14, 2<<20)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -1098,7 +1102,11 @@ func handleFileList(cfg *config.Config) gin.HandlerFunc {
 		if order != "desc" {
 			order = "asc"
 		}
-		root := cfg.Paths.WebRoot + "/" + domain
+		root, err := resolveFileManagerRoot(cfg, domain)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
 		list, total, err := files.ListPaged(root, path, offset, limit, sortKey, order)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -1123,7 +1131,11 @@ func handleFileMkdir(cfg *config.Config) gin.HandlerFunc {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		root := cfg.Paths.WebRoot + "/" + req.Domain
+		root, err := resolveFileManagerRoot(cfg, req.Domain)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
 		if err := files.Mkdir(root, req.Path); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
@@ -1140,7 +1152,11 @@ func handleFileDelete(cfg *config.Config) gin.HandlerFunc {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "domain and path required"})
 			return
 		}
-		root := cfg.Paths.WebRoot + "/" + domain
+		root, err := resolveFileManagerRoot(cfg, domain)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
 		if err := files.Remove(root, path); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
@@ -1157,7 +1173,11 @@ func handleFileRead(cfg *config.Config) gin.HandlerFunc {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "domain and path required"})
 			return
 		}
-		root := cfg.Paths.WebRoot + "/" + domain
+		root, err := resolveFileManagerRoot(cfg, domain)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
 		b, err := files.ReadFileForEditor(root, path)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -1178,7 +1198,11 @@ func handleFileWrite(cfg *config.Config) gin.HandlerFunc {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		root := cfg.Paths.WebRoot + "/" + req.Domain
+		root, err := resolveFileManagerRoot(cfg, req.Domain)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
 		if err := files.WriteFile(root, req.Path, []byte(req.Content), 0o644); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
@@ -1198,7 +1222,11 @@ func handleFileCreate(cfg *config.Config) gin.HandlerFunc {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		root := cfg.Paths.WebRoot + "/" + req.Domain
+		root, err := resolveFileManagerRoot(cfg, req.Domain)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
 		if err := files.CreateFile(root, req.Path, []byte(req.Content), 0o644); err != nil {
 			c.JSON(http.StatusUnprocessableEntity, gin.H{"error": err.Error()})
 			return
@@ -1219,7 +1247,11 @@ func handleFileRename(cfg *config.Config) gin.HandlerFunc {
 			return
 		}
 
-		root := cfg.Paths.WebRoot + "/" + req.Domain
+		root, err := resolveFileManagerRoot(cfg, req.Domain)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
 		if err := files.Rename(root, req.From, req.To); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
@@ -1245,7 +1277,11 @@ func handleFileCopy(cfg *config.Config) gin.HandlerFunc {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		root := cfg.Paths.WebRoot + "/" + req.Domain
+		root, err := resolveFileManagerRoot(cfg, req.Domain)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
 		if err := files.Copy(root, req.From, req.To); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
@@ -1270,7 +1306,11 @@ func handleFileChmod(cfg *config.Config) gin.HandlerFunc {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid mode"})
 			return
 		}
-		root := cfg.Paths.WebRoot + "/" + req.Domain
+		root, err := resolveFileManagerRoot(cfg, req.Domain)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
 		if err := files.Chmod(root, req.Path, os.FileMode(m)); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
@@ -1290,7 +1330,11 @@ func handleFileZip(cfg *config.Config) gin.HandlerFunc {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		root := cfg.Paths.WebRoot + "/" + req.Domain
+		root, err := resolveFileManagerRoot(cfg, req.Domain)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
 		if err := files.ZipPath(root, req.Source, req.Target); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
@@ -1310,7 +1354,11 @@ func handleFileUnzip(cfg *config.Config) gin.HandlerFunc {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		root := cfg.Paths.WebRoot + "/" + req.Domain
+		root, err := resolveFileManagerRoot(cfg, req.Domain)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
 		if err := files.UnzipPath(root, req.Archive, req.TargetDir); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
@@ -1328,7 +1376,11 @@ func handleFileDownload(cfg *config.Config) gin.HandlerFunc {
 			return
 		}
 
-		root := cfg.Paths.WebRoot + "/" + domain
+		root, err := resolveFileManagerRoot(cfg, domain)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
 		b, err := files.ReadFileForDownload(root, path)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -1375,7 +1427,11 @@ func handleFileUpload(cfg *config.Config) gin.HandlerFunc {
 			c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "upload of risky file types is blocked"})
 			return
 		}
-		root := cfg.Paths.WebRoot + "/" + domain
+		root, err := resolveFileManagerRoot(cfg, domain)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
 		rel := filepath.Join(relDir, name)
 		dest, err := files.ResolveUnderRoot(root, rel)
 		if err != nil {
@@ -1392,4 +1448,29 @@ func handleFileUpload(cfg *config.Config) gin.HandlerFunc {
 		}
 		c.JSON(http.StatusOK, gin.H{"message": "uploaded", "path": rel})
 	}
+}
+
+var fileDomainRe = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$`)
+
+func resolveFileManagerRoot(cfg *config.Config, domain string) (string, error) {
+	d := strings.ToLower(strings.TrimSpace(domain))
+	if !fileDomainRe.MatchString(d) {
+		return "", errors.New("invalid domain")
+	}
+
+	joined := filepath.Join(cfg.Paths.WebRoot, d)
+	realRoot, err := filepath.EvalSymlinks(joined)
+	if err != nil {
+		return "", errors.New("domain root not found")
+	}
+	realWebRoot, err := filepath.EvalSymlinks(cfg.Paths.WebRoot)
+	if err != nil {
+		return "", err
+	}
+	sep := string(os.PathSeparator)
+	if realRoot != realWebRoot && !strings.HasPrefix(realRoot, realWebRoot+sep) {
+		return "", errors.New("domain root escapes web root")
+	}
+
+	return realRoot, nil
 }

@@ -63,9 +63,9 @@ export default function SecurityPage() {
       qc.invalidateQueries({ queryKey: ['security-overview'] })
     },
     onError: (err: unknown) => {
-      const ax = err as { response?: { data?: { message?: string }; status?: number } }
+      const ax = err as { response?: { data?: { message?: string; hint?: string }; status?: number } }
       if (ax.response?.status === 403) toast.error('Yalnızca yönetici')
-      else toast.error(ax.response?.data?.message ?? String(err))
+      else toast.error([ax.response?.data?.message, ax.response?.data?.hint].filter(Boolean).join(' — ') || String(err))
     },
   })
 
@@ -80,9 +80,9 @@ export default function SecurityPage() {
       qc.invalidateQueries({ queryKey: ['security-overview'] })
     },
     onError: (err: unknown) => {
-      const ax = err as { response?: { data?: { message?: string }; status?: number } }
+      const ax = err as { response?: { data?: { message?: string; hint?: string }; status?: number } }
       if (ax.response?.status === 403) toast.error('Yalnızca yönetici')
-      else toast.error(ax.response?.data?.message ?? String(err))
+      else toast.error([ax.response?.data?.message, ax.response?.data?.hint].filter(Boolean).join(' — ') || String(err))
     },
   })
 
@@ -94,10 +94,10 @@ export default function SecurityPage() {
       qc.invalidateQueries({ queryKey: ['security-overview'] })
     },
     onError: (err: unknown) => {
-      const ax = err as { response?: { data?: { message?: string; result?: { output?: string } }; status?: number } }
+      const ax = err as { response?: { data?: { message?: string; hint?: string; result?: { output?: string } }; status?: number } }
       setScanOutput(String(ax.response?.data?.result?.output ?? ''))
       if (ax.response?.status === 403) toast.error('Yalnızca yönetici')
-      else toast.error(ax.response?.data?.message ?? String(err))
+      else toast.error([ax.response?.data?.message, ax.response?.data?.hint].filter(Boolean).join(' — ') || String(err))
     },
   })
 
@@ -113,8 +113,8 @@ export default function SecurityPage() {
       qc.invalidateQueries({ queryKey: ['security-overview'] })
     },
     onError: (err: unknown) => {
-      const ax = err as { response?: { data?: { message?: string } } }
-      toast.error(ax.response?.data?.message ?? String(err))
+      const ax = err as { response?: { data?: { message?: string; hint?: string } } }
+      toast.error([ax.response?.data?.message, ax.response?.data?.hint].filter(Boolean).join(' — ') || String(err))
     },
   })
 

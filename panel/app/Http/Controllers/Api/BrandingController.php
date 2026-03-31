@@ -7,6 +7,7 @@ use App\Models\PanelSetting;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -69,6 +70,12 @@ class BrandingController extends Controller
             'logo_customer' => 'nullable|image|max:'.$maxKb,
             'logo_admin' => 'nullable|image|max:'.$maxKb,
         ]);
+        if (! $request->hasFile('logo_customer') && ! $request->hasFile('logo_admin')) {
+            return response()->json([
+                'message' => __('settings.branding_upload_failed'),
+                'hint' => 'En az bir logo dosyası seçin (logo_customer veya logo_admin).',
+            ], 422);
+        }
 
         $disk = 'public';
         $publicRoot = storage_path('app/public');
@@ -103,10 +110,16 @@ class BrandingController extends Controller
             $save('branding.logo_admin_url', $request->file('logo_admin'));
         } catch (Throwable $e) {
             report($e);
+            Log::error('branding.upload.failed', [
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
 
             return response()->json([
                 'message' => __('settings.branding_upload_failed'),
                 'max_upload_kb' => $maxKb,
+                'hint' => __('settings.branding_storage_not_writable'),
+                'debug_error' => config('app.debug') ? $e->getMessage() : null,
             ], 500);
         }
 
@@ -149,6 +162,74 @@ class BrandingController extends Controller
             'message' => __('settings.branding_config_saved'),
             'max_upload_kb' => (int) $validated['max_upload_kb'],
         ]);
+    }
+
+    public function diagnostics(): JsonResponse
+    {
+        $checks = [];
+        $publicRoot = storage_path('app/public');
+        $brandingDir = $publicRoot.'/branding';
+
+        $checks[] = [
+            'key' => 'panel_settings_table',
+            'ok' => Schema::hasTable('panel_settings'),
+            'message' => Schema::hasTable('panel_settings') ? 'panel_settings table exists' : 'panel_settings table missing',
+        ];
+
+        try {
+            if (! File::isDirectory($publicRoot)) {
+                File::makeDirectory($publicRoot, 0755, true, true);
+            }
+            if (! File::isDirectory($brandingDir)) {
+                File::makeDirectory($brandingDir, 0755, true, true);
+            }
+            $checks[] = [
+                'key' => 'branding_dir_exists',
+                'ok' => true,
+                'message' => 'branding directory exists',
+            ];
+        } catch (Throwable $e) {
+            $checks[] = [
+                'key' => 'branding_dir_exists',
+                'ok' => false,
+                'message' => 'branding directory cannot be created: '.$e->getMessage(),
+            ];
+        }
+
+        $tmpFile = $brandingDir.'/.write-test-'.uniqid('', true);
+        try {
+            File::put($tmpFile, 'ok');
+            File::delete($tmpFile);
+            $checks[] = [
+                'key' => 'branding_write_test',
+                'ok' => true,
+                'message' => 'branding directory is writable',
+            ];
+        } catch (Throwable $e) {
+            $checks[] = [
+                'key' => 'branding_write_test',
+                'ok' => false,
+                'message' => 'branding directory is not writable: '.$e->getMessage(),
+            ];
+        }
+
+        try {
+            Storage::disk('public')->makeDirectory('branding');
+            $checks[] = [
+                'key' => 'public_disk',
+                'ok' => true,
+                'message' => 'public disk available',
+            ];
+        } catch (Throwable $e) {
+            $checks[] = [
+                'key' => 'public_disk',
+                'ok' => false,
+                'message' => 'public disk error: '.$e->getMessage(),
+            ];
+        }
+
+        $ok = collect($checks)->every(fn ($c) => (bool) ($c['ok'] ?? false));
+        return response()->json(['ok' => $ok, 'checks' => $checks]);
     }
 
     /**

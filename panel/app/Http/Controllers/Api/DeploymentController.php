@@ -10,6 +10,7 @@ use App\Models\Domain;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Symfony\Component\Process\Process;
@@ -121,15 +122,6 @@ class DeploymentController extends Controller
         if (! $cfg || ! $cfg->auto_deploy) {
             return response()->json(['message' => 'auto deploy disabled'], 422);
         }
-        $token = (string) ($request->header('X-Deploy-Token') ?: $request->query('token', ''));
-        if ($token === '' || ! hash_equals((string) $cfg->webhook_token, $token)) {
-            Log::warning('panelsar.deploy_audit', [
-                'action' => 'webhook_invalid_token',
-                'domain' => $domain->name,
-                'ip' => $request->ip(),
-            ]);
-            return response()->json(['message' => 'invalid token'], 403);
-        }
         $branch = $this->extractWebhookBranch($request);
         if (! $this->isBranchAllowed($cfg, $branch)) {
             Log::warning('panelsar.deploy_audit', [
@@ -141,7 +133,15 @@ class DeploymentController extends Controller
             return response()->json(['message' => 'branch not allowed'], 422);
         }
         if (! $this->verifyWebhookSignature($request, (string) $cfg->webhook_token)) {
+            Log::warning('panelsar.deploy_audit', [
+                'action' => 'webhook_invalid_signature',
+                'domain' => $domain->name,
+                'ip' => $request->ip(),
+            ]);
             return response()->json(['message' => 'invalid signature'], 403);
+        }
+        if (! $this->verifyWebhookReplayWindow($request, $domain)) {
+            return response()->json(['message' => 'replay blocked'], 409);
         }
         $run = DeploymentRun::create([
             'domain_id' => $domain->id,
@@ -388,7 +388,32 @@ class DeploymentController extends Controller
         if ($gitLabToken !== '') {
             return hash_equals($secret, $gitLabToken);
         }
-        $token = trim((string) ($request->header('X-Deploy-Token') ?: $request->query('token', '')));
+        $token = trim((string) $request->header('X-Deploy-Token'));
         return $token !== '' && hash_equals($secret, $token);
+    }
+
+    private function verifyWebhookReplayWindow(Request $request, Domain $domain): bool
+    {
+        $deliveryId = trim((string) (
+            $request->header('X-GitHub-Delivery')
+            ?: $request->header('X-Gitlab-Event-UUID')
+            ?: $request->header('X-Request-Id')
+        ));
+        if ($deliveryId === '') {
+            // Delivery ID yoksa yine de payload hash ile kısa replay engeli uygula.
+            $deliveryId = 'body:'.hash('sha256', (string) $request->getContent());
+        }
+        $key = 'deploy:webhook:dedupe:'.$domain->id.':'.$deliveryId;
+        if (Cache::has($key)) {
+            Log::warning('panelsar.deploy_audit', [
+                'action' => 'webhook_replay_blocked',
+                'domain' => $domain->name,
+                'delivery_id' => $deliveryId,
+                'ip' => $request->ip(),
+            ]);
+            return false;
+        }
+        Cache::put($key, 1, now()->addMinutes(15));
+        return true;
     }
 }

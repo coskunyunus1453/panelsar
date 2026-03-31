@@ -415,7 +415,7 @@ class PluginStoreController extends Controller
             $p = new Process([
                 'ssh',
                 '-i', $tmpKey,
-                '-o', 'StrictHostKeyChecking=no',
+                '-o', 'StrictHostKeyChecking=accept-new',
                 '-p', (string) $port,
                 $user.'@'.$host,
                 $remoteCmd,
@@ -437,7 +437,7 @@ class PluginStoreController extends Controller
         $p = new Process([
             'ssh',
             '-i', $keyPath,
-            '-o', 'StrictHostKeyChecking=no',
+            '-o', 'StrictHostKeyChecking=accept-new',
             '-p', (string) $port,
             $userAtHost,
             $remoteCmd,
@@ -452,7 +452,7 @@ class PluginStoreController extends Controller
         $p = new Process([
             'ssh',
             '-i', $keyPath,
-            '-o', 'StrictHostKeyChecking=no',
+            '-o', 'StrictHostKeyChecking=accept-new',
             '-p', (string) $port,
             $userAtHost,
             $cmd,
@@ -470,7 +470,7 @@ class PluginStoreController extends Controller
         $p = new Process([
             'ssh',
             '-i', $keyPath,
-            '-o', 'StrictHostKeyChecking=no',
+            '-o', 'StrictHostKeyChecking=accept-new',
             '-p', (string) $port,
             $userAtHost,
             $cmd,

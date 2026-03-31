@@ -43,6 +43,15 @@ class BackupController extends Controller
         if (! $this->userOwnsDomain($request, $domain)) {
             abort(403);
         }
+        if (! empty($validated['destination_id'])) {
+            $ownsDestination = BackupDestination::query()
+                ->where('id', (int) $validated['destination_id'])
+                ->where('user_id', $request->user()->id)
+                ->exists();
+            if (! $ownsDestination) {
+                abort(403);
+            }
+        }
 
         $this->quota->ensureCanQueueBackup($request->user());
 
@@ -171,6 +180,15 @@ class BackupController extends Controller
         if (! $this->userOwnsDomain($request, $domain)) {
             abort(403);
         }
+        if (! empty($validated['destination_id'])) {
+            $ownsDestination = BackupDestination::query()
+                ->where('id', (int) $validated['destination_id'])
+                ->where('user_id', $request->user()->id)
+                ->exists();
+            if (! $ownsDestination) {
+                abort(403);
+            }
+        }
         $row = BackupSchedule::create([
             'user_id' => $request->user()->id,
             'domain_id' => $domain->id,
@@ -194,6 +212,15 @@ class BackupController extends Controller
             'schedule' => ['sometimes', 'string', 'regex:/^\S+\s+\S+\s+\S+\s+\S+\s+\S+$/'],
             'enabled' => 'sometimes|boolean',
         ]);
+        if (! empty($validated['destination_id'])) {
+            $ownsDestination = BackupDestination::query()
+                ->where('id', (int) $validated['destination_id'])
+                ->where('user_id', $request->user()->id)
+                ->exists();
+            if (! $ownsDestination) {
+                abort(403);
+            }
+        }
         $backupSchedule->fill($validated);
         $backupSchedule->save();
         $this->audit($request, 'backup_schedule_update', true, null, ['schedule_id' => $backupSchedule->id]);
@@ -282,6 +309,13 @@ class BackupController extends Controller
             if (! $destId || trim($set) === '') {
                 return response()->json(['message' => __('backups.remote_restore_missing')], 422);
             }
+            $ownsDestination = BackupDestination::query()
+                ->where('id', (int) $destId)
+                ->where('user_id', $request->user()->id)
+                ->exists();
+            if (! $ownsDestination) {
+                abort(403);
+            }
             // Bu adım engine restore-file endpointi gelene kadar referans üretir.
             $result = $this->engine->restoreBackup($eid ?: $set);
             $this->audit($request, 'backup_restore_remote', true, null, [
@@ -303,7 +337,50 @@ class BackupController extends Controller
 
     public function engineSnapshot(Request $request): JsonResponse
     {
-        return response()->json(['remote' => $this->engine->listBackups()]);
+        $rows = $this->engine->listBackups();
+        if ($request->user()->isAdmin()) {
+            return response()->json(['remote' => $rows]);
+        }
+
+        $allowedDomains = Domain::query()
+            ->where('user_id', $request->user()->id)
+            ->pluck('name')
+            ->map(static fn ($v) => strtolower(trim((string) $v)))
+            ->filter()
+            ->values()
+            ->all();
+        $allowedEngineIds = Backup::query()
+            ->where('user_id', $request->user()->id)
+            ->whereNotNull('engine_backup_id')
+            ->pluck('engine_backup_id')
+            ->map(static fn ($v) => trim((string) $v))
+            ->filter()
+            ->values()
+            ->all();
+        $allowedPanelIds = Backup::query()
+            ->where('user_id', $request->user()->id)
+            ->pluck('id')
+            ->map(static fn ($v) => (string) $v)
+            ->values()
+            ->all();
+
+        $filtered = array_values(array_filter($rows, static function ($row) use ($allowedDomains, $allowedEngineIds, $allowedPanelIds): bool {
+            if (! is_array($row)) {
+                return false;
+            }
+            $domain = strtolower(trim((string) ($row['domain'] ?? '')));
+            if ($domain !== '' && in_array($domain, $allowedDomains, true)) {
+                return true;
+            }
+            $engineId = trim((string) ($row['id'] ?? ($row['engine_backup_id'] ?? '')));
+            if ($engineId !== '' && in_array($engineId, $allowedEngineIds, true)) {
+                return true;
+            }
+            $panelBackupId = trim((string) ($row['panel_backup_id'] ?? ''));
+            return $panelBackupId !== '' && in_array($panelBackupId, $allowedPanelIds, true);
+        }));
+
+        return response()->json(['remote' => $filtered]);
     }
 
     public function sync(Request $request, Backup $backup): JsonResponse

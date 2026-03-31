@@ -9,7 +9,9 @@ use App\Services\UserHostingPackageSync;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Rules\Password;
 
 class UserController extends Controller
 {
@@ -145,6 +147,28 @@ class UserController extends Controller
         $user->update(['status' => 'active']);
 
         return response()->json(['message' => __('users.activated')]);
+    }
+
+    public function resetPassword(Request $request, User $user): JsonResponse
+    {
+        $validated = $request->validate([
+            'password' => ['required', 'confirmed', Password::min(12)->letters()->mixedCase()->numbers()->symbols()],
+        ]);
+
+        $user->forceFill([
+            'password' => Hash::make((string) $validated['password']),
+        ])->save();
+
+        Log::info('panelsar.user_password_reset', [
+            'actor_user_id' => $request->user()?->id,
+            'target_user_id' => $user->id,
+            'target_email' => $user->email,
+            'ip' => $request->ip(),
+        ]);
+
+        return response()->json([
+            'message' => 'Kullanıcı şifresi güvenli şekilde güncellendi.',
+        ]);
     }
 
     private function resellerMayAssignRole(User $reseller, Role $role): bool

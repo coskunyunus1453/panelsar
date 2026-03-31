@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Database;
+use App\Models\Domain;
 use App\Services\DatabaseService;
 use App\Services\HostingQuotaService;
 use Illuminate\Http\JsonResponse;
@@ -32,6 +33,16 @@ class DatabaseController extends Controller
             'domain_id' => 'nullable|exists:domains,id',
             'grant_host' => 'nullable|string|max:64',
         ]);
+
+        if (! empty($validated['domain_id'])) {
+            $ownsDomain = Domain::query()
+                ->where('id', (int) $validated['domain_id'])
+                ->where('user_id', $request->user()->id)
+                ->exists();
+            if (! $ownsDomain) {
+                abort(403);
+            }
+        }
 
         $this->quota->ensureCanCreateDatabase($request->user());
 

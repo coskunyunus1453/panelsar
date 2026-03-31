@@ -19,6 +19,7 @@ import clsx from 'clsx'
 import api from '../services/api'
 import { useDomainsList } from '../hooks/useDomains'
 import { useAuthStore } from '../store/authStore'
+import { safeExternalHttpUrl } from '../lib/urlSafety'
 
 type MailRow = {
   id: number
@@ -223,7 +224,7 @@ export default function EmailPage() {
 
   const accounts: MailRow[] = q.data?.accounts ?? []
   const forwarders: ForwarderRow[] = q.data?.forwarders ?? []
-  const webmailUrl: string | undefined = q.data?.webmail_url
+  const webmailUrl: string | undefined = safeExternalHttpUrl(q.data?.webmail_url ?? '') ?? undefined
   const mailOv = q.data?.mail as
     | { mail_enabled?: boolean; mailboxes?: EngineMailbox[]; spf?: string; dmarc?: string }
     | undefined

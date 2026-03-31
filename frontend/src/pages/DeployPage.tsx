@@ -57,9 +57,9 @@ export default function DeployPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cfg?.id, cfg?.repo_url, cfg?.branch, cfg?.runtime, cfg?.auto_deploy])
   const webhookUrl = useMemo(() => {
-    if (!domainId || !cfg?.webhook_token) return ''
-    return `${window.location.origin}/api/deployment/webhook/${domainId}?token=${cfg.webhook_token}`
-  }, [domainId, cfg?.webhook_token])
+    if (!domainId) return ''
+    return `${window.location.origin}/api/deployment/webhook/${domainId}`
+  }, [domainId])
 
   const syncFromServer = (next?: DeployConfig) => {
     if (!next) return

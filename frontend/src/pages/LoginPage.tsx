@@ -99,7 +99,7 @@ export default function LoginPage() {
               </div>
             </div>
 
-            <div className="flex items-center justify-between">
+            <div className="flex items-center">
               <label className="flex items-center gap-2 text-sm text-gray-400">
                 <input
                   type="checkbox"
@@ -107,9 +107,6 @@ export default function LoginPage() {
                 />
                 {t('auth.remember')}
               </label>
-              <a href="#" className="text-sm text-primary-400 hover:text-primary-300">
-                {t('auth.forgot')}
-              </a>
             </div>
 
             <button

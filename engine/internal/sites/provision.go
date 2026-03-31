@@ -5,11 +5,15 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 )
 
+var siteDomainRe = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$`)
+
 func Provision(webRoot, domain, phpVersion, serverType string) (documentRoot string, err error) {
-	if domain == "" || domain == "." || strings.Contains(domain, "..") {
+	domain = normalizeDomain(domain)
+	if !isValidDomain(domain) {
 		return "", fmt.Errorf("invalid domain")
 	}
 	if phpVersion == "" {
@@ -65,7 +69,8 @@ h1{color:#2563eb}
 }
 
 func Remove(webRoot, domain string) error {
-	if domain == "" || strings.Contains(domain, "..") {
+	domain = normalizeDomain(domain)
+	if !isValidDomain(domain) {
 		return fmt.Errorf("invalid domain")
 	}
 	return os.RemoveAll(filepath.Join(webRoot, domain))
@@ -76,10 +81,10 @@ func ProvisionSubdomain(webRoot, parentDomain, hostname, pathSegment, phpVersion
 	parentDomain = strings.ToLower(strings.TrimSpace(parentDomain))
 	hostname = strings.ToLower(strings.TrimSpace(hostname))
 	pathSegment = strings.TrimSpace(pathSegment)
-	if parentDomain == "" || strings.Contains(parentDomain, "..") {
+	if !isValidDomain(parentDomain) {
 		return "", fmt.Errorf("invalid parent domain")
 	}
-	if hostname == "" || strings.Contains(hostname, "..") {
+	if !isValidDomain(hostname) {
 		return "", fmt.Errorf("invalid hostname")
 	}
 	if pathSegment == "" || strings.Contains(pathSegment, "/") || strings.Contains(pathSegment, "..") {
@@ -125,6 +130,17 @@ func ProvisionSubdomain(webRoot, parentDomain, hostname, pathSegment, phpVersion
 		return "", err
 	}
 	return docRoot, nil
+}
+
+func normalizeDomain(v string) string {
+	return strings.ToLower(strings.TrimSpace(v))
+}
+
+func isValidDomain(v string) bool {
+	if v == "" || v == "." || strings.Contains(v, "..") || strings.Contains(v, "/") || strings.Contains(v, "\\") || filepath.IsAbs(v) {
+		return false
+	}
+	return siteDomainRe.MatchString(v)
 }
 
 // ReadSubdomainMeta alt site meta json (silmeden önce okumak için).

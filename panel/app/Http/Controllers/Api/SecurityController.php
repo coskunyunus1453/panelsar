@@ -38,27 +38,33 @@ class SecurityController extends Controller
     {
         $validated = $request->validate(['enabled' => 'required|boolean']);
         $result = $this->engine->toggleFail2ban((bool) $validated['enabled']);
-        $code = empty($result['error']) ? 200 : 502;
+        if (! empty($result['error'])) {
+            return $this->securityErrorResponse($result['error'], $result);
+        }
 
-        return response()->json(['result' => $result], $code);
+        return response()->json(['result' => $result], 200);
     }
 
     public function toggleModSecurity(Request $request): JsonResponse
     {
         $validated = $request->validate(['enabled' => 'required|boolean']);
         $result = $this->engine->toggleModSecurity((bool) $validated['enabled']);
-        $code = empty($result['error']) ? 200 : 502;
+        if (! empty($result['error'])) {
+            return $this->securityErrorResponse($result['error'], $result);
+        }
 
-        return response()->json(['result' => $result], $code);
+        return response()->json(['result' => $result], 200);
     }
 
     public function toggleClamav(Request $request): JsonResponse
     {
         $validated = $request->validate(['enabled' => 'required|boolean']);
         $result = $this->engine->toggleClamav((bool) $validated['enabled']);
-        $code = empty($result['error']) ? 200 : 502;
+        if (! empty($result['error'])) {
+            return $this->securityErrorResponse($result['error'], $result);
+        }
 
-        return response()->json(['result' => $result], $code);
+        return response()->json(['result' => $result], 200);
     }
 
     public function scanClamav(Request $request): JsonResponse
@@ -67,9 +73,11 @@ class SecurityController extends Controller
             'target' => 'nullable|string|max:255',
         ]);
         $result = $this->engine->runClamavScan($validated['target'] ?? null);
-        $code = empty($result['error']) ? 200 : 502;
+        if (! empty($result['error'])) {
+            return $this->securityErrorResponse($result['error'], $result);
+        }
 
-        return response()->json(['result' => $result], $code);
+        return response()->json(['result' => $result], 200);
     }
 
     public function updateFail2banJail(Request $request): JsonResponse
@@ -85,9 +93,11 @@ class SecurityController extends Controller
             (int) $validated['findtime'],
             (int) $validated['maxretry']
         );
-        $code = empty($result['error']) ? 200 : 502;
+        if (! empty($result['error'])) {
+            return $this->securityErrorResponse($result['error'], $result);
+        }
 
-        return response()->json(['result' => $result], $code);
+        return response()->json(['result' => $result], 200);
     }
 
     public function reconcileMailState(Request $request): JsonResponse
@@ -99,8 +109,35 @@ class SecurityController extends Controller
         $dryRun = array_key_exists('dry_run', $validated) ? (bool) $validated['dry_run'] : true;
         $confirm = isset($validated['confirm']) ? (string) $validated['confirm'] : null;
         $result = $this->engine->reconcileMailState($dryRun, $confirm);
-        $code = empty($result['error']) ? 200 : 502;
+        if (! empty($result['error'])) {
+            return $this->securityErrorResponse($result['error'], $result);
+        }
 
-        return response()->json(['result' => $result], $code);
+        return response()->json(['result' => $result], 200);
+    }
+
+    private function securityErrorResponse(mixed $rawError, array $result): JsonResponse
+    {
+        $err = is_string($rawError) ? trim($rawError) : 'security operation failed';
+        $hint = null;
+        $code = 502;
+        $lower = strtolower($err);
+
+        if (str_contains($lower, 'sudo') || str_contains($lower, 'panelsar-security')) {
+            $code = 422;
+            $hint = 'Sunucuda /usr/local/sbin/panelsar-security ve sudoers NOPASSWD kuralını kontrol edin. Gerekirse deploy/bootstrap/install-production.sh yeniden çalıştırın.';
+        } elseif (str_contains($lower, 'missing /etc/modsecurity') || str_contains($lower, 'modsecurity')) {
+            $code = 422;
+            $hint = 'ModSecurity yapılandırması bulunamadı. Sunucuda Apache + modsecurity2 kurulu mu kontrol edin.';
+        } elseif (str_contains($lower, 'systemctl') || str_contains($lower, 'unit') || str_contains($lower, 'not found')) {
+            $code = 422;
+            $hint = 'İlgili servis paketi (fail2ban/modsecurity/clamav) yüklü veya etkin olmayabilir.';
+        }
+
+        return response()->json([
+            'message' => $err,
+            'hint' => $hint,
+            'result' => $result,
+        ], $code);
     }
 }

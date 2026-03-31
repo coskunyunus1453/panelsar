@@ -58,12 +58,13 @@ export default function SettingsPage() {
       qc.invalidateQueries({ queryKey: ['branding'] })
     },
     onError: (err: unknown) => {
-      const ax = err as { response?: { data?: { message?: string }; status?: number } }
+      const ax = err as { response?: { data?: { message?: string; hint?: string; debug_error?: string }; status?: number } }
       if (ax.response?.status === 413) {
         toast.error(t('settings.branding_413_hint'))
         return
       }
-      toast.error(ax.response?.data?.message ?? String(err))
+      const d = ax.response?.data
+      toast.error([d?.message, d?.hint, d?.debug_error].filter(Boolean).join(' — ') || String(err), { duration: 10000 })
     },
   })
   const brandCfgM = useMutation({
@@ -71,6 +72,21 @@ export default function SettingsPage() {
     onSuccess: () => {
       toast.success(t('settings.branding_limit_saved'))
       qc.invalidateQueries({ queryKey: ['branding-config'] })
+    },
+    onError: (err: unknown) => {
+      const ax = err as { response?: { data?: { message?: string } } }
+      toast.error(ax.response?.data?.message ?? String(err))
+    },
+  })
+  const brandDiagM = useMutation({
+    mutationFn: async () =>
+      (await api.get('/admin/settings/branding/diagnostics')).data as {
+        ok: boolean
+        checks: { key: string; ok: boolean; message: string }[]
+      },
+    onSuccess: (data) => {
+      const summary = data.checks.map((c) => `${c.ok ? 'OK' : 'ERR'}: ${c.message}`).join(' | ')
+      toast.success((data.ok ? 'Tanılama başarılı' : 'Tanılamada sorun var') + ' — ' + summary, { duration: 12000 })
     },
     onError: (err: unknown) => {
       const ax = err as { response?: { data?: { message?: string } } }
@@ -162,20 +178,24 @@ export default function SettingsPage() {
             onSubmit={async (ev) => {
               ev.preventDefault()
               const form = ev.currentTarget
-              const maxKb = brandingCfgQ.data?.max_upload_kb ?? 900
-              const inCustomer = form.elements.namedItem('logo_customer') as HTMLInputElement | null
-              const inAdmin = form.elements.namedItem('logo_admin') as HTMLInputElement | null
-              const fd = new FormData()
-              const customerFile = inCustomer?.files?.[0]
-              const adminFile = inAdmin?.files?.[0]
-              if (customerFile) fd.append('logo_customer', await optimizeImageToLimit(customerFile, maxKb))
-              if (adminFile) fd.append('logo_admin', await optimizeImageToLimit(adminFile, maxKb))
-              if (!fd.has('logo_customer') && !fd.has('logo_admin')) {
-                toast.error(t('settings.branding_choose_file'))
-                return
+              try {
+                const maxKb = brandingCfgQ.data?.max_upload_kb ?? 900
+                const inCustomer = form.elements.namedItem('logo_customer') as HTMLInputElement | null
+                const inAdmin = form.elements.namedItem('logo_admin') as HTMLInputElement | null
+                const fd = new FormData()
+                const customerFile = inCustomer?.files?.[0]
+                const adminFile = inAdmin?.files?.[0]
+                if (customerFile) fd.append('logo_customer', await optimizeImageToLimit(customerFile, maxKb))
+                if (adminFile) fd.append('logo_admin', await optimizeImageToLimit(adminFile, maxKb))
+                if (!fd.has('logo_customer') && !fd.has('logo_admin')) {
+                  toast.error(t('settings.branding_choose_file'))
+                  return
+                }
+                brandM.mutate(fd)
+                form.reset()
+              } catch (e) {
+                toast.error(e instanceof Error ? e.message : String(e))
               }
-              brandM.mutate(fd)
-              ev.currentTarget.reset()
             }}
           >
             <div>
@@ -188,6 +208,9 @@ export default function SettingsPage() {
             </div>
             <button type="submit" className="btn-primary" disabled={brandM.isPending}>
               {t('common.save')}
+            </button>
+            <button type="button" className="btn-secondary ml-2" onClick={() => brandDiagM.mutate()} disabled={brandDiagM.isPending}>
+              Storage Tanılama
             </button>
             <p className="text-xs text-gray-500">
               {t('settings.branding_limit_hint', { kb: brandingCfgQ.data?.max_upload_kb ?? 900 })}

@@ -3,9 +3,12 @@ package terminal
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
+	"strings"
 	"sync/atomic"
 	"syscall"
 
@@ -26,7 +29,15 @@ var upgrader = websocket.Upgrader{
 	ReadBufferSize:  4096,
 	WriteBufferSize: 4096,
 	CheckOrigin: func(r *http.Request) bool {
-		return true
+		origin := strings.TrimSpace(r.Header.Get("Origin"))
+		if origin == "" {
+			return false
+		}
+		u, err := url.Parse(origin)
+		if err != nil || u.Host == "" {
+			return false
+		}
+		return strings.EqualFold(u.Host, r.Host)
 	},
 }
 
@@ -36,7 +47,7 @@ type resizeMsg struct {
 	Rows uint16 `json:"rows"`
 }
 
-// HandleWS — ?token=JWT (jwt_secret ile imzalı, typ=terminal_ws, role=admin).
+// HandleWS — token query veya Sec-WebSocket-Protocol üzerinden JWT bekler.
 func HandleWS(cfg *config.Config, log *logrus.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if cfg.Security.JWTSecret == "" {
@@ -44,7 +55,7 @@ func HandleWS(cfg *config.Config, log *logrus.Logger) gin.HandlerFunc {
 			return
 		}
 
-		tokenStr := c.Query("token")
+		tokenStr, selectedProto := terminalTokenFromRequest(c.Request)
 		if tokenStr == "" {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "token gerekli"})
 			return
@@ -70,7 +81,11 @@ func HandleWS(cfg *config.Config, log *logrus.Logger) gin.HandlerFunc {
 
 		jwtUseRoot := jwtClaimUseRoot(claims)
 
-		conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
+		respHeader := http.Header{}
+		if selectedProto != "" {
+			respHeader.Set("Sec-WebSocket-Protocol", selectedProto)
+		}
+		conn, err := upgrader.Upgrade(c.Writer, c.Request, respHeader)
 		if err != nil {
 			log.WithError(err).Warn("terminal websocket upgrade")
 			return
@@ -159,11 +174,27 @@ func HandleWS(cfg *config.Config, log *logrus.Logger) gin.HandlerFunc {
 	}
 }
 
+func terminalTokenFromRequest(r *http.Request) (string, string) {
+	q := strings.TrimSpace(r.URL.Query().Get("token"))
+	if q != "" {
+		return q, ""
+	}
+
+	for _, p := range websocket.Subprotocols(r) {
+		pp := strings.TrimSpace(p)
+		if strings.HasPrefix(pp, "panelsar.jwt.") && len(pp) > len("panelsar.jwt.") {
+			return strings.TrimPrefix(pp, "panelsar.jwt."), pp
+		}
+	}
+
+	return "", ""
+}
+
 // jwtClaimUseRoot — panel JWT içindeki use_root; yoksa veya tanınmazsa true (geriye uyum).
 func jwtClaimUseRoot(claims jwt.MapClaims) bool {
 	v, ok := claims["use_root"]
 	if !ok {
-		return true
+		return false
 	}
 	switch x := v.(type) {
 	case bool:
@@ -173,7 +204,7 @@ func jwtClaimUseRoot(claims jwt.MapClaims) bool {
 	case string:
 		return x == "1" || x == "true" || x == "TRUE" || x == "True"
 	default:
-		return true
+		return false
 	}
 }
 
@@ -184,8 +215,11 @@ func parseTerminalClaims(tokenString, secret string) (jwt.MapClaims, error) {
 		}
 		return []byte(secret), nil
 	})
-	if err != nil || !token.Valid {
+	if err != nil {
 		return nil, err
+	}
+	if !token.Valid {
+		return nil, errors.New("invalid token")
 	}
 	claims, ok := token.Claims.(jwt.MapClaims)
 	if !ok {

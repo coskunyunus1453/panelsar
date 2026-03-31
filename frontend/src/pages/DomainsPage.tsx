@@ -17,6 +17,7 @@ import {
   Trash2,
 } from 'lucide-react'
 import DomainDeleteConfirmModal from '../components/domains/DomainDeleteConfirmModal'
+import { safeDomainUrl } from '../lib/urlSafety'
 
 const PHP_OPTIONS = ['7.4', '8.0', '8.1', '8.2', '8.3', '8.4'] as const
 
@@ -554,7 +555,14 @@ export default function DomainsPage() {
                             type="button"
                             title={t('domains.open_site')}
                             className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500"
-                            onClick={() => window.open(`http://${domain.name}`, '_blank')}
+                            onClick={() => {
+                              const url = safeDomainUrl(domain.name)
+                              if (!url) {
+                                toast.error('Geçersiz domain URL')
+                                return
+                              }
+                              window.open(url, '_blank', 'noopener,noreferrer')
+                            }}
                           >
                             <ExternalLink className="h-4 w-4" />
                           </button>

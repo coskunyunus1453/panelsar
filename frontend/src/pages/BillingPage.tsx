@@ -3,6 +3,7 @@ import { useMutation, useQuery } from '@tanstack/react-query'
 import api from '../services/api'
 import { CreditCard } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { safeExternalHttpUrl } from '../lib/urlSafety'
 
 type PackageRow = {
   id: number
@@ -25,6 +26,16 @@ type SubRow = {
 
 export default function BillingPage() {
   const { t } = useTranslation()
+  const isAllowedCheckoutHost = (url: string): boolean => {
+    try {
+      const u = new URL(url)
+      const host = u.hostname.toLowerCase()
+      const appHost = window.location.hostname.toLowerCase()
+      return host === appHost || host === 'checkout.stripe.com' || host.endsWith('.stripe.com')
+    } catch {
+      return false
+    }
+  }
 
   const pkgs = useQuery({
     queryKey: ['billing-packages'],
@@ -44,9 +55,15 @@ export default function BillingPage() {
         cancel_url: `${window.location.origin}/billing`,
       }),
     onSuccess: (res) => {
-      const url = (res.data as { url?: string })?.url
-      if (url) window.location.href = url
-      else toast.success('Demo: Stripe yapılandırılmadı')
+      const raw = (res.data as { url?: string })?.url
+      const url = raw ? safeExternalHttpUrl(raw) : null
+      if (url && isAllowedCheckoutHost(url)) {
+        window.location.href = url
+      } else if (raw) {
+        toast.error('Güvensiz checkout URL engellendi')
+      } else {
+        toast.success('Demo: Stripe yapılandırılmadı')
+      }
     },
     onError: (err: unknown) => {
       const ax = err as { response?: { data?: { message?: string; demo?: boolean } } }

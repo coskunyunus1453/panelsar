@@ -669,6 +669,10 @@
   "installer": {
     "subtitle": "One-click applications",
     "install": "Install",
+    "run_diagnostics": "Run diagnostics",
+    "diagnostics_title": "Pre-install diagnostics",
+    "diagnostics_done": "Diagnostics completed",
+    "diagnostics_failed": "Diagnostics failed",
     "started": "Install queued",
     "wordpress_db": "MySQL database",
     "table_prefix": "Table prefix (wp_)",

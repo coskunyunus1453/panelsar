@@ -9,8 +9,9 @@ import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import '@xterm/xterm/css/xterm.css'
 import toast from 'react-hot-toast'
+import { safeWebSocketUrl } from '../lib/urlSafety'
 
-type SessionRes = { url: string; expires_in: number }
+type SessionRes = { url: string; token?: string; expires_in: number }
 type TerminalSettings = { use_root: boolean }
 
 export default function TerminalPage() {
@@ -74,7 +75,13 @@ export default function TerminalPage() {
         term.open(el)
         fit.fit()
 
-        const ws = new WebSocket(data.url)
+        const wsUrl = safeWebSocketUrl(data.url)
+        if (!wsUrl) {
+          throw new Error('Güvensiz terminal websocket URL')
+        }
+        const wsToken = String(data.token || '').trim()
+        const protocols = wsToken ? [`panelsar.jwt.${wsToken}`] : undefined
+        const ws = protocols ? new WebSocket(wsUrl, protocols) : new WebSocket(wsUrl)
         ws.binaryType = 'arraybuffer'
         let ro: ResizeObserver | undefined
 

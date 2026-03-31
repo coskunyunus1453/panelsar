@@ -14,11 +14,11 @@ import (
 )
 
 type ListEntry struct {
-	Name  string `json:"name"`
-	IsDir bool   `json:"is_dir"`
-	Size  int64  `json:"size"`
-	Mode  string `json:"mode"`
-	ModTime int64 `json:"mtime"`
+	Name    string `json:"name"`
+	IsDir   bool   `json:"is_dir"`
+	Size    int64  `json:"size"`
+	Mode    string `json:"mode"`
+	ModTime int64  `json:"mtime"`
 }
 
 func ResolveUnderRoot(root, rel string) (string, error) {
@@ -94,10 +94,10 @@ func List(root, rel string) ([]ListEntry, error) {
 			continue
 		}
 		out = append(out, ListEntry{
-			Name:  e.Name(),
-			IsDir: e.IsDir(),
-			Size:  info.Size(),
-			Mode:  info.Mode().String(),
+			Name:    e.Name(),
+			IsDir:   e.IsDir(),
+			Size:    info.Size(),
+			Mode:    info.Mode().String(),
 			ModTime: info.ModTime().Unix(),
 		})
 	}
@@ -392,11 +392,14 @@ func UnzipPath(root, archiveRel, targetDirRel string) error {
 	}
 	defer r.Close()
 	for _, f := range r.File {
-		name := strings.ReplaceAll(f.Name, "\\", "/")
-		if strings.Contains(name, "..") {
+		name := filepath.Clean(filepath.FromSlash(strings.ReplaceAll(f.Name, "\\", "/")))
+		if name == "." || name == ".." || filepath.IsAbs(name) || strings.HasPrefix(name, ".."+string(os.PathSeparator)) {
 			return fmt.Errorf("archive entry escapes target")
 		}
-		dst := filepath.Join(targetDir, filepath.FromSlash(name))
+		dst := filepath.Join(targetDir, name)
+		if dst != targetDir && !strings.HasPrefix(dst, targetDir+string(os.PathSeparator)) {
+			return fmt.Errorf("archive entry escapes target")
+		}
 		if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
 			return err
 		}

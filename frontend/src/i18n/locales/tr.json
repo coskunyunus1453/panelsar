@@ -669,6 +669,10 @@
   "installer": {
     "subtitle": "Tek tıkla uygulamalar",
     "install": "Kur",
+    "run_diagnostics": "Tanılama çalıştır",
+    "diagnostics_title": "Kurulum öncesi tanılama",
+    "diagnostics_done": "Tanılama tamamlandı",
+    "diagnostics_failed": "Tanılama sırasında hata oluştu",
     "started": "Kurulum kuyruğa alındı",
     "wordpress_db": "MySQL veritabanı",
     "table_prefix": "Tablo öneki (wp_)",

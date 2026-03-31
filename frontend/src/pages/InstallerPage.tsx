@@ -15,6 +15,7 @@ type InstallerRun = {
   created_at?: string
 }
 type InstallerRunDetail = InstallerRun & { output?: string; started_at?: string; finished_at?: string }
+type InstallerDiagnostics = { ok: boolean; checks: { key: string; ok: boolean; message: string }[] }
 
 const FALLBACK_APPS: AppRow[] = [
   { id: 'wordpress', name: 'WordPress', version: 'latest', automated: true },
@@ -34,6 +35,7 @@ export default function InstallerPage() {
   const [activeRunId, setActiveRunId] = useState<number | null>(null)
   const [seenFinalRuns, setSeenFinalRuns] = useState<number[]>([])
   const [detailRunId, setDetailRunId] = useState<number | null>(null)
+  const [diagData, setDiagData] = useState<InstallerDiagnostics | null>(null)
 
   const databasesQ = useQuery({
     queryKey: ['databases', 'paginated'],
@@ -80,6 +82,27 @@ export default function InstallerPage() {
       const d = ax.response?.data
       const msg = d?.message ?? String(err)
       notify('error', 'Kurulum hatası', [msg, d?.hint].filter(Boolean).join(' — '))
+    },
+  })
+  const diagnosticsM = useMutation({
+    mutationFn: async () => {
+      const { data } = await api.post('/installer/diagnostics', {
+        domain_id: domainId || undefined,
+        database_id: wpDatabaseId || undefined,
+      })
+      return data as InstallerDiagnostics
+    },
+    onSuccess: (data) => {
+      setDiagData(data)
+      notify('success', t('installer.diagnostics_title'), t('installer.diagnostics_done'))
+    },
+    onError: (err: unknown) => {
+      const ax = err as { response?: { data?: InstallerDiagnostics & { message?: string } } }
+      const payload = ax.response?.data
+      if (payload?.checks?.length) {
+        setDiagData(payload)
+      }
+      notify('error', t('installer.diagnostics_title'), payload?.message ?? t('installer.diagnostics_failed'))
     },
   })
 
@@ -173,7 +196,31 @@ export default function InstallerPage() {
             placeholder="wp_"
           />
         </div>
+        <button
+          type="button"
+          className="btn-secondary text-sm"
+          disabled={diagnosticsM.isPending}
+          onClick={() => diagnosticsM.mutate()}
+        >
+          {diagnosticsM.isPending ? t('common.loading') : t('installer.run_diagnostics')}
+        </button>
       </div>
+
+      {diagData && (
+        <div className="card p-4 border border-gray-200 dark:border-gray-700">
+          <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">
+            {t('installer.diagnostics_title')}
+          </h3>
+          <div className="space-y-2">
+            {diagData.checks.map((check) => (
+              <div key={check.key} className="text-xs flex items-start gap-2">
+                <span className={check.ok ? 'text-emerald-600' : 'text-rose-600'}>{check.ok ? 'OK' : 'ERR'}</span>
+                <span className="text-gray-600 dark:text-gray-300">{check.message}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {apps.map((app) => {

@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import api from '../services/api'
 import { Database, Plus, Search, Trash2, ExternalLink, KeyRound, Pencil } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { safeExternalHttpUrl } from '../lib/urlSafety'
 
 type DbRow = {
   id: number
@@ -132,8 +133,8 @@ export default function DatabasesPage() {
   const filtered = list.filter((db) => db.name.toLowerCase().includes(search.toLowerCase()))
 
   const openDbWebUi = (db: DbRow) => {
-    const php = phpmyadminUrl
-    const adm = adminerUrl
+    const php = safeExternalHttpUrl(phpmyadminUrl)
+    const adm = safeExternalHttpUrl(adminerUrl)
     if (db.type === 'mysql') {
       if (!php) {
         toast.error(

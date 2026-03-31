@@ -203,6 +203,7 @@ Route::middleware(['auth:sanctum', 'abilities:access:customer-panel'])->group(fu
     });
 
     Route::middleware('ability:installer:read')->get('installer/apps', [InstallerController::class, 'apps']);
+    Route::middleware('ability:installer:read')->post('installer/diagnostics', [InstallerController::class, 'diagnostics']);
     Route::middleware('ability:installer:read')->get('installer/runs', [InstallerController::class, 'runs']);
     Route::middleware('ability:installer:read')->get('installer/runs/{installerRun}', [InstallerController::class, 'runShow']);
     Route::middleware('ability:installer:write')->post('domains/{domain}/installer', [InstallerController::class, 'install']);
@@ -253,10 +254,14 @@ Route::middleware(['auth:sanctum', 'abilities:access:customer-panel'])->group(fu
         Route::post('settings/branding', [BrandingController::class, 'update']);
         Route::get('settings/branding', [BrandingController::class, 'config']);
         Route::put('settings/branding', [BrandingController::class, 'updateConfig']);
+        Route::get('settings/branding/diagnostics', [BrandingController::class, 'diagnostics']);
         Route::get('abilities/registry', [RoleController::class, 'registry']);
         Route::apiResource('roles', RoleController::class)->except(['show']);
         Route::get('stack/modules', [StackController::class, 'modules']);
         Route::post('stack/install', [StackController::class, 'install']);
+        Route::get('stack/runs', [StackController::class, 'runs']);
+        Route::get('stack/runs/{stackInstallRun}', [StackController::class, 'showRun']);
+        Route::post('stack/runs/{stackInstallRun}/cancel', [StackController::class, 'cancelRun']);
         Route::get('settings/mail', [OutboundMailSettingsController::class, 'show']);
         Route::put('settings/mail', [OutboundMailSettingsController::class, 'update']);
         Route::post('settings/mail/test', [OutboundMailSettingsController::class, 'test']);
@@ -265,24 +270,25 @@ Route::middleware(['auth:sanctum', 'abilities:access:customer-panel'])->group(fu
         Route::apiResource('users', UserController::class);
         Route::post('users/{user}/suspend', [UserController::class, 'suspend']);
         Route::post('users/{user}/activate', [UserController::class, 'activate']);
+        Route::post('users/{user}/reset-password', [UserController::class, 'resetPassword']);
         Route::apiResource('packages', PackageController::class);
     });
 
-    Route::prefix('admin')->middleware('ability:webserver:read')->group(function () {
+    Route::prefix('admin')->middleware(['role:admin', 'ability:webserver:read'])->group(function () {
         Route::get('settings/webserver', [WebServerSettingsController::class, 'show']);
     });
 
-    Route::prefix('admin')->middleware('ability:webserver:write')->group(function () {
+    Route::prefix('admin')->middleware(['role:admin', 'ability:webserver:write'])->group(function () {
         Route::put('settings/webserver', [WebServerSettingsController::class, 'update']);
     });
 
-    Route::prefix('admin')->middleware('ability:php:read')->group(function () {
+    Route::prefix('admin')->middleware(['role:admin', 'ability:php:read'])->group(function () {
         Route::get('settings/php/versions', [PhpSettingsController::class, 'versions']);
         Route::get('settings/php/{version}/ini', [PhpSettingsController::class, 'ini']);
         Route::get('settings/php/{version}/modules', [PhpSettingsController::class, 'modules']);
     });
 
-    Route::prefix('admin')->middleware('ability:php:write')->group(function () {
+    Route::prefix('admin')->middleware(['role:admin', 'ability:php:write'])->group(function () {
         Route::put('settings/php/{version}/ini', [PhpSettingsController::class, 'updateIni']);
         Route::patch('settings/php/{version}/modules', [PhpSettingsController::class, 'updateModules']);
     });

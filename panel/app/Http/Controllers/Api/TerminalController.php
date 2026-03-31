@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\Schema;
 class TerminalController extends Controller
 {
     /**
-     * Kısa ömürlü JWT üretir; tarayıcı engine WebSocket’ine (?token=) bağlanır.
+     * Kısa ömürlü JWT üretir; tarayıcı token'ı Sec-WebSocket-Protocol ile taşır.
      * ENGINE_API_SECRET, engine.yaml içindeki security.jwt_secret ile aynı olmalıdır.
      */
     public function session(Request $request): JsonResponse
@@ -42,10 +42,11 @@ class TerminalController extends Controller
 
         $scheme = $this->websocketScheme($request);
         $host = $request->getHost();
-        $url = $scheme.'://'.$host.'/engine-ws/terminal?token='.rawurlencode($jwt);
+        $url = $scheme.'://'.$host.'/engine-ws/terminal';
 
         return response()->json([
             'url' => $url,
+            'token' => $jwt,
             'expires_in' => 120,
         ]);
     }

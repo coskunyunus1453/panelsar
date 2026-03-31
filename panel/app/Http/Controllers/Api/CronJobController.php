@@ -9,6 +9,7 @@ use App\Services\EngineApiService;
 use App\Services\HostingQuotaService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 use Symfony\Component\Process\Exception\ProcessTimedOutException;
 use Symfony\Component\Process\Process;
 
@@ -41,6 +42,7 @@ class CronJobController extends Controller
             'command' => 'required|string|max:2000',
             'description' => 'nullable|string|max:255',
         ]);
+        $this->assertSafeCommand($validated['command']);
 
         $this->quota->ensureCanCreateCronJob($request->user());
 
@@ -79,6 +81,7 @@ class CronJobController extends Controller
             'command' => 'required|string|max:2000',
             'description' => 'nullable|string|max:255',
         ]);
+        $this->assertSafeCommand($validated['command']);
 
         $eid = $cronJob->engine_job_id;
         if ($eid === null || $eid === '') {
@@ -136,7 +139,8 @@ class CronJobController extends Controller
             'started_at' => now(),
         ]);
 
-        $process = Process::fromShellCommandline($cronJob->command);
+        $argv = $this->safeCommandToArgv($cronJob->command);
+        $process = new Process($argv);
         $process->setTimeout(180);
         $process->setIdleTimeout(120);
 
@@ -213,5 +217,55 @@ class CronJobController extends Controller
         if ($cronJob->user_id !== $request->user()->id && ! $request->user()->isAdmin()) {
             abort(403);
         }
+    }
+
+    private function assertSafeCommand(string $command): void
+    {
+        $this->safeCommandToArgv($command);
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function safeCommandToArgv(string $command): array
+    {
+        $cmd = trim($command);
+        if ($cmd === '') {
+            throw ValidationException::withMessages([
+                'command' => 'Komut boş olamaz.',
+            ]);
+        }
+
+        // Shell metakarakterlerini reddet; komut doğrudan shell'e verilmez.
+        if (preg_match('/[;&|`><\n\r]/', $cmd) === 1) {
+            throw ValidationException::withMessages([
+                'command' => 'Güvenlik nedeniyle shell operatörleri (|, ;, &, >, <, `) kullanılamaz.',
+            ]);
+        }
+
+        $parts = str_getcsv($cmd, ' ', '"', '\\');
+        $argv = array_values(array_filter(array_map(static fn ($v) => trim((string) $v), $parts), static fn ($v) => $v !== ''));
+        if ($argv === []) {
+            throw ValidationException::withMessages([
+                'command' => 'Komut çözümlenemedi.',
+            ]);
+        }
+
+        $binary = $argv[0];
+        if (! preg_match('/^[A-Za-z0-9_\/.\-]+$/', $binary)) {
+            throw ValidationException::withMessages([
+                'command' => 'Komut adı geçersiz karakter içeriyor.',
+            ]);
+        }
+
+        foreach ($argv as $arg) {
+            if (preg_match('/[\x00]/', $arg) === 1) {
+                throw ValidationException::withMessages([
+                    'command' => 'Komut argümanlarında geçersiz karakter var.',
+                ]);
+            }
+        }
+
+        return $argv;
     }
 }

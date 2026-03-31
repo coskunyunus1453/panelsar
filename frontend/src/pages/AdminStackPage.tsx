@@ -3,9 +3,10 @@ import { Navigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '../store/authStore'
 import api from '../services/api'
-import { Layers, Download, CheckCircle2, AlertCircle } from 'lucide-react'
+import { Layers, Download, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import clsx from 'clsx'
+import { useState } from 'react'
 
 type StackModule = {
   id: string
@@ -14,6 +15,15 @@ type StackModule = {
   description: string
   check_package: string
   installed: boolean
+}
+type StackRun = {
+  id: number
+  bundle_id: string
+  status: 'queued' | 'running' | 'success' | 'failed'
+  progress?: number
+  cancel_requested?: boolean
+  message?: string
+  output?: string
 }
 
 function groupByCategory(mods: StackModule[]): Record<string, StackModule[]> {
@@ -30,6 +40,7 @@ export default function AdminStackPage() {
   const qc = useQueryClient()
   const user = useAuthStore((s) => s.user)
   const isAdmin = user?.roles?.some((r) => r.name === 'admin')
+  const [activeRunId, setActiveRunId] = useState<number | null>(null)
 
   const modulesQ = useQuery({
     queryKey: ['admin-stack-modules'],
@@ -44,15 +55,12 @@ export default function AdminStackPage() {
   const installM = useMutation({
     mutationFn: async (bundleId: string) => {
       const { data } = await api.post('/admin/stack/install', { bundle_id: bundleId })
-      return data as { message?: string; modules?: StackModule[] }
+      return data as { message?: string; run_id?: number; background?: boolean }
     },
     onSuccess: (data) => {
+      if (typeof data.run_id === 'number') setActiveRunId(data.run_id)
       toast.success(data.message ?? t('stack.install_ok'))
-      if (Array.isArray(data.modules)) {
-        qc.setQueryData(['admin-stack-modules'], data.modules)
-      } else {
-        qc.invalidateQueries({ queryKey: ['admin-stack-modules'] })
-      }
+      qc.invalidateQueries({ queryKey: ['admin-stack-runs'] })
     },
     onError: (err: unknown) => {
       const ax = err as {
@@ -63,12 +71,36 @@ export default function AdminStackPage() {
       toast.error([msg, d?.hint, d?.output].filter(Boolean).join(' — '), { duration: 12_000 })
     },
   })
+  const runsQ = useQuery({
+    queryKey: ['admin-stack-runs'],
+    queryFn: async () => (await api.get('/admin/stack/runs')).data as { runs: StackRun[] },
+    enabled: !!isAdmin,
+    refetchInterval: 3000,
+  })
+  const runDetailQ = useQuery({
+    queryKey: ['admin-stack-run', activeRunId],
+    queryFn: async () => (await api.get(`/admin/stack/runs/${activeRunId}`)).data as { run: StackRun },
+    enabled: activeRunId !== null,
+    refetchInterval: 3000,
+  })
+  const cancelRunM = useMutation({
+    mutationFn: async (id: number) => (await api.post(`/admin/stack/runs/${id}/cancel`)).data as { message?: string },
+    onSuccess: (d) => {
+      toast.success(d?.message ?? 'İptal talebi gönderildi')
+      qc.invalidateQueries({ queryKey: ['admin-stack-runs'] })
+    },
+    onError: (err: unknown) => {
+      const ax = err as { response?: { data?: { message?: string } } }
+      toast.error(ax.response?.data?.message ?? String(err))
+    },
+  })
 
   if (!isAdmin) {
     return <Navigate to="/dashboard" replace />
   }
 
   const mods = modulesQ.data ?? []
+  const activeRun = activeRunId !== null ? (runsQ.data?.runs ?? []).find((r) => r.id === activeRunId) : null
   const grouped = groupByCategory(mods)
   const catOrder = ['php', 'mail', 'other']
   const cats = catOrder.filter((c) => grouped[c]?.length)
@@ -105,6 +137,32 @@ export default function AdminStackPage() {
         <p className="text-gray-500 dark:text-gray-400">{t('common.loading')}</p>
       )}
 
+      {activeRun && (
+        <div className="rounded-lg border border-indigo-200 bg-indigo-50 p-4 text-sm dark:border-indigo-900/40 dark:bg-indigo-950/20">
+          <div className="flex items-center gap-2">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            <span>{activeRun.status === 'running' || activeRun.status === 'queued' ? 'Paket kuruluyor, lütfen bekleyin...' : 'Kurulum bitti.'}</span>
+            {(activeRun.status === 'queued' || activeRun.status === 'running') && (
+              <button
+                type="button"
+                className="btn-secondary py-1 px-2 text-xs ml-auto"
+                onClick={() => cancelRunM.mutate(activeRun.id)}
+                disabled={cancelRunM.isPending}
+              >
+                İptal Et
+              </button>
+            )}
+          </div>
+          <div className="mt-2 h-2 w-full rounded bg-gray-200 dark:bg-gray-700 overflow-hidden">
+            <div
+              className="h-full bg-primary-600 transition-all"
+              style={{ width: `${Math.max(0, Math.min(100, Number(activeRun.progress ?? 0)))}%` }}
+            />
+          </div>
+          {activeRun.message && <p className="mt-1 text-xs">{activeRun.message}</p>}
+        </div>
+      )}
+
       {cats.map((cat) => (
         <section key={cat} className="space-y-3">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
@@ -137,7 +195,7 @@ export default function AdminStackPage() {
                 </div>
                 <button
                   type="button"
-                  disabled={m.installed || installM.isPending}
+                  disabled={m.installed || installM.isPending || !!activeRun}
                   onClick={() => installM.mutate(m.id)}
                   className={clsx(
                     'inline-flex shrink-0 items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors',
@@ -146,14 +204,62 @@ export default function AdminStackPage() {
                       : 'bg-primary-600 text-white hover:bg-primary-700 dark:bg-primary-500 dark:hover:bg-primary-600',
                   )}
                 >
-                  <Download className="h-4 w-4" />
-                  {t('stack.install')}
+                  {installM.isPending && !m.installed ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                  {installM.isPending && !m.installed ? 'Kuruluyor...' : t('stack.install')}
                 </button>
               </li>
             ))}
           </ul>
         </section>
       ))}
+
+      <div className="card p-4">
+        <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">Son paket kurulumları</h3>
+        <div className="space-y-2">
+          {(runsQ.data?.runs ?? []).map((r) => (
+            <div key={r.id} className="rounded-md border border-gray-200 dark:border-gray-700 p-2 text-xs">
+              <div className="flex items-center gap-2">
+                <span className="font-mono">{r.bundle_id}</span>
+                <span className="text-gray-500">#{r.id}</span>
+                <span className="ml-auto">{r.status} ({Number(r.progress ?? 0)}%)</span>
+                {(r.status === 'queued' || r.status === 'running') && (
+                  <button
+                    type="button"
+                    className="btn-secondary py-1 px-2 text-[10px]"
+                    onClick={() => cancelRunM.mutate(r.id)}
+                    disabled={cancelRunM.isPending}
+                  >
+                    İptal
+                  </button>
+                )}
+                <button type="button" className="btn-secondary py-1 px-2 text-[10px]" onClick={() => setActiveRunId(r.id)}>
+                  Detay
+                </button>
+              </div>
+              {r.message && <p className="mt-1 text-gray-500">{r.message}</p>}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {activeRunId !== null && runDetailQ.data?.run && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-2xl rounded-lg bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 p-4">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
+                Paket kurulum detayı #{activeRunId}
+              </h3>
+              <button type="button" className="btn-secondary py-1 px-2 text-xs" onClick={() => setActiveRunId(null)}>
+                Kapat
+              </button>
+            </div>
+            <p className="text-xs text-gray-500 mb-2">{runDetailQ.data.run.message}</p>
+            <pre className="max-h-[360px] overflow-auto rounded-md bg-gray-50 dark:bg-gray-800 p-3 text-[11px] whitespace-pre-wrap">
+{runDetailQ.data.run.output || '-'}
+            </pre>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

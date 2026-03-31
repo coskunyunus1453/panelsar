@@ -4,7 +4,7 @@ import { Navigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '../store/authStore'
 import api from '../services/api'
-import { Users, Plus, UserX, UserCheck } from 'lucide-react'
+import { Users, Plus, UserX, UserCheck, KeyRound } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 type Role = { name: string }
@@ -22,6 +22,7 @@ export default function AdminUsersPage() {
   const isAdmin = useAuthStore((s) => s.user?.roles?.some((r) => r.name === 'admin'))
   const [search, setSearch] = useState('')
   const [showAdd, setShowAdd] = useState(false)
+  const [resetTarget, setResetTarget] = useState<AdminUser | null>(null)
 
   const q = useQuery({
     queryKey: ['admin-users', search],
@@ -65,6 +66,24 @@ export default function AdminUsersPage() {
     onSuccess: () => {
       toast.success(t('users.activated'))
       qc.invalidateQueries({ queryKey: ['admin-users'] })
+    },
+  })
+  const resetPasswordM = useMutation({
+    mutationFn: async (payload: { id: number; password: string; password_confirmation: string }) =>
+      api.post(`/admin/users/${payload.id}/reset-password`, {
+        password: payload.password,
+        password_confirmation: payload.password_confirmation,
+      }),
+    onSuccess: () => {
+      toast.success('Şifre sıfırlandı')
+      setResetTarget(null)
+    },
+    onError: (err: unknown) => {
+      const ax = err as { response?: { data?: { message?: string; errors?: Record<string, string[]> } } }
+      const first = ax.response?.data?.errors
+        ? Object.values(ax.response.data.errors)[0]?.[0]
+        : undefined
+      toast.error(first ?? ax.response?.data?.message ?? String(err))
     },
   })
 
@@ -153,6 +172,55 @@ export default function AdminUsersPage() {
         </div>
       )}
 
+      {resetTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="card max-w-md w-full p-6 space-y-4 bg-white dark:bg-gray-900">
+            <h2 className="text-lg font-semibold">Şifre Sıfırla</h2>
+            <p className="text-xs text-gray-500">{resetTarget.email}</p>
+            <form
+              className="space-y-3"
+              onSubmit={(ev) => {
+                ev.preventDefault()
+                const fd = new FormData(ev.currentTarget)
+                resetPasswordM.mutate({
+                  id: resetTarget.id,
+                  password: String(fd.get('password') || ''),
+                  password_confirmation: String(fd.get('password_confirmation') || ''),
+                })
+              }}
+            >
+              <input
+                name="password"
+                type="password"
+                className="input w-full"
+                required
+                minLength={12}
+                placeholder="Yeni güçlü şifre"
+              />
+              <input
+                name="password_confirmation"
+                type="password"
+                className="input w-full"
+                required
+                minLength={12}
+                placeholder="Yeni şifre tekrar"
+              />
+              <p className="text-[11px] text-amber-600 dark:text-amber-400">
+                En az 12 karakter, büyük-küçük harf, rakam ve sembol zorunlu.
+              </p>
+              <div className="flex justify-end gap-2">
+                <button type="button" className="btn-secondary" onClick={() => setResetTarget(null)}>
+                  {t('common.cancel')}
+                </button>
+                <button type="submit" className="btn-primary" disabled={resetPasswordM.isPending}>
+                  Şifreyi Güncelle
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       <div className="card overflow-hidden">
         <table className="w-full text-sm">
           <thead className="bg-gray-50 dark:bg-gray-800/80">
@@ -172,6 +240,14 @@ export default function AdminUsersPage() {
                 <td className="px-4 py-2">{u.roles?.map((r) => r.name).join(', ') ?? '—'}</td>
                 <td className="px-4 py-2">{u.status}</td>
                 <td className="px-4 py-2 text-right space-x-1">
+                  <button
+                    type="button"
+                    className="btn-secondary text-xs py-1"
+                    onClick={() => setResetTarget(u)}
+                    disabled={resetPasswordM.isPending}
+                  >
+                    <KeyRound className="h-3 w-3 inline" /> Şifre Sıfırla
+                  </button>
                   {u.status === 'active' ? (
                     <button
                       type="button"
