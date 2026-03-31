@@ -191,12 +191,58 @@ class EngineApiService
     }
 
     /**
+     * @return array{nginx?: array{installed?: bool,active?: bool}, apache?: array{installed?: bool,active?: bool}}
+     */
+    public function getWebServerServices(): array
+    {
+        return $this->get('/api/v1/webserver/services')['services'] ?? [];
+    }
+
+    /**
      * @param array<string, mixed> $payload
      * @return array{message?: string, settings?: array<string, mixed>, reload?: array<string, mixed>}
      */
     public function updateWebServerSettings(array $payload): array
     {
         return $this->patchJson('/api/v1/webserver/settings', $payload);
+    }
+
+    /**
+     * @return array{modules?: list<array{name:string,enabled:bool}>, error?: string}
+     */
+    public function getApacheModules(): array
+    {
+        return $this->get('/api/v1/webserver/apache/modules');
+    }
+
+    /**
+     * @return array{module?: string, enabled?: bool, error?: string}
+     */
+    public function setApacheModule(string $name, bool $enabled): array
+    {
+        return $this->postChecked('/api/v1/webserver/apache/modules/'.rawurlencode($name).'/toggle', [
+            'enabled' => $enabled,
+        ]);
+    }
+
+    /**
+     * @return array{scope?: string, content?: string, error?: string}
+     */
+    public function getNginxConfig(string $scope = 'main'): array
+    {
+        return $this->get('/api/v1/webserver/nginx/config?scope='.rawurlencode($scope));
+    }
+
+    /**
+     * @return array{message?: string, scope?: string, error?: string}
+     */
+    public function updateNginxConfig(string $scope, string $content, bool $testReload = true): array
+    {
+        return $this->postChecked('/api/v1/webserver/nginx/config', [
+            'scope' => $scope,
+            'content' => $content,
+            'test_reload' => $testReload,
+        ]);
     }
 
     public function rebootSystem(): array
@@ -583,6 +629,11 @@ class EngineApiService
         return $this->post('/api/v1/security/fail2ban/toggle', ['enabled' => $enabled]);
     }
 
+    public function installFail2ban(): array
+    {
+        return $this->postChecked('/api/v1/security/fail2ban/install');
+    }
+
     public function updateFail2banJail(int $bantime, int $findtime, int $maxretry): array
     {
         return $this->post('/api/v1/security/fail2ban/jail', [
@@ -595,6 +646,11 @@ class EngineApiService
     public function toggleModSecurity(bool $enabled): array
     {
         return $this->post('/api/v1/security/modsecurity/toggle', ['enabled' => $enabled]);
+    }
+
+    public function installModSecurity(): array
+    {
+        return $this->postChecked('/api/v1/security/modsecurity/install');
     }
 
     public function toggleClamav(bool $enabled): array

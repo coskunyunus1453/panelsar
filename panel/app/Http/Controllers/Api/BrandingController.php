@@ -71,6 +71,22 @@ class BrandingController extends Controller
             'logo_admin' => 'nullable|image|max:'.$maxKb,
         ]);
         if (! $request->hasFile('logo_customer') && ! $request->hasFile('logo_admin')) {
+            $contentLen = (int) ($request->server('CONTENT_LENGTH') ?? 0);
+            $phpUploadBytes = $this->iniSizeToBytes((string) ini_get('upload_max_filesize'));
+            $phpPostBytes = $this->iniSizeToBytes((string) ini_get('post_max_size'));
+            if ($contentLen > 0 && ($contentLen > $phpUploadBytes || $contentLen > $phpPostBytes)) {
+                return response()->json([
+                    'message' => __('settings.branding_upload_failed'),
+                    'hint' => sprintf(
+                        'Dosya isteği PHP limitini aştı (upload_max_filesize=%s, post_max_size=%s). php.ini değerlerini artırın ve php-fpm/nginx yeniden başlatın.',
+                        (string) ini_get('upload_max_filesize'),
+                        (string) ini_get('post_max_size')
+                    ),
+                    'php_upload_max_filesize' => (string) ini_get('upload_max_filesize'),
+                    'php_post_max_size' => (string) ini_get('post_max_size'),
+                    'content_length' => $contentLen,
+                ], 413);
+            }
             return response()->json([
                 'message' => __('settings.branding_upload_failed'),
                 'hint' => 'En az bir logo dosyası seçin (logo_customer veya logo_admin).',
@@ -228,6 +244,18 @@ class BrandingController extends Controller
             ];
         }
 
+        $checks[] = [
+            'key' => 'php_upload_limits',
+            'ok' => true,
+            'message' => sprintf(
+                'upload_max_filesize=%s, post_max_size=%s, max_file_uploads=%s, upload_tmp_dir=%s',
+                (string) ini_get('upload_max_filesize'),
+                (string) ini_get('post_max_size'),
+                (string) ini_get('max_file_uploads'),
+                (string) (ini_get('upload_tmp_dir') ?: sys_get_temp_dir())
+            ),
+        ];
+
         $ok = collect($checks)->every(fn ($c) => (bool) ($c['ok'] ?? false));
         return response()->json(['ok' => $ok, 'checks' => $checks]);
     }
@@ -287,5 +315,21 @@ class BrandingController extends Controller
         }
 
         return $n;
+    }
+
+    private function iniSizeToBytes(string $value): int
+    {
+        $v = trim($value);
+        if ($v === '') {
+            return 0;
+        }
+        $unit = strtolower(substr($v, -1));
+        $num = (float) $v;
+        return match ($unit) {
+            'g' => (int) round($num * 1024 * 1024 * 1024),
+            'm' => (int) round($num * 1024 * 1024),
+            'k' => (int) round($num * 1024),
+            default => (int) $num,
+        };
     }
 }

@@ -469,6 +469,39 @@ fi
 sudo -u www-data php "$PANEL_ROOT/artisan" config:cache
 sudo -u www-data php "$PANEL_ROOT/artisan" route:cache
 sudo -u www-data php "$PANEL_ROOT/artisan" view:cache
+sudo -u www-data php "$PANEL_ROOT/artisan" panelsar:ensure-system-cron || true
+
+# OS-level scheduler: Laravel schedule:run her dakika tetiklensin.
+cat > /etc/cron.d/panelsar-panel-scheduler <<EOF
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+* * * * * www-data cd "$PANEL_ROOT" && /usr/bin/php artisan schedule:run >> /dev/null 2>&1
+EOF
+chmod 644 /etc/cron.d/panelsar-panel-scheduler
+systemctl enable --now cron 2>/dev/null || systemctl enable --now crond 2>/dev/null || true
+
+# Queue worker: uzun süren işleri request dışına alır (installer/deploy/stack vb.).
+cat > /etc/systemd/system/panelsar-panel-queue.service <<EOF
+[Unit]
+Description=Panelsar Laravel Queue Worker
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=$PANEL_ROOT
+ExecStart=/usr/bin/php artisan queue:work --sleep=3 --tries=3 --timeout=120
+Restart=always
+RestartSec=5
+KillSignal=SIGTERM
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target
+EOF
+systemctl daemon-reload
+systemctl enable --now panelsar-panel-queue.service
 
 # Nginx
 NGX_DST="/etc/nginx/sites-available/panelsar.conf"

@@ -21,6 +21,21 @@ service_active() {
   fi
 }
 
+sanitize_mod_name() {
+  local m="$1"
+  [[ "$m" =~ ^[a-zA-Z0-9_]+$ ]] || return 1
+  echo "$m"
+}
+
+nginx_scope_path() {
+  local scope="$1"
+  case "$scope" in
+    main) echo "/etc/nginx/nginx.conf" ;;
+    panel) echo "/etc/nginx/sites-available/panelsar.conf" ;;
+    *) return 1 ;;
+  esac
+}
+
 case "$ACTION" in
   fail2ban-jail-get)
     CONF="/etc/fail2ban/jail.local"
@@ -73,6 +88,14 @@ EOF
       systemctl disable --now fail2ban
     fi
     service_active "fail2ban"
+    ;;
+  fail2ban-install)
+    export DEBIAN_FRONTEND=noninteractive
+    apt-get update -y >/dev/null
+    apt-get install -y fail2ban >/dev/null
+    systemctl enable --now fail2ban >/dev/null 2>&1 || true
+    service_exists "fail2ban" || { echo "fail2ban install failed" >&2; exit 1; }
+    echo "installed"
     ;;
   clamav-status)
     if systemctl is-active --quiet clamav-daemon || systemctl is-active --quiet clamav-freshclam; then
@@ -136,8 +159,71 @@ EOF
       echo "disabled"
     fi
     ;;
+  modsec-install)
+    export DEBIAN_FRONTEND=noninteractive
+    apt-get update -y >/dev/null
+    apt-get install -y libapache2-mod-security2 modsecurity-crs >/dev/null
+    if command -v a2enmod >/dev/null 2>&1; then
+      a2enmod security2 >/dev/null 2>&1 || true
+    fi
+    CONF=""
+    for C in /etc/modsecurity/modsecurity.conf /etc/apache2/mods-available/security2.conf /etc/httpd/conf.d/mod_security.conf; do
+      if [[ -f "$C" ]]; then CONF="$C"; break; fi
+    done
+    [[ -n "$CONF" ]] || { echo "missing modsecurity config file" >&2; exit 1; }
+    sed -i -E 's/^\s*SecRuleEngine\s+.*/SecRuleEngine On/' "$CONF" || true
+    systemctl reload apache2 >/dev/null 2>&1 || true
+    echo "installed"
+    ;;
+  apache-modules-list)
+    for f in /etc/apache2/mods-available/*.load; do
+      [[ -f "$f" ]] || continue
+      mod="$(basename "$f" .load)"
+      if a2query -m "$mod" 2>/dev/null | grep -q "enabled"; then
+        echo "$mod enabled"
+      else
+        echo "$mod disabled"
+      fi
+    done
+    ;;
+  apache-module-set)
+    MOD="$(sanitize_mod_name "$ARG1")" || { echo "invalid module name" >&2; exit 1; }
+    [[ "$ARG2" == "on" || "$ARG2" == "off" ]] || { echo "invalid state" >&2; exit 1; }
+    [[ -f "/etc/apache2/mods-available/${MOD}.load" ]] || { echo "module not found: $MOD" >&2; exit 1; }
+    if [[ "$ARG2" == "on" ]]; then
+      a2enmod "$MOD" >/dev/null
+    else
+      a2dismod "$MOD" >/dev/null
+    fi
+    apache2ctl configtest >/tmp/panelsar-apache-test.log 2>&1 || { cat /tmp/panelsar-apache-test.log; exit 1; }
+    systemctl reload apache2 >/dev/null 2>&1 || true
+    if a2query -m "$MOD" 2>/dev/null | grep -q "enabled"; then
+      echo "enabled"
+    else
+      echo "disabled"
+    fi
+    ;;
+  nginx-config-get)
+    SCOPE="${ARG1:-main}"
+    P="$(nginx_scope_path "$SCOPE")" || { echo "invalid scope" >&2; exit 1; }
+    [[ -f "$P" ]] || { echo "config file not found: $P" >&2; exit 1; }
+    cat "$P"
+    ;;
+  nginx-config-set)
+    SCOPE="${ARG1:-main}"
+    SRC="${ARG2:-}"
+    RELOAD="${ARG3:-1}"
+    P="$(nginx_scope_path "$SCOPE")" || { echo "invalid scope" >&2; exit 1; }
+    [[ -n "$SRC" && -f "$SRC" ]] || { echo "temp config source missing" >&2; exit 1; }
+    install -m 644 "$SRC" "$P"
+    nginx -t >/tmp/panelsar-nginx-test.log 2>&1 || { cat /tmp/panelsar-nginx-test.log; exit 1; }
+    if [[ "$RELOAD" == "1" ]]; then
+      systemctl reload nginx >/dev/null 2>&1 || true
+    fi
+    echo "ok"
+    ;;
   *)
-    echo "usage: panelsar-security fail2ban-status|fail2ban-set <on|off>|fail2ban-jail-get|fail2ban-jail-set <bantime> <findtime> <maxretry>|clamav-status|clamav-set <on|off>|clamav-scan <abs-dir>|modsec-status|modsec-set <on|off>" >&2
+    echo "usage: panelsar-security fail2ban-status|fail2ban-set <on|off>|fail2ban-install|fail2ban-jail-get|fail2ban-jail-set <bantime> <findtime> <maxretry>|clamav-status|clamav-set <on|off>|clamav-scan <abs-dir>|modsec-status|modsec-set <on|off>|modsec-install|apache-modules-list|apache-module-set <module> <on|off>|nginx-config-get <main|panel>|nginx-config-set <main|panel> <tmpfile> <reload:0|1>" >&2
     exit 1
     ;;
 esac

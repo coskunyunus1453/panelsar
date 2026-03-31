@@ -3,6 +3,8 @@ import { useTranslation } from 'react-i18next'
 import { useQuery } from '@tanstack/react-query'
 import {
   Activity,
+  AlertTriangle,
+  CheckCircle2,
   Cpu,
   Database,
   Gauge,
@@ -34,6 +36,7 @@ import api from '../services/api'
 import { useAuthStore } from '../store/authStore'
 import { useThemeStore } from '../store/themeStore'
 import { tokenHasAbility } from '../lib/abilities'
+import { useDomainsList } from '../hooks/useDomains'
 
 type HistoryPoint = { t: number; cpu: number; mem: number; disk: number }
 
@@ -127,6 +130,8 @@ export default function MonitoringPage() {
   const canServer = tokenHasAbility(abilities, 'monitoring:server')
   const [history, setHistory] = useState<HistoryPoint[]>([])
   const [tick, setTick] = useState(() => Date.now())
+  const [healthDomainId, setHealthDomainId] = useState<number | ''>('')
+  const domainsQ = useDomainsList()
 
   const gridColor = isDark ? '#334155' : '#e2e8f0'
   const axisColor = isDark ? '#94a3b8' : '#64748b'
@@ -137,6 +142,39 @@ export default function MonitoringPage() {
     queryKey: ['monitoring-summary'],
     queryFn: async () => (await api.get('/monitoring/summary')).data,
     refetchInterval: 45_000,
+  })
+  const healthQ = useQuery({
+    queryKey: ['monitoring-health', healthDomainId || 'global'],
+    queryFn: async () =>
+      (
+        await api.get('/monitoring/health', {
+          params: healthDomainId === '' ? undefined : { domain_id: healthDomainId },
+        })
+      ).data as {
+        score: number
+        grade: 'excellent' | 'good' | 'warning' | 'critical'
+        response_ms: number
+        site_response_ms?: number | null
+        scope?: 'global' | 'domain'
+        domain?: { id: number; name: string; status: string } | null
+        snapshot: { cpu: number; ram: number; disk: number; error_rate: number }
+        reasons: Array<{ key: string; ok: boolean; label: string; detail: string }>
+      },
+    refetchInterval: 20_000,
+  })
+  const healthSitesQ = useQuery({
+    queryKey: ['monitoring-health-sites'],
+    queryFn: async () =>
+      (await api.get('/monitoring/health/sites', { params: { limit: 20 } })).data as {
+        items: Array<{
+          domain_id: number
+          name: string
+          score: number
+          grade: 'excellent' | 'good' | 'warning' | 'critical'
+          reasons: string[]
+        }>
+      },
+    refetchInterval: 30_000,
   })
 
   const serverQ = useQuery({
@@ -241,6 +279,16 @@ export default function MonitoringPage() {
       iconBg: 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400',
     },
   ]
+  const health = healthQ.data
+  const healthScore = Math.max(0, Math.min(100, health?.score ?? 0))
+  const healthColor =
+    healthScore >= 90
+      ? 'from-emerald-500 to-emerald-400'
+      : healthScore >= 75
+        ? 'from-blue-500 to-sky-400'
+        : healthScore >= 60
+          ? 'from-amber-500 to-orange-400'
+          : 'from-red-500 to-rose-400'
 
   const serviceBadge = (status?: string) => {
     const st = (status ?? '').toLowerCase()
@@ -374,6 +422,108 @@ export default function MonitoringPage() {
             </div>
           </div>
         ))}
+      </div>
+
+      <div className="card p-6">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Health Score</h2>
+            <p className="text-sm text-gray-500 dark:text-gray-400">Sunucu genel sağlık puanı (0-100)</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <select
+              className="input h-9 text-xs"
+              value={healthDomainId}
+              onChange={(e) => setHealthDomainId(e.target.value ? Number(e.target.value) : '')}
+            >
+              <option value="">Global</option>
+              {(domainsQ.data ?? []).map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.name}
+                </option>
+              ))}
+            </select>
+            <div className="text-xs text-gray-500">
+              {(health?.scope === 'domain' ? 'Site' : 'API')} {health?.scope === 'domain' ? (health?.site_response_ms ?? '—') : (health?.response_ms ?? '—')} ms
+            </div>
+          </div>
+        </div>
+        <div className="mt-4 grid gap-6 lg:grid-cols-3">
+          <div className="flex items-center gap-5">
+            <div
+              className="relative h-28 w-28 rounded-full transition-all duration-700"
+              style={{
+                background: `conic-gradient(rgb(59 130 246) ${healthScore * 3.6}deg, rgb(229 231 235) 0deg)`,
+              }}
+            >
+              <div className={`absolute inset-0 rounded-full bg-gradient-to-br ${healthColor} opacity-20`} />
+              <div className="absolute inset-[8px] rounded-full bg-white dark:bg-gray-900 flex items-center justify-center shadow-inner">
+                <span className="text-2xl font-bold tabular-nums text-gray-900 dark:text-white">{healthScore}</span>
+              </div>
+            </div>
+            <div className="space-y-1 text-sm">
+              <div className="text-gray-900 dark:text-white font-semibold">
+                {healthScore >= 90 ? 'Mükemmel' : healthScore >= 75 ? 'İyi' : healthScore >= 60 ? 'Dikkat' : 'Kritik'}
+              </div>
+              <div className="text-gray-500">CPU {health?.snapshot?.cpu ?? '—'}%</div>
+              <div className="text-gray-500">RAM {health?.snapshot?.ram ?? '—'}%</div>
+              <div className="text-gray-500">Disk {health?.snapshot?.disk ?? '—'}%</div>
+            </div>
+          </div>
+          <div className="lg:col-span-2 space-y-2">
+            {(health?.reasons ?? []).slice(0, 6).map((r) => (
+              <div key={r.key} className="flex items-start gap-2 rounded-lg border border-gray-100 dark:border-gray-800 px-3 py-2">
+                {r.ok ? (
+                  <CheckCircle2 className="h-4 w-4 mt-0.5 text-emerald-500" />
+                ) : (
+                  <AlertTriangle className="h-4 w-4 mt-0.5 text-amber-500" />
+                )}
+                <div>
+                  <div className="text-sm font-medium text-gray-900 dark:text-white">{r.label}</div>
+                  <div className="text-xs text-gray-500">{r.detail}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="card p-6">
+        <div className="flex items-center justify-between gap-3">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Site Health Listesi</h3>
+          <span className="text-xs text-gray-500">ilk 20 site</span>
+        </div>
+        <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          {(healthSitesQ.data?.items ?? []).map((it) => {
+            const badge =
+              it.score >= 90
+                ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300'
+                : it.score >= 75
+                  ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300'
+                  : it.score >= 60
+                    ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300'
+                    : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300'
+            return (
+              <button
+                key={it.domain_id}
+                type="button"
+                className="text-left rounded-xl border border-gray-100 dark:border-gray-800 p-3 hover:bg-gray-50 dark:hover:bg-gray-800/40 transition-colors"
+                onClick={() => setHealthDomainId(it.domain_id)}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-medium text-sm text-gray-900 dark:text-white truncate">{it.name}</span>
+                  <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${badge}`}>{it.score}</span>
+                </div>
+                {it.reasons?.length > 0 ? (
+                  <p className="mt-1 text-xs text-gray-500 truncate">{it.reasons.join(' • ')}</p>
+                ) : (
+                  <p className="mt-1 text-xs text-gray-500">Durum iyi</p>
+                )}
+              </button>
+            )
+          })}
+          {healthSitesQ.isLoading && <p className="text-sm text-gray-500">{t('common.loading')}</p>}
+        </div>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-5">

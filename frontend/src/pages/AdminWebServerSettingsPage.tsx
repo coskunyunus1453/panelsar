@@ -4,7 +4,7 @@ import { Navigate } from 'react-router-dom'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { useAuthStore } from '../store/authStore'
 import api from '../services/api'
-import { ServerCog, Save, AlertTriangle } from 'lucide-react'
+import { ServerCog, Save, AlertTriangle, RefreshCw } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { tokenHasAbility } from '../lib/abilities'
 
@@ -20,6 +20,16 @@ type WebServerSettings = {
   php_fpm_pool_dir_template: string
   php_fpm_pool_user: string
   php_fpm_pool_group: string
+}
+
+type ApacheModuleRow = {
+  name: string
+  enabled: boolean
+}
+
+type ServiceHealth = {
+  installed?: boolean
+  active?: boolean
 }
 
 export default function AdminWebServerSettingsPage() {
@@ -42,6 +52,9 @@ export default function AdminWebServerSettingsPage() {
   }, [settingsQ.data])
 
   const canEdit = useMemo(() => !!form && canWrite, [form, canWrite])
+  const [activeTab, setActiveTab] = useState<'general' | 'apache' | 'nginx'>('general')
+  const [nginxScope, setNginxScope] = useState<'main' | 'panel'>('main')
+  const [nginxContent, setNginxContent] = useState('')
 
   const saveM = useMutation({
     mutationFn: async () => {
@@ -64,6 +77,58 @@ export default function AdminWebServerSettingsPage() {
     },
     onSuccess: () => {
       toast.success(t('webserver.saved'))
+    },
+    onError: (err: unknown) => {
+      const ax = err as { response?: { data?: { message?: string } } }
+      toast.error(ax.response?.data?.message ?? String(err))
+    },
+  })
+
+  const apacheModulesQ = useQuery({
+    queryKey: ['admin-webserver-apache-modules'],
+    queryFn: async () => (await api.get('/admin/settings/webserver/apache-modules')).data as { modules: ApacheModuleRow[] },
+    enabled: canView,
+  })
+
+  const servicesQ = useQuery({
+    queryKey: ['admin-webserver-services'],
+    queryFn: async () =>
+      (await api.get('/admin/settings/webserver/services')).data as { services: { nginx?: ServiceHealth; apache?: ServiceHealth } },
+    enabled: canView,
+  })
+
+  const toggleApacheModuleM = useMutation({
+    mutationFn: async ({ name, enabled }: { name: string; enabled: boolean }) =>
+      api.post(`/admin/settings/webserver/apache-modules/${encodeURIComponent(name)}`, { enabled }),
+    onSuccess: () => {
+      void apacheModulesQ.refetch()
+    },
+    onError: (err: unknown) => {
+      const ax = err as { response?: { data?: { message?: string } } }
+      toast.error(ax.response?.data?.message ?? String(err))
+    },
+  })
+
+  const nginxConfigQ = useQuery({
+    queryKey: ['admin-webserver-nginx-config', nginxScope],
+    queryFn: async () =>
+      (await api.get('/admin/settings/webserver/nginx-config', { params: { scope: nginxScope } })).data as {
+        scope: 'main' | 'panel'
+        content: string
+      },
+    enabled: canView,
+  })
+
+  useEffect(() => {
+    if (nginxConfigQ.data?.content !== undefined) setNginxContent(nginxConfigQ.data.content)
+  }, [nginxConfigQ.data?.content, nginxScope])
+
+  const saveNginxM = useMutation({
+    mutationFn: async () =>
+      api.put('/admin/settings/webserver/nginx-config', { scope: nginxScope, content: nginxContent, test_reload: true }),
+    onSuccess: () => {
+      toast.success(t('webserver.saved'))
+      void nginxConfigQ.refetch()
     },
     onError: (err: unknown) => {
       const ax = err as { response?: { data?: { message?: string } } }
@@ -108,7 +173,44 @@ export default function AdminWebServerSettingsPage() {
         </div>
       )}
 
-      <div className="card p-6 space-y-5">
+      <div className="card p-4 sm:p-6 space-y-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="rounded-xl border border-gray-200 dark:border-gray-800 p-3 text-sm">
+            <div className="font-semibold">Nginx</div>
+            <div className="mt-1 text-xs text-gray-500">
+              {servicesQ.data?.services?.nginx?.installed ? 'Kurulu' : 'Kurulu değil'} /{' '}
+              {servicesQ.data?.services?.nginx?.active ? 'Aktif' : 'Pasif'}
+            </div>
+            {!servicesQ.data?.services?.nginx?.installed && (
+              <p className="mt-2 text-xs text-amber-600">Nginx kurulu görünmüyor. Bu sekmede düzenleme sınırlı olabilir.</p>
+            )}
+          </div>
+          <div className="rounded-xl border border-gray-200 dark:border-gray-800 p-3 text-sm">
+            <div className="font-semibold">Apache</div>
+            <div className="mt-1 text-xs text-gray-500">
+              {servicesQ.data?.services?.apache?.installed ? 'Kurulu' : 'Kurulu değil'} /{' '}
+              {servicesQ.data?.services?.apache?.active ? 'Aktif' : 'Pasif'}
+            </div>
+            {!servicesQ.data?.services?.apache?.installed && (
+              <p className="mt-2 text-xs text-amber-600">Apache kurulu görünmüyor. Modül yönetimi kullanılamaz.</p>
+            )}
+          </div>
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          <button type="button" className={`btn ${activeTab === 'general' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setActiveTab('general')}>
+            {t('webserver.title')}
+          </button>
+          <button type="button" className={`btn ${activeTab === 'apache' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setActiveTab('apache')}>
+            {t('webserver.apache')}
+          </button>
+          <button type="button" className={`btn ${activeTab === 'nginx' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setActiveTab('nginx')}>
+            {t('webserver.nginx')}
+          </button>
+        </div>
+
+        {activeTab === 'general' && (
+          <>
         <section className="space-y-3">
           <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">{t('webserver.nginx')}</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -234,6 +336,69 @@ export default function AdminWebServerSettingsPage() {
             {t('webserver.save_hint')}
           </p>
         </section>
+          </>
+        )}
+
+        {activeTab === 'apache' && (
+          <section className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">{t('webserver.apache')}</h2>
+              <button
+                type="button"
+                className="btn-secondary inline-flex items-center gap-2"
+                onClick={() => void apacheModulesQ.refetch()}
+                disabled={apacheModulesQ.isFetching}
+              >
+                <RefreshCw className="h-4 w-4" />
+                {t('common.refresh')}
+              </button>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {(apacheModulesQ.data?.modules ?? []).map((m) => (
+                <label key={m.name} className="border border-gray-200 dark:border-gray-800 rounded-xl px-3 py-2 flex items-center justify-between text-sm">
+                  <span className="font-medium">{m.name}</span>
+                  <input
+                    type="checkbox"
+                    checked={m.enabled}
+                    disabled={!canWrite || toggleApacheModuleM.isPending}
+                    onChange={(e) => toggleApacheModuleM.mutate({ name: m.name, enabled: e.target.checked })}
+                  />
+                </label>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {activeTab === 'nginx' && (
+          <section className="space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">{t('webserver.nginx')}</h2>
+              <div className="flex items-center gap-2">
+                <select className="input h-9" value={nginxScope} onChange={(e) => setNginxScope(e.target.value as 'main' | 'panel')}>
+                  <option value="main">nginx.conf</option>
+                  <option value="panel">panelsar.conf</option>
+                </select>
+                <button type="button" className="btn-secondary" onClick={() => void nginxConfigQ.refetch()}>{t('common.refresh')}</button>
+              </div>
+            </div>
+            <textarea
+              className="input w-full min-h-[360px] font-mono text-xs"
+              value={nginxContent}
+              onChange={(e) => setNginxContent(e.target.value)}
+              disabled={!canWrite || nginxConfigQ.isLoading}
+            />
+            <div className="flex justify-end">
+              <button
+                type="button"
+                className="btn-primary"
+                onClick={() => saveNginxM.mutate()}
+                disabled={!canWrite || saveNginxM.isPending || nginxConfigQ.isLoading}
+              >
+                {t('common.save')}
+              </button>
+            </div>
+          </section>
+        )}
       </div>
     </div>
   )

@@ -2,6 +2,7 @@ package security
 
 import (
 	"fmt"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strconv"
@@ -85,5 +86,83 @@ func Fail2banJailSet(bantime, findtime, maxretry int) error {
 		return fmt.Errorf("invalid fail2ban jail settings")
 	}
 	_, err := run("fail2ban-jail-set", strconv.Itoa(bantime), strconv.Itoa(findtime), strconv.Itoa(maxretry))
+	return err
+}
+
+type ApacheModuleRow struct {
+	Name    string `json:"name"`
+	Enabled bool   `json:"enabled"`
+}
+
+func ApacheModulesList() ([]ApacheModuleRow, error) {
+	out, err := run("apache-modules-list")
+	if err != nil {
+		return nil, err
+	}
+	lines := strings.Split(strings.TrimSpace(out), "\n")
+	rows := make([]ApacheModuleRow, 0, len(lines))
+	for _, ln := range lines {
+		p := strings.Fields(strings.TrimSpace(ln))
+		if len(p) < 2 {
+			continue
+		}
+		rows = append(rows, ApacheModuleRow{
+			Name:    p[0],
+			Enabled: strings.EqualFold(p[1], "enabled"),
+		})
+	}
+	return rows, nil
+}
+
+func ApacheModuleSet(name string, enabled bool) (bool, error) {
+	state := "off"
+	if enabled {
+		state = "on"
+	}
+	out, err := run("apache-module-set", strings.TrimSpace(name), state)
+	if err != nil {
+		return false, err
+	}
+	return strings.EqualFold(strings.TrimSpace(out), "enabled"), nil
+}
+
+func NginxConfigGet(scope string) (string, error) {
+	if scope == "" {
+		scope = "main"
+	}
+	return run("nginx-config-get", scope)
+}
+
+func NginxConfigSet(scope, content string, reload bool) error {
+	if scope == "" {
+		scope = "main"
+	}
+	tmp, err := os.CreateTemp("", "panelsar-nginx-*.conf")
+	if err != nil {
+		return err
+	}
+	tmpPath := tmp.Name()
+	defer os.Remove(tmpPath)
+	if _, err := tmp.WriteString(content); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	_ = tmp.Close()
+
+	reloadArg := "0"
+	if reload {
+		reloadArg = "1"
+	}
+	_, err = run("nginx-config-set", scope, tmpPath, reloadArg)
+	return err
+}
+
+func InstallFail2ban() error {
+	_, err := run("fail2ban-install")
+	return err
+}
+
+func InstallModSecurity() error {
+	_, err := run("modsec-install")
 	return err
 }

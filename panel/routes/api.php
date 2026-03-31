@@ -180,6 +180,8 @@ Route::middleware(['auth:sanctum', 'abilities:access:customer-panel'])->group(fu
     Route::middleware('ability:cron:read')->get('cron/{cronJob}/runs', [CronJobController::class, 'runs']);
 
     Route::middleware('ability:monitoring:read')->get('monitoring/summary', [MonitoringController::class, 'userSummary']);
+    Route::middleware('ability:monitoring:read')->get('monitoring/health', [MonitoringController::class, 'health']);
+    Route::middleware('ability:monitoring:read')->get('monitoring/health/sites', [MonitoringController::class, 'healthSites']);
     Route::middleware('ability:monitoring:server')->get('monitoring/server', [MonitoringController::class, 'server']);
 
     Route::middleware('ability:dashboard:read')->group(function () {
@@ -195,8 +197,10 @@ Route::middleware(['auth:sanctum', 'abilities:access:customer-panel'])->group(fu
     Route::middleware(['role:admin', 'ability:security:write'])->group(function () {
         Route::post('security/firewall', [SecurityController::class, 'firewall']);
         Route::post('security/fail2ban/toggle', [SecurityController::class, 'toggleFail2ban']);
+        Route::post('security/fail2ban/install', [SecurityController::class, 'installFail2ban']);
         Route::post('security/fail2ban/jail', [SecurityController::class, 'updateFail2banJail']);
         Route::post('security/modsecurity/toggle', [SecurityController::class, 'toggleModSecurity']);
+        Route::post('security/modsecurity/install', [SecurityController::class, 'installModSecurity']);
         Route::post('security/clamav/toggle', [SecurityController::class, 'toggleClamav']);
         Route::post('security/clamav/scan', [SecurityController::class, 'scanClamav']);
         Route::post('security/mail/reconcile', [SecurityController::class, 'reconcileMailState']);
@@ -265,6 +269,9 @@ Route::middleware(['auth:sanctum', 'abilities:access:customer-panel'])->group(fu
         Route::get('settings/mail', [OutboundMailSettingsController::class, 'show']);
         Route::put('settings/mail', [OutboundMailSettingsController::class, 'update']);
         Route::post('settings/mail/test', [OutboundMailSettingsController::class, 'test']);
+        Route::post('settings/mail/diagnostics', [OutboundMailSettingsController::class, 'diagnostics']);
+        Route::post('settings/mail/wizard-checks', [OutboundMailSettingsController::class, 'wizardChecks']);
+        Route::post('settings/mail/wizard-apply-dns', [OutboundMailSettingsController::class, 'wizardApplyDns']);
         Route::get('settings/terminal', [TerminalSettingsController::class, 'show']);
         Route::put('settings/terminal', [TerminalSettingsController::class, 'update']);
         Route::apiResource('users', UserController::class);
@@ -276,10 +283,15 @@ Route::middleware(['auth:sanctum', 'abilities:access:customer-panel'])->group(fu
 
     Route::prefix('admin')->middleware(['role:admin', 'ability:webserver:read'])->group(function () {
         Route::get('settings/webserver', [WebServerSettingsController::class, 'show']);
+        Route::get('settings/webserver/services', [WebServerSettingsController::class, 'services']);
+        Route::get('settings/webserver/apache-modules', [WebServerSettingsController::class, 'apacheModules']);
+        Route::get('settings/webserver/nginx-config', [WebServerSettingsController::class, 'getNginxConfig']);
     });
 
     Route::prefix('admin')->middleware(['role:admin', 'ability:webserver:write'])->group(function () {
         Route::put('settings/webserver', [WebServerSettingsController::class, 'update']);
+        Route::post('settings/webserver/apache-modules/{module}', [WebServerSettingsController::class, 'setApacheModule']);
+        Route::put('settings/webserver/nginx-config', [WebServerSettingsController::class, 'updateNginxConfig']);
     });
 
     Route::prefix('admin')->middleware(['role:admin', 'ability:php:read'])->group(function () {

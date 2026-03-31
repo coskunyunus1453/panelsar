@@ -302,6 +302,13 @@ func registerModuleRoutes(cfg *config.Config, d *daemon.Daemon, api *gin.RouterG
 		}
 		c.JSON(http.StatusOK, gin.H{"message": "fail2ban updated", "enabled": enabled})
 	})
+	api.POST("/security/fail2ban/install", func(c *gin.Context) {
+		if err := security.InstallFail2ban(); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"message": "fail2ban installed"})
+	})
 	api.POST("/security/fail2ban/jail", func(c *gin.Context) {
 		var req struct {
 			Bantime  int `json:"bantime" binding:"required"`
@@ -332,6 +339,13 @@ func registerModuleRoutes(cfg *config.Config, d *daemon.Daemon, api *gin.RouterG
 			return
 		}
 		c.JSON(http.StatusOK, gin.H{"message": "modsecurity updated", "enabled": enabled})
+	})
+	api.POST("/security/modsecurity/install", func(c *gin.Context) {
+		if err := security.InstallModSecurity(); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"message": "modsecurity installed"})
 	})
 	api.POST("/security/clamav/toggle", func(c *gin.Context) {
 		var req struct {
@@ -506,6 +520,27 @@ func registerModuleRoutes(cfg *config.Config, d *daemon.Daemon, api *gin.RouterG
 		})
 	})
 
+	api.GET("/webserver/services", func(c *gin.Context) {
+		check := func(name string) gin.H {
+			installed := false
+			active := false
+			unit := name + ".service"
+			if out, _ := exec.Command("systemctl", "list-unit-files", "--type=service", unit).CombinedOutput(); strings.Contains(string(out), unit) {
+				installed = true
+			}
+			if err := exec.Command("systemctl", "is-active", "--quiet", name).Run(); err == nil {
+				active = true
+			}
+			return gin.H{"installed": installed, "active": active}
+		}
+		c.JSON(http.StatusOK, gin.H{
+			"services": gin.H{
+				"nginx":  check("nginx"),
+				"apache": check("apache2"),
+			},
+		})
+	})
+
 	api.PATCH("/webserver/settings", func(c *gin.Context) {
 		var req struct {
 			NginxManageVhosts      *bool   `json:"nginx_manage_vhosts"`
@@ -619,6 +654,75 @@ func registerModuleRoutes(cfg *config.Config, d *daemon.Daemon, api *gin.RouterG
 			},
 			"reload": reloadResult,
 		})
+	})
+
+	api.GET("/webserver/apache/modules", func(c *gin.Context) {
+		rows, err := security.ApacheModulesList()
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		sort.Slice(rows, func(i, j int) bool { return rows[i].Name < rows[j].Name })
+		c.JSON(http.StatusOK, gin.H{"modules": rows})
+	})
+
+	api.POST("/webserver/apache/modules/:name/toggle", func(c *gin.Context) {
+		var req struct {
+			Enabled bool `json:"enabled"`
+		}
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		name := strings.TrimSpace(c.Param("name"))
+		if name == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "module name required"})
+			return
+		}
+		enabled, err := security.ApacheModuleSet(name, req.Enabled)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"module": name, "enabled": enabled})
+	})
+
+	api.GET("/webserver/nginx/config", func(c *gin.Context) {
+		scope := strings.TrimSpace(c.Query("scope"))
+		if scope == "" {
+			scope = "main"
+		}
+		content, err := security.NginxConfigGet(scope)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"scope": scope, "content": content})
+	})
+
+	api.POST("/webserver/nginx/config", func(c *gin.Context) {
+		var req struct {
+			Scope      string `json:"scope"`
+			Content    string `json:"content" binding:"required"`
+			TestReload *bool  `json:"test_reload"`
+		}
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		scope := strings.TrimSpace(req.Scope)
+		if scope == "" {
+			scope = "main"
+		}
+		reload := true
+		if req.TestReload != nil {
+			reload = *req.TestReload
+		}
+		if err := security.NginxConfigSet(scope, req.Content, reload); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"message": "nginx config updated", "scope": scope})
 	})
 
 	api.GET("/php/versions", func(c *gin.Context) {

@@ -18,6 +18,8 @@ class CronJob extends Model
         'last_run_at',
         'next_run_at',
         'engine_job_id',
+        'is_system',
+        'system_key',
     ];
 
     protected function casts(): array
@@ -25,6 +27,7 @@ class CronJob extends Model
         return [
             'last_run_at' => 'datetime',
             'next_run_at' => 'datetime',
+            'is_system' => 'boolean',
         ];
     }
 

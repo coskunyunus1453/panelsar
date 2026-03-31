@@ -225,6 +225,7 @@ export default function EmailPage() {
   const accounts: MailRow[] = q.data?.accounts ?? []
   const forwarders: ForwarderRow[] = q.data?.forwarders ?? []
   const webmailUrl: string | undefined = safeExternalHttpUrl(q.data?.webmail_url ?? '') ?? undefined
+  const webmailStatus = q.data?.webmail_status as { host?: string; dns_ok?: boolean; hint?: string } | undefined
   const mailOv = q.data?.mail as
     | { mail_enabled?: boolean; mailboxes?: EngineMailbox[]; spf?: string; dmarc?: string }
     | undefined
@@ -395,6 +396,12 @@ export default function EmailPage() {
                   {t('email.copy_host')}
                 </button>
               </div>
+            </div>
+          )}
+          {!webmailUrl && webmailStatus?.host && (
+            <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50/70 px-3 py-2 text-xs text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-200">
+              <div className="font-medium">Webmail linki hazır değil: <code>{webmailStatus.host}</code></div>
+              <div className="mt-1">{webmailStatus.hint ?? 'DNS kontrolü başarısız.'}</div>
             </div>
           )}
         </div>

@@ -45,10 +45,30 @@ class SecurityController extends Controller
         return response()->json(['result' => $result], 200);
     }
 
+    public function installFail2ban(): JsonResponse
+    {
+        $result = $this->engine->installFail2ban();
+        if (! empty($result['error'])) {
+            return $this->securityErrorResponse($result['error'], $result);
+        }
+
+        return response()->json(['result' => $result], 200);
+    }
+
     public function toggleModSecurity(Request $request): JsonResponse
     {
         $validated = $request->validate(['enabled' => 'required|boolean']);
         $result = $this->engine->toggleModSecurity((bool) $validated['enabled']);
+        if (! empty($result['error'])) {
+            return $this->securityErrorResponse($result['error'], $result);
+        }
+
+        return response()->json(['result' => $result], 200);
+    }
+
+    public function installModSecurity(): JsonResponse
+    {
+        $result = $this->engine->installModSecurity();
         if (! empty($result['error'])) {
             return $this->securityErrorResponse($result['error'], $result);
         }

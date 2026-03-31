@@ -1,10 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Navigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '../store/authStore'
 import api from '../services/api'
-import { Mail, Send, Save } from 'lucide-react'
+import { Mail, Send, Save, Loader2, CheckCircle2, XCircle } from 'lucide-react'
 import toast from 'react-hot-toast'
 import clsx from 'clsx'
 
@@ -18,6 +18,8 @@ type MailSettings = {
   smtp_encryption: string
   from_address: string
   from_name: string
+  smtp_recommended_host?: string
+  smtp_recommended_port?: number
 }
 
 export default function AdminMailSettingsPage() {
@@ -44,6 +46,10 @@ export default function AdminMailSettingsPage() {
   const [clearPass, setClearPass] = useState(false)
   const [fromAddress, setFromAddress] = useState('')
   const [fromName, setFromName] = useState('')
+  const [wizardDomain, setWizardDomain] = useState('')
+  const [wizardProgress, setWizardProgress] = useState(0)
+  const [wizardTick, setWizardTick] = useState(0)
+  const [dnsCopyText, setDnsCopyText] = useState('')
 
   useEffect(() => {
     if (!q.data) return
@@ -56,6 +62,11 @@ export default function AdminMailSettingsPage() {
     setFromName(q.data.from_name || '')
     setSmtpPass('')
     setClearPass(false)
+    if (!wizardDomain) {
+      const from = q.data.from_address || ''
+      const parts = from.split('@')
+      if (parts.length === 2) setWizardDomain(parts[1])
+    }
   }, [q.data])
 
   const saveM = useMutation({
@@ -100,6 +111,144 @@ export default function AdminMailSettingsPage() {
       toast.error(ax.response?.data?.message ?? String(err))
     },
   })
+
+  const diagM = useMutation({
+    mutationFn: async () =>
+      (
+        await api.post<{
+          ok: boolean
+          dns_resolved: boolean
+          ips: string[]
+          port_open: boolean
+          connection_error?: string
+          hint?: string
+        }>('/admin/settings/mail/diagnostics', { smtp_host: smtpHost, smtp_port: smtpPort })
+      ).data,
+    onSuccess: (d) => {
+      const status = d.ok ? 'SMTP tanılama başarılı' : 'SMTP tanılama: sorun bulundu'
+      const details = [
+        `DNS: ${d.dns_resolved ? 'ok' : 'hata'}`,
+        `Port: ${d.port_open ? 'ok' : 'kapalı'}`,
+        d.hint ? `İpucu: ${d.hint}` : '',
+      ]
+        .filter(Boolean)
+        .join(' | ')
+      toast.success(`${status} — ${details}`, { duration: 7000 })
+    },
+    onError: (err: unknown) => {
+      const ax = err as { response?: { data?: { message?: string } } }
+      toast.error(ax.response?.data?.message ?? String(err))
+    },
+  })
+
+  const wizardM = useMutation({
+    mutationFn: async () =>
+      (
+        await api.post<{
+          ok: boolean
+          checks: Array<{ key: string; label: string; ok: boolean; detail: string }>
+          recommended: { smtp_host: string; smtp_port: number; smtp_encryption: string; webmail_url?: string | null }
+          dns_suggestions?: Array<{
+            type: string
+            name: string
+            value?: string | null
+            priority?: number
+            required?: boolean
+          }>
+        }>('/admin/settings/mail/wizard-checks', { domain: wizardDomain.trim() })
+      ).data,
+    onSuccess: (d) => {
+      setWizardProgress(100)
+      if (d.ok) {
+        toast.success('Mail sihirbazı: tüm kontroller başarılı', { duration: 5000 })
+      } else {
+        toast.error('Mail sihirbazı: eksikler var, aşağıdaki adımları tamamlayın', { duration: 5000 })
+      }
+    },
+    onError: (err: unknown) => {
+      setWizardProgress(100)
+      const ax = err as { response?: { data?: { message?: string } } }
+      toast.error(ax.response?.data?.message ?? String(err))
+    },
+  })
+
+  const applyDnsM = useMutation({
+    mutationFn: async () =>
+      (
+        await api.post<{
+          message: string
+          created: Array<{ type: string; name: string; value: string }>
+          skipped: Array<{ reason: string }>
+          errors: Array<{ error: string }>
+        }>('/admin/settings/mail/wizard-apply-dns', { domain: wizardDomain.trim() })
+      ).data,
+    onSuccess: (d) => {
+      const msg = `${d.message} | eklendi=${d.created.length}, atlandı=${d.skipped.length}, hata=${d.errors.length}`
+      if (d.errors.length > 0) toast.error(msg, { duration: 7000 })
+      else toast.success(msg, { duration: 7000 })
+    },
+    onError: (err: unknown) => {
+      const ax = err as { response?: { data?: { message?: string } } }
+      toast.error(ax.response?.data?.message ?? String(err))
+    },
+  })
+
+  useEffect(() => {
+    if (!wizardM.isPending) return
+    setWizardProgress(7)
+    const id = window.setInterval(() => {
+      setWizardTick((s) => s + 1)
+      setWizardProgress((p) => (p >= 92 ? p : p + 4))
+    }, 180)
+    return () => window.clearInterval(id)
+  }, [wizardM.isPending])
+
+  const runningLabel = useMemo(() => {
+    const steps = [
+      'DNS kayıtları kontrol ediliyor...',
+      'mail host çözümleme test ediliyor...',
+      'SMTP portları test ediliyor...',
+      'IMAP portları test ediliyor...',
+      'webmail host/https kontrol ediliyor...',
+      'önerilen ayarlar hazırlanıyor...',
+    ]
+    return steps[wizardTick % steps.length]
+  }, [wizardTick])
+
+  useEffect(() => {
+    const rows = wizardM.data?.dns_suggestions ?? []
+    if (!rows.length) {
+      setDnsCopyText('')
+      return
+    }
+    const txt = rows
+      .map((r) => {
+        if (r.type === 'MX') return `${r.type} ${r.name} ${r.value ?? ''} priority=${r.priority ?? 10}`
+        return `${r.type} ${r.name} ${r.value ?? ''}`
+      })
+      .join('\n')
+    setDnsCopyText(txt)
+  }, [wizardM.data?.dns_suggestions])
+
+  const applyWizardRecommendation = () => {
+    const rec = wizardM.data?.recommended
+    if (!rec) return
+    setDriver('smtp')
+    setSmtpHost(rec.smtp_host)
+    setSmtpPort(rec.smtp_port)
+    setSmtpEnc(rec.smtp_encryption)
+    toast.success('Önerilen SMTP ayarları forma uygulandı')
+  }
+
+  const copyDnsTemplate = async () => {
+    if (!dnsCopyText) return
+    try {
+      await navigator.clipboard.writeText(dnsCopyText)
+      toast.success('DNS şablonu panoya kopyalandı')
+    } catch {
+      toast.error('Panoya kopyalanamadı')
+    }
+  }
 
   if (!isAdmin) {
     return <Navigate to="/dashboard" replace />
@@ -163,6 +312,12 @@ export default function AdminMailSettingsPage() {
                   onChange={(e) => setSmtpHost(e.target.value)}
                   placeholder="smtp.sendgrid.net"
                 />
+                {!!q.data?.smtp_recommended_host && (
+                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    Öneri (sunucu içi gönderim): <code>{q.data.smtp_recommended_host}</code>:{' '}
+                    <code>{q.data.smtp_recommended_port ?? 587}</code>
+                  </p>
+                )}
               </div>
               <div>
                 <label className="label">{t('mail_settings.smtp_port')}</label>
@@ -246,6 +401,88 @@ export default function AdminMailSettingsPage() {
             </div>
           </div>
 
+          <div className="rounded-xl border border-primary-200 bg-primary-50/60 p-4 dark:border-primary-900/40 dark:bg-primary-950/20 space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-sm font-semibold text-gray-900 dark:text-white">Mail Kurulum Sihirbazı</p>
+              <button
+                type="button"
+                className="btn-primary"
+                disabled={wizardM.isPending || !wizardDomain.trim()}
+                onClick={() => wizardM.mutate()}
+              >
+                {wizardM.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Kontrol Et'}
+              </button>
+            </div>
+            <div>
+              <label className="label">Domain</label>
+              <input
+                className="input max-w-md"
+                value={wizardDomain}
+                onChange={(e) => setWizardDomain(e.target.value)}
+                placeholder="relevant.tr"
+              />
+            </div>
+            <div className="h-2 w-full rounded bg-gray-200 dark:bg-gray-800 overflow-hidden">
+              <div className="h-full bg-primary-600 transition-all duration-200" style={{ width: `${wizardProgress}%` }} />
+            </div>
+            <p className="text-xs text-gray-600 dark:text-gray-300">
+              {wizardM.isPending ? runningLabel : 'DNS, SMTP, IMAP ve webmail kontrolleri gerçek bağlantı testi ile yapılır.'}
+            </p>
+
+            {wizardM.data?.checks && (
+              <div className="space-y-2">
+                {wizardM.data.checks.map((c) => (
+                  <div key={c.key} className="flex items-start gap-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white/70 dark:bg-gray-900/40 px-3 py-2 text-sm">
+                    {c.ok ? (
+                      <CheckCircle2 className="mt-0.5 h-4 w-4 text-emerald-600" />
+                    ) : (
+                      <XCircle className="mt-0.5 h-4 w-4 text-red-600" />
+                    )}
+                    <div>
+                      <div className="font-medium text-gray-900 dark:text-white">{c.label}</div>
+                      <div className="text-xs text-gray-600 dark:text-gray-300">{c.detail}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {wizardM.data?.recommended && (
+              <div className="rounded-lg border border-emerald-200 bg-emerald-50/70 p-3 text-xs text-emerald-900 dark:border-emerald-900/40 dark:bg-emerald-950/20 dark:text-emerald-200">
+                Önerilen SMTP: <code>{wizardM.data.recommended.smtp_host}</code>:{' '}
+                <code>{wizardM.data.recommended.smtp_port}</code> ({wizardM.data.recommended.smtp_encryption.toUpperCase()})
+                {wizardM.data.recommended.webmail_url ? (
+                  <span> | Webmail: <code>{wizardM.data.recommended.webmail_url}</code></span>
+                ) : null}
+                <div className="mt-2">
+                  <button type="button" className="btn-secondary py-1.5 text-xs" onClick={applyWizardRecommendation}>
+                    SMTP ayarlarına uygula
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {!!dnsCopyText && (
+              <div className="rounded-lg border border-amber-200 bg-amber-50/70 p-3 text-xs text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-200">
+                <div className="mb-2 font-medium">DNS kayıt şablonu</div>
+                <pre className="max-h-40 overflow-auto rounded bg-black p-2 text-[11px] text-green-200 whitespace-pre-wrap">{dnsCopyText}</pre>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <button type="button" className="btn-secondary py-1.5 text-xs" onClick={copyDnsTemplate}>
+                    DNS şablonunu kopyala
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-primary py-1.5 text-xs"
+                    onClick={() => applyDnsM.mutate()}
+                    disabled={applyDnsM.isPending || !wizardDomain.trim()}
+                  >
+                    {applyDnsM.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Eksik DNS kayıtlarını otomatik ekle'}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
           <div className="flex flex-wrap gap-3">
             <button
               type="submit"
@@ -274,6 +511,14 @@ export default function AdminMailSettingsPage() {
               >
                 <Send className="h-4 w-4" />
                 {t('mail_settings.test')}
+              </button>
+              <button
+                type="button"
+                disabled={diagM.isPending || saveM.isPending || driver !== 'smtp'}
+                onClick={() => diagM.mutate()}
+                className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-800 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:hover:bg-gray-700"
+              >
+                SMTP tanılama
               </button>
               <span className="text-xs text-gray-500 dark:text-gray-400">
                 {q.data?.driver === 'log' && q.data?.outbound_mail_persisted

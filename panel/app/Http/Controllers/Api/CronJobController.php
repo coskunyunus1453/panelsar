@@ -22,7 +22,13 @@ class CronJobController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        $jobs = $request->user()->cronJobs()->latest()->paginate(30);
+        $jobs = CronJob::query()
+            ->where(function ($q) use ($request) {
+                $q->where('user_id', $request->user()->id)
+                    ->orWhere('is_system', true);
+            })
+            ->latest()
+            ->paginate(30);
 
         return response()->json($jobs);
     }
@@ -75,6 +81,9 @@ class CronJobController extends Controller
     public function update(Request $request, CronJob $cronJob): JsonResponse
     {
         $this->assertCanAccess($request, $cronJob);
+        if ($cronJob->is_system) {
+            return response()->json(['message' => 'Sistem cron görevi düzenlenemez.'], 403);
+        }
 
         $validated = $request->validate([
             'schedule' => ['required', 'string', 'max:80', $this->cronScheduleRule()],
@@ -116,6 +125,9 @@ class CronJobController extends Controller
     public function destroy(Request $request, CronJob $cronJob): JsonResponse
     {
         $this->assertCanAccess($request, $cronJob);
+        if ($cronJob->is_system) {
+            return response()->json(['message' => 'Sistem cron görevi silinemez.'], 403);
+        }
         $eid = $cronJob->engine_job_id;
         if ($eid === null || $eid === '') {
             $eid = (string) $cronJob->id;
@@ -131,6 +143,9 @@ class CronJobController extends Controller
     public function runNow(Request $request, CronJob $cronJob): JsonResponse
     {
         $this->assertCanAccess($request, $cronJob);
+        if ($cronJob->is_system && ! $request->user()->isAdmin()) {
+            return response()->json(['message' => 'Sistem cron görevi yalnızca yönetici tarafından çalıştırılabilir.'], 403);
+        }
 
         $run = CronJobRun::create([
             'cron_job_id' => $cronJob->id,

@@ -44,6 +44,21 @@ export default function SecurityPage() {
   const [jailBantime, setJailBantime] = useState(600)
   const [jailFindtime, setJailFindtime] = useState(600)
   const [jailMaxretry, setJailMaxretry] = useState(5)
+  const [installModal, setInstallModal] = useState<{
+    open: boolean
+    key: 'fail2ban' | 'modsecurity' | null
+    status: 'idle' | 'running' | 'success' | 'error'
+    logs: string[]
+    startedAt: number | null
+    finishedAt: number | null
+  }>({
+    open: false,
+    key: null,
+    status: 'idle',
+    logs: [],
+    startedAt: null,
+    finishedAt: null,
+  })
 
   const q = useQuery({
     queryKey: ['security-overview'],
@@ -85,6 +100,54 @@ export default function SecurityPage() {
       else toast.error([ax.response?.data?.message, ax.response?.data?.hint].filter(Boolean).join(' — ') || String(err))
     },
   })
+
+  const installM = useMutation({
+    mutationFn: async (key: 'fail2ban' | 'modsecurity') => {
+      if (key === 'fail2ban') return api.post('/security/fail2ban/install')
+      return api.post('/security/modsecurity/install')
+    },
+    onSuccess: () => {
+      setInstallModal((s) => ({
+        ...s,
+        status: 'success',
+        finishedAt: Date.now(),
+        logs: [...s.logs, 'Kurulum tamamlandı ve servis doğrulaması geçti.'],
+      }))
+      toast.success('Paket kurulumu tamamlandı')
+      qc.invalidateQueries({ queryKey: ['security-overview'] })
+    },
+    onError: (err: unknown) => {
+      const ax = err as { response?: { data?: { message?: string; hint?: string }; status?: number } }
+      setInstallModal((s) => ({
+        ...s,
+        status: 'error',
+        finishedAt: Date.now(),
+        logs: [
+          ...s.logs,
+          [ax.response?.data?.message, ax.response?.data?.hint].filter(Boolean).join(' — ') || String(err),
+        ],
+      }))
+      if (ax.response?.status === 403) toast.error('Yalnızca yönetici')
+      else toast.error([ax.response?.data?.message, ax.response?.data?.hint].filter(Boolean).join(' — ') || String(err))
+    },
+  })
+
+  const runInstall = (key: 'fail2ban' | 'modsecurity') => {
+    const title = key === 'fail2ban' ? 'Fail2ban' : 'ModSecurity'
+    setInstallModal({
+      open: true,
+      key,
+      status: 'running',
+      startedAt: Date.now(),
+      finishedAt: null,
+      logs: [
+        `${title} kurulum işlemi başlatıldı.`,
+        'APT paket listesi güncelleniyor...',
+        'Paket kurulumu ve servis etkinleştirme adımları uygulanıyor...',
+      ],
+    })
+    installM.mutate(key)
+  }
 
   const clamavScanM = useMutation({
     mutationFn: async () => (await api.post('/security/clamav/scan', { target: scanTarget })).data,
@@ -155,6 +218,8 @@ export default function SecurityPage() {
   }
 
   const overview = q.data?.overview as Overview | undefined
+  const fail2banMissing = String(overview?.fail2ban?.error ?? '').toLowerCase().includes('not installed')
+  const modsecMissing = String(overview?.modsecurity?.error ?? '').toLowerCase().includes('missing modsecurity config')
   const fwRules = overview?.firewall?.recent_rules ?? []
 
   const coverage = useMemo(() => {
@@ -284,6 +349,16 @@ export default function SecurityPage() {
                 {overview?.fail2ban?.error && (
                   <p className="mt-2 text-[11px] text-red-600">{String(overview.fail2ban.error)}</p>
                 )}
+                {isAdmin && fail2banMissing && (
+                  <button
+                    type="button"
+                    className="mt-2 rounded-lg bg-amber-600 px-2 py-1 text-xs text-white hover:bg-amber-700"
+                    onClick={() => runInstall('fail2ban')}
+                    disabled={installM.isPending}
+                  >
+                    Fail2ban kur
+                  </button>
+                )}
               </div>
 
               <div
@@ -339,6 +414,16 @@ export default function SecurityPage() {
                 )}
                 {overview?.modsecurity?.error && (
                   <p className="mt-2 text-[11px] text-red-600">{String(overview.modsecurity.error)}</p>
+                )}
+                {isAdmin && modsecMissing && (
+                  <button
+                    type="button"
+                    className="mt-2 rounded-lg bg-amber-600 px-2 py-1 text-xs text-white hover:bg-amber-700"
+                    onClick={() => runInstall('modsecurity')}
+                    disabled={installM.isPending}
+                  >
+                    ModSecurity kur
+                  </button>
                 )}
               </div>
 
@@ -673,6 +758,45 @@ export default function SecurityPage() {
               </button>
             </div>
           </form>
+        </div>
+      )}
+
+      {installModal.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-2xl rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 p-5 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold">
+                {installModal.key === 'fail2ban' ? 'Fail2ban Kurulum' : 'ModSecurity Kurulum'}
+              </h3>
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => setInstallModal((s) => ({ ...s, open: false }))}
+                disabled={installModal.status === 'running'}
+              >
+                Kapat
+              </button>
+            </div>
+            <div className="text-sm">
+              Durum:{' '}
+              {installModal.status === 'running'
+                ? 'Çalışıyor'
+                : installModal.status === 'success'
+                  ? 'Tamamlandı'
+                  : installModal.status === 'error'
+                    ? 'Hata'
+                    : 'Bekliyor'}
+            </div>
+            <pre className="max-h-64 overflow-auto rounded-lg bg-black p-3 text-xs text-green-200 whitespace-pre-wrap">
+              {installModal.logs.join('\n')}
+            </pre>
+            {installModal.startedAt && (
+              <p className="text-xs text-gray-500">
+                Başlangıç: {new Date(installModal.startedAt).toLocaleString()}{' '}
+                {installModal.finishedAt ? `• Bitiş: ${new Date(installModal.finishedAt).toLocaleString()}` : ''}
+              </p>
+            )}
+          </div>
         </div>
       )}
     </div>

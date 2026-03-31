@@ -3,15 +3,22 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Domain;
 use App\Models\PanelSetting;
+use App\Services\EngineApiService;
 use App\Services\OutboundMailConfigurator;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\Rule;
+use Illuminate\Support\Str;
 
 class OutboundMailSettingsController extends Controller
 {
+    public function __construct(
+        private EngineApiService $engine,
+    ) {}
+
     public function show(): JsonResponse
     {
         $rows = PanelSetting::query()
@@ -19,6 +26,9 @@ class OutboundMailSettingsController extends Controller
             ->pluck('value', 'key');
 
         $pass = $rows->get('outbound_mail.smtp_password');
+
+        $appHost = parse_url((string) config('app.url'), PHP_URL_HOST);
+        $defaultHost = is_string($appHost) && $appHost !== '' ? $appHost : '127.0.0.1';
 
         return response()->json([
             'outbound_mail_persisted' => $rows->has('outbound_mail.driver'),
@@ -30,6 +40,8 @@ class OutboundMailSettingsController extends Controller
             'smtp_encryption' => $rows->get('outbound_mail.smtp_encryption', '') ?: '',
             'from_address' => $rows->get('outbound_mail.from_address', config('mail.from.address')),
             'from_name' => $rows->get('outbound_mail.from_name', config('mail.from.name')),
+            'smtp_recommended_host' => $defaultHost,
+            'smtp_recommended_port' => 587,
         ]);
     }
 
@@ -119,5 +131,293 @@ class OutboundMailSettingsController extends Controller
         }
 
         return response()->json(['message' => __('stack.mail_test_sent', ['email' => $to])]);
+    }
+
+    public function diagnostics(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'smtp_host' => ['nullable', 'string', 'max:255'],
+            'smtp_port' => ['nullable', 'integer', 'min:1', 'max:65535'],
+        ]);
+
+        $host = trim((string) ($validated['smtp_host'] ?? ''));
+        $port = (int) ($validated['smtp_port'] ?? 587);
+        if ($host === '') {
+            return response()->json([
+                'ok' => false,
+                'message' => 'SMTP host zorunlu.',
+            ], 422);
+        }
+
+        $ips = @gethostbynamel($host);
+        $resolved = is_array($ips) && count($ips) > 0 && $ips[0] !== $host;
+
+        $connOk = false;
+        $connErr = null;
+        if ($resolved) {
+            $errno = 0;
+            $errstr = '';
+            $sock = @fsockopen($host, $port, $errno, $errstr, 5.0);
+            if (is_resource($sock)) {
+                $connOk = true;
+                fclose($sock);
+            } else {
+                $connErr = trim($errstr) !== '' ? $errstr : ('errno: '.$errno);
+            }
+        }
+
+        $hint = null;
+        if (! $resolved) {
+            $hint = 'Host DNS kaydı bulunamadı. Önce A/AAAA kaydı ekleyin veya doğru SMTP host girin.';
+        } elseif (! $connOk) {
+            $hint = 'DNS var ama port erişimi yok. SMTP servisi (Postfix/Exim) ve firewall/NAT kontrol edilmeli.';
+        } elseif (Str::startsWith($host, 'mail.')) {
+            $hint = 'mail.<domain> hostu erişilebilir görünüyor.';
+        }
+
+        return response()->json([
+            'ok' => $resolved && $connOk,
+            'host' => $host,
+            'port' => $port,
+            'dns_resolved' => $resolved,
+            'ips' => $resolved ? $ips : [],
+            'port_open' => $connOk,
+            'connection_error' => $connErr,
+            'hint' => $hint,
+        ]);
+    }
+
+    public function wizardChecks(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'domain' => ['required', 'string', 'max:255', 'regex:/^[a-z0-9.-]+\.[a-z]{2,}$/i'],
+        ]);
+
+        $domain = strtolower(trim((string) $validated['domain']));
+        $mailHost = 'mail.'.$domain;
+        $webmailHost = 'webmail.'.$domain;
+
+        $aDomain = @gethostbynamel($domain);
+        $aMail = @gethostbynamel($mailHost);
+        $aWebmail = @gethostbynamel($webmailHost);
+
+        $domainDnsOk = is_array($aDomain) && count($aDomain) > 0 && $aDomain[0] !== $domain;
+        $mailDnsOk = is_array($aMail) && count($aMail) > 0 && $aMail[0] !== $mailHost;
+        $webmailDnsOk = is_array($aWebmail) && count($aWebmail) > 0 && $aWebmail[0] !== $webmailHost;
+
+        $smtp587 = $this->probePort($mailHost, 587, 4.0);
+        $smtp465 = $this->probePort($mailHost, 465, 4.0);
+        $imap993 = $this->probePort($mailHost, 993, 4.0);
+        $imap143 = $this->probePort($mailHost, 143, 4.0);
+        $web443 = $this->probePort($webmailHost, 443, 4.0);
+
+        $checks = [
+            [
+                'key' => 'domain_dns',
+                'label' => 'Domain DNS',
+                'ok' => $domainDnsOk,
+                'detail' => $domainDnsOk ? 'Domain DNS kaydı var.' : 'Domain DNS kaydı bulunamadı.',
+            ],
+            [
+                'key' => 'mail_dns',
+                'label' => 'Mail Host DNS',
+                'ok' => $mailDnsOk,
+                'detail' => $mailDnsOk ? 'mail alt alan adı çözümleniyor.' : "DNS'te {$mailHost} kaydı yok.",
+            ],
+            [
+                'key' => 'smtp_port',
+                'label' => 'SMTP Port (587/465)',
+                'ok' => $smtp587['ok'] || $smtp465['ok'],
+                'detail' => $smtp587['ok']
+                    ? 'SMTP 587 erişilebilir.'
+                    : ($smtp465['ok'] ? 'SMTP 465 erişilebilir.' : 'SMTP portları erişilemiyor.'),
+            ],
+            [
+                'key' => 'imap_port',
+                'label' => 'IMAP Port (993/143)',
+                'ok' => $imap993['ok'] || $imap143['ok'],
+                'detail' => $imap993['ok']
+                    ? 'IMAP 993 erişilebilir.'
+                    : ($imap143['ok'] ? 'IMAP 143 erişilebilir.' : 'IMAP portları erişilemiyor.'),
+            ],
+            [
+                'key' => 'webmail_dns',
+                'label' => 'Webmail DNS',
+                'ok' => $webmailDnsOk,
+                'detail' => $webmailDnsOk ? 'webmail alt alan adı çözümleniyor.' : "DNS'te {$webmailHost} kaydı yok.",
+            ],
+            [
+                'key' => 'webmail_https',
+                'label' => 'Webmail HTTPS (443)',
+                'ok' => $web443['ok'],
+                'detail' => $web443['ok'] ? '443 portuna erişim var.' : '443 portuna erişim yok veya servis dinlemiyor.',
+            ],
+        ];
+
+        $allOk = ! in_array(false, array_column($checks, 'ok'), true);
+        $recommended = [
+            'smtp_host' => $mailHost,
+            'smtp_port' => $smtp587['ok'] ? 587 : 465,
+            'smtp_encryption' => $smtp587['ok'] ? 'tls' : 'ssl',
+            'imap_host' => $mailHost,
+            'imap_port' => $imap993['ok'] ? 993 : 143,
+            'webmail_url' => $webmailDnsOk ? "https://{$webmailHost}" : null,
+        ];
+
+        $ipGuess = null;
+        if ($domainDnsOk && is_array($aDomain) && count($aDomain) > 0) {
+            $ipGuess = (string) $aDomain[0];
+        }
+
+        $dnsSuggestions = [
+            [
+                'type' => 'A',
+                'name' => 'mail',
+                'value' => $ipGuess,
+                'required' => ! $mailDnsOk,
+            ],
+            [
+                'type' => 'A',
+                'name' => 'webmail',
+                'value' => $ipGuess,
+                'required' => ! $webmailDnsOk,
+            ],
+            [
+                'type' => 'MX',
+                'name' => '@',
+                'value' => $mailHost,
+                'priority' => 10,
+                'required' => true,
+            ],
+            [
+                'type' => 'TXT',
+                'name' => '@',
+                'value' => 'v=spf1 mx a ~all',
+                'required' => true,
+            ],
+            [
+                'type' => 'TXT',
+                'name' => '_dmarc',
+                'value' => 'v=DMARC1; p=none; rua=mailto:postmaster@'.$domain,
+                'required' => true,
+            ],
+        ];
+
+        return response()->json([
+            'ok' => $allOk,
+            'domain' => $domain,
+            'checks' => $checks,
+            'recommended' => $recommended,
+            'dns_suggestions' => $dnsSuggestions,
+            'raw' => [
+                'domain_ips' => $domainDnsOk ? $aDomain : [],
+                'mail_ips' => $mailDnsOk ? $aMail : [],
+                'webmail_ips' => $webmailDnsOk ? $aWebmail : [],
+                'smtp_587' => $smtp587,
+                'smtp_465' => $smtp465,
+                'imap_993' => $imap993,
+                'imap_143' => $imap143,
+                'web_443' => $web443,
+            ],
+        ]);
+    }
+
+    public function wizardApplyDns(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'domain' => ['required', 'string', 'max:255', 'regex:/^[a-z0-9.-]+\.[a-z]{2,}$/i'],
+        ]);
+        $domainName = strtolower(trim((string) $validated['domain']));
+
+        $domain = Domain::query()->where('name', $domainName)->first();
+        if (! $domain) {
+            return response()->json([
+                'message' => 'Domain panelde bulunamadı.',
+            ], 404);
+        }
+
+        $mailHost = 'mail.'.$domainName;
+        $aDomain = @gethostbynamel($domainName);
+        $domainDnsOk = is_array($aDomain) && count($aDomain) > 0 && $aDomain[0] !== $domainName;
+        $ipGuess = ($domainDnsOk && is_array($aDomain) && count($aDomain) > 0) ? (string) $aDomain[0] : null;
+
+        $rows = [
+            ['type' => 'A', 'name' => 'mail', 'value' => $ipGuess, 'ttl' => 3600, 'priority' => null],
+            ['type' => 'A', 'name' => 'webmail', 'value' => $ipGuess, 'ttl' => 3600, 'priority' => null],
+            ['type' => 'MX', 'name' => '@', 'value' => $mailHost, 'ttl' => 3600, 'priority' => 10],
+            ['type' => 'TXT', 'name' => '@', 'value' => 'v=spf1 mx a ~all', 'ttl' => 3600, 'priority' => null],
+            ['type' => 'TXT', 'name' => '_dmarc', 'value' => 'v=DMARC1; p=none; rua=mailto:postmaster@'.$domainName, 'ttl' => 3600, 'priority' => null],
+        ];
+
+        $created = [];
+        $skipped = [];
+        $errors = [];
+        foreach ($rows as $row) {
+            $type = strtoupper((string) $row['type']);
+            $name = (string) $row['name'];
+            $value = trim((string) ($row['value'] ?? ''));
+            $ttl = (int) ($row['ttl'] ?? 3600);
+            $priority = $row['priority'];
+
+            if (! in_array($type, ['A', 'MX', 'TXT'], true)) {
+                $skipped[] = ['record' => $row, 'reason' => 'unsupported_type'];
+                continue;
+            }
+            if ($value === '') {
+                $skipped[] = ['record' => $row, 'reason' => 'missing_value'];
+                continue;
+            }
+
+            $exists = $domain->dnsRecords()
+                ->where('type', $type)
+                ->where('name', $name)
+                ->where('value', $value)
+                ->exists();
+            if ($exists) {
+                $skipped[] = ['record' => $row, 'reason' => 'already_exists'];
+                continue;
+            }
+
+            $record = $domain->dnsRecords()->create([
+                'type' => $type,
+                'name' => $name,
+                'value' => $value,
+                'ttl' => $ttl,
+                'priority' => $priority,
+            ]);
+            $enginePayload = [
+                'id' => (string) $record->id,
+                'type' => $type,
+                'name' => $name,
+                'value' => $value,
+                'ttl' => $ttl,
+                'priority' => $priority,
+            ];
+            $engineRes = $this->engine->dnsCreate($domainName, $enginePayload);
+            if (isset($engineRes['error']) && is_string($engineRes['error']) && $engineRes['error'] !== '') {
+                $errors[] = ['record' => $row, 'error' => $engineRes['error']];
+            }
+            $created[] = $row;
+        }
+
+        return response()->json([
+            'message' => 'DNS otomatik uygulama tamamlandı.',
+            'created' => $created,
+            'skipped' => $skipped,
+            'errors' => $errors,
+        ]);
+    }
+
+    private function probePort(string $host, int $port, float $timeout): array
+    {
+        $errno = 0;
+        $errstr = '';
+        $sock = @fsockopen($host, $port, $errno, $errstr, $timeout);
+        if (is_resource($sock)) {
+            fclose($sock);
+            return ['ok' => true, 'error' => null];
+        }
+
+        return ['ok' => false, 'error' => (trim($errstr) !== '' ? $errstr : 'errno: '.$errno)];
     }
 }

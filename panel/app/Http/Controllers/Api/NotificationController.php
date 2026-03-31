@@ -7,6 +7,7 @@ use App\Models\Backup;
 use App\Models\CronJobRun;
 use App\Models\DeploymentRun;
 use App\Models\InstallerRun;
+use App\Models\SystemAlert;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -58,6 +59,17 @@ class NotificationController extends Controller
                 'message' => $r->status.($r->exit_code !== null ? (' (exit '.$r->exit_code.')') : ''),
                 'path' => '/cron',
                 'created_at' => optional($r->created_at)->toIso8601String(),
+            ];
+        }
+
+        foreach (SystemAlert::query()->latest('id')->limit(20)->get() as $a) {
+            $items[] = [
+                'id' => 'sysalert-'.$a->id,
+                'level' => $a->level ?: 'info',
+                'title' => $a->title,
+                'message' => $a->message,
+                'path' => $a->path ?: '/system',
+                'created_at' => optional($a->created_at)->toIso8601String(),
             ];
         }
 

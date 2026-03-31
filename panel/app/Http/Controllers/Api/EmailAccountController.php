@@ -30,6 +30,10 @@ class EmailAccountController extends Controller
             abort(403);
         }
 
+        $webmailHost = 'webmail.'.$domain->name;
+        $dnsIps = @gethostbynamel($webmailHost);
+        $webmailDnsOk = is_array($dnsIps) && count($dnsIps) > 0 && $dnsIps[0] !== $webmailHost;
+
         return response()->json([
             'mail' => $this->engine->mailOverview($domain->name),
             'accounts' => $request->user()->emailAccounts()->where('domain_id', $domain->id)->get(),
@@ -42,7 +46,15 @@ class EmailAccountController extends Controller
                 })
                 ->orderBy('source')
                 ->get(),
-            'webmail_url' => sprintf('https://webmail.%s', $domain->name),
+            'webmail_url' => $webmailDnsOk ? sprintf('https://%s', $webmailHost) : null,
+            'webmail_status' => [
+                'host' => $webmailHost,
+                'dns_ok' => $webmailDnsOk,
+                'ips' => $webmailDnsOk ? $dnsIps : [],
+                'hint' => $webmailDnsOk
+                    ? null
+                    : 'webmail alt alan adı için DNS kaydı bulunamadı. DNS panelinden webmail A kaydı ekleyin.',
+            ],
         ]);
     }
 

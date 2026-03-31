@@ -47,5 +47,68 @@ class WebServerSettingsController extends Controller
             'reload' => $result['reload'] ?? null,
         ]);
     }
+
+    public function apacheModules(): JsonResponse
+    {
+        $result = $this->engine->getApacheModules();
+
+        return response()->json([
+            'modules' => $result['modules'] ?? [],
+        ]);
+    }
+
+    public function services(): JsonResponse
+    {
+        return response()->json([
+            'services' => $this->engine->getWebServerServices(),
+        ]);
+    }
+
+    public function setApacheModule(Request $request, string $module): JsonResponse
+    {
+        $validated = $request->validate([
+            'enabled' => 'required|boolean',
+        ]);
+
+        $result = $this->engine->setApacheModule($module, (bool) $validated['enabled']);
+
+        return response()->json([
+            'module' => $result['module'] ?? $module,
+            'enabled' => (bool) ($result['enabled'] ?? false),
+        ]);
+    }
+
+    public function getNginxConfig(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'scope' => 'sometimes|string|in:main,panel',
+        ]);
+        $scope = (string) ($validated['scope'] ?? 'main');
+        $result = $this->engine->getNginxConfig($scope);
+
+        return response()->json([
+            'scope' => $result['scope'] ?? $scope,
+            'content' => (string) ($result['content'] ?? ''),
+        ]);
+    }
+
+    public function updateNginxConfig(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'scope' => 'required|string|in:main,panel',
+            'content' => 'required|string|max:300000',
+            'test_reload' => 'sometimes|boolean',
+        ]);
+        $result = $this->engine->updateNginxConfig(
+            (string) $validated['scope'],
+            (string) $validated['content'],
+            (bool) ($validated['test_reload'] ?? true)
+        );
+
+        return response()->json([
+            'message' => $result['message'] ?? 'ok',
+            'scope' => $result['scope'] ?? $validated['scope'],
+        ]);
+    }
 }
 

@@ -102,6 +102,11 @@ if [[ ! -f deploy/bootstrap/install-production.sh ]]; then
   exit 1
 fi
 
+# Kritik helper dosyasını kurulumdan önce senkronla (install-production yine doğrulayacak).
+if [[ -f deploy/host/panelsar-security ]]; then
+  install -m 755 deploy/host/panelsar-security /usr/local/sbin/panelsar-security
+fi
+
 # Panel/engine özellik güncellemeleri için bu dosyayı değiştirmeniz gerekmez: aynı komut repo’yu çeker;
 # install-production.sh PHP, ön yüz, Go engine derlemesi ve systemd yeniden başlatmayı yapar.
 echo "==> Kurulum (install-production.sh) başlıyor..."
