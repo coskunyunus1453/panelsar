@@ -2,6 +2,7 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import { useEffect } from 'react'
 import { useAuthStore } from './store/authStore'
 import { useThemeStore } from './store/themeStore'
+import { useUiModeStore } from './store/uiModeStore'
 import Layout from './components/layout/Layout'
 import LoginPage from './pages/LoginPage'
 import DashboardPage from './pages/DashboardPage'
@@ -41,6 +42,22 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>
 }
 
+function AdvancedRoute({ children }: { children: React.ReactNode }) {
+  const { mode, setMode } = useUiModeStore()
+  if (mode === 'advanced') return <>{children}</>
+  return (
+    <div className="max-w-2xl rounded-xl border border-amber-200 dark:border-amber-900/40 bg-amber-50/80 dark:bg-amber-950/20 p-5">
+      <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Gelişmiş mod gerekli</h2>
+      <p className="mt-1 text-sm text-gray-600 dark:text-gray-300">
+        Bu sayfa teknik/ileri ayarlar içerir. Kolay modda gizlenir.
+      </p>
+      <button className="btn-primary mt-3" onClick={() => setMode('advanced')}>
+        Gelişmiş Moda Geç
+      </button>
+    </div>
+  )
+}
+
 export default function App() {
   const isDark = useThemeStore((s) => s.isDark)
 
@@ -73,26 +90,26 @@ export default function App() {
         <Route path="ftp" element={<FtpPage />} />
         <Route path="ssl" element={<SslPage />} />
         <Route path="backups" element={<BackupsPage />} />
-        <Route path="cron" element={<CronPage />} />
-        <Route path="monitoring" element={<MonitoringPage />} />
-        <Route path="security" element={<SecurityPage />} />
+        <Route path="cron" element={<AdvancedRoute><CronPage /></AdvancedRoute>} />
+        <Route path="monitoring" element={<AdvancedRoute><MonitoringPage /></AdvancedRoute>} />
+        <Route path="security" element={<AdvancedRoute><SecurityPage /></AdvancedRoute>} />
         <Route path="installer" element={<InstallerPage />} />
-        <Route path="site-tools" element={<SiteToolsPage />} />
-        <Route path="deploy" element={<DeployPage />} />
-        <Route path="billing" element={<BillingPage />} />
-        <Route path="reseller" element={<ResellerPage />} />
-        <Route path="ai-advisor" element={<AiAdvisorPage />} />
-        <Route path="plugins" element={<PluginsStorePage />} />
-        <Route path="admin/users" element={<AdminUsersPage />} />
-        <Route path="admin/roles" element={<AdminRolesPage />} />
-        <Route path="admin/packages" element={<AdminPackagesPage />} />
-        <Route path="admin/system" element={<AdminSystemPage />} />
-        <Route path="admin/license" element={<AdminLicensePage />} />
-        <Route path="admin/terminal" element={<TerminalPage />} />
-        <Route path="admin/stack" element={<AdminStackPage />} />
-        <Route path="admin/mail-settings" element={<AdminMailSettingsPage />} />
-        <Route path="admin/webserver" element={<AdminWebServerSettingsPage />} />
-        <Route path="admin/php-settings" element={<AdminPhpSettingsPage />} />
+        <Route path="site-tools" element={<AdvancedRoute><SiteToolsPage /></AdvancedRoute>} />
+        <Route path="deploy" element={<AdvancedRoute><DeployPage /></AdvancedRoute>} />
+        <Route path="billing" element={<AdvancedRoute><BillingPage /></AdvancedRoute>} />
+        <Route path="reseller" element={<AdvancedRoute><ResellerPage /></AdvancedRoute>} />
+        <Route path="ai-advisor" element={<AdvancedRoute><AiAdvisorPage /></AdvancedRoute>} />
+        <Route path="plugins" element={<AdvancedRoute><PluginsStorePage /></AdvancedRoute>} />
+        <Route path="admin/users" element={<AdvancedRoute><AdminUsersPage /></AdvancedRoute>} />
+        <Route path="admin/roles" element={<AdvancedRoute><AdminRolesPage /></AdvancedRoute>} />
+        <Route path="admin/packages" element={<AdvancedRoute><AdminPackagesPage /></AdvancedRoute>} />
+        <Route path="admin/system" element={<AdvancedRoute><AdminSystemPage /></AdvancedRoute>} />
+        <Route path="admin/license" element={<AdvancedRoute><AdminLicensePage /></AdvancedRoute>} />
+        <Route path="admin/terminal" element={<AdvancedRoute><TerminalPage /></AdvancedRoute>} />
+        <Route path="admin/stack" element={<AdvancedRoute><AdminStackPage /></AdvancedRoute>} />
+        <Route path="admin/mail-settings" element={<AdvancedRoute><AdminMailSettingsPage /></AdvancedRoute>} />
+        <Route path="admin/webserver" element={<AdvancedRoute><AdminWebServerSettingsPage /></AdvancedRoute>} />
+        <Route path="admin/php-settings" element={<AdvancedRoute><AdminPhpSettingsPage /></AdvancedRoute>} />
         <Route path="settings" element={<SettingsPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

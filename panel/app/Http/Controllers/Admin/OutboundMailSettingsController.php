@@ -12,6 +12,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Str;
+use Symfony\Component\Process\Process;
 
 class OutboundMailSettingsController extends Controller
 {
@@ -405,6 +406,66 @@ class OutboundMailSettingsController extends Controller
             'created' => $created,
             'skipped' => $skipped,
             'errors' => $errors,
+        ]);
+    }
+
+    public function setupMailStack(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'domain' => ['required', 'string', 'max:255', 'regex:/^[a-z0-9.-]+\.[a-z]{2,}$/i'],
+        ]);
+        $domainName = strtolower(trim((string) $validated['domain']));
+
+        $domain = Domain::query()->where('name', $domainName)->first();
+        if (! $domain) {
+            return response()->json([
+                'message' => 'Domain panelde bulunamadı.',
+            ], 404);
+        }
+
+        $proc = new Process(['sudo', '-n', '/usr/local/sbin/panelsar-security', 'mail-stack-setup', $domainName]);
+        $proc->setTimeout(300);
+        $proc->run();
+        $output = trim($proc->getOutput()."\n".$proc->getErrorOutput());
+        if (! $proc->isSuccessful()) {
+            return response()->json([
+                'message' => 'Mail stack kurulumu başarısız',
+                'output' => $output,
+            ], 422);
+        }
+
+        // Kurulumdan sonra DNS kayıtlarını otomatik dene.
+        $dnsReq = new Request(['domain' => $domainName]);
+        $dnsResp = $this->wizardApplyDns($dnsReq);
+        $dnsBody = method_exists($dnsResp, 'getData') ? $dnsResp->getData(true) : null;
+        $checkReq = new Request(['domain' => $domainName]);
+        $checkResp = $this->wizardChecks($checkReq);
+        $checkBody = method_exists($checkResp, 'getData') ? $checkResp->getData(true) : null;
+
+        $remediations = [];
+        foreach ((array) ($checkBody['checks'] ?? []) as $row) {
+            $ok = (bool) ($row['ok'] ?? false);
+            if ($ok) {
+                continue;
+            }
+            $key = (string) ($row['key'] ?? '');
+            $remediations[] = match ($key) {
+                'mail_dns' => 'DNS panelinden mail alt alanı için A kaydı ekleyin (mail -> sunucu IP).',
+                'webmail_dns' => 'DNS panelinden webmail alt alanı için A kaydı ekleyin (webmail -> sunucu IP).',
+                'smtp_port' => 'Firewall/Security Group üzerinde 587 ve 465 portlarını açın; postfix dinliyor mu kontrol edin.',
+                'imap_port' => 'Firewall/Security Group üzerinde 993 ve 143 portlarını açın; dovecot dinliyor mu kontrol edin.',
+                'webmail_https' => 'Nginx/Apache webmail hostunu ve 443 TLS ayarını doğrulayın.',
+                default => 'Alan adı DNS ve servis yapılandırmasını tekrar kontrol edin.',
+            };
+        }
+        $remediations = array_values(array_unique($remediations));
+
+        return response()->json([
+            'message' => 'Mail stack kurulumu tamamlandı',
+            'output' => $output,
+            'dns' => $dnsBody,
+            'validation' => $checkBody,
+            'remediations' => $remediations,
         ]);
     }
 

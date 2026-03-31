@@ -36,6 +36,13 @@ nginx_scope_path() {
   esac
 }
 
+sanitize_domain() {
+  local d="$1"
+  [[ "$d" =~ ^[A-Za-z0-9.-]+\.[A-Za-z]{2,}$ ]] || return 1
+  [[ "$d" != .* && "$d" != *..* ]] || return 1
+  echo "$d"
+}
+
 case "$ACTION" in
   fail2ban-jail-get)
     CONF="/etc/fail2ban/jail.local"
@@ -222,8 +229,56 @@ EOF
     fi
     echo "ok"
     ;;
+  mail-stack-setup)
+    DOMAIN="$(sanitize_domain "$ARG1")" || { echo "invalid domain" >&2; exit 1; }
+    export DEBIAN_FRONTEND=noninteractive
+    echo "[1/6] apt update"
+    apt-get update -y >/dev/null
+    echo "[2/6] install postfix+dovecot"
+    apt-get install -y postfix dovecot-imapd dovecot-pop3d >/dev/null
+    echo "[3/6] enable services"
+    systemctl enable --now postfix >/dev/null 2>&1 || true
+    systemctl enable --now dovecot >/dev/null 2>&1 || true
+    echo "[4/6] open mail ports"
+    if command -v ufw >/dev/null 2>&1; then
+      ufw allow 25/tcp >/dev/null 2>&1 || true
+      ufw allow 465/tcp >/dev/null 2>&1 || true
+      ufw allow 587/tcp >/dev/null 2>&1 || true
+      ufw allow 143/tcp >/dev/null 2>&1 || true
+      ufw allow 993/tcp >/dev/null 2>&1 || true
+    fi
+    echo "[5/6] prepare webmail placeholder vhost"
+    WEBROOT="/var/www/panelsar/webmail-placeholder/${DOMAIN}"
+    mkdir -p "$WEBROOT"
+    cat > "${WEBROOT}/index.html" <<EOF
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Webmail - ${DOMAIN}</title></head>
+<body style="font-family:Arial,sans-serif;padding:24px">
+<h2>Webmail hazirlik sayfasi</h2>
+<p>Domain: <b>${DOMAIN}</b></p>
+<p>IMAP: <code>mail.${DOMAIN}:993 (SSL/TLS)</code></p>
+<p>SMTP: <code>mail.${DOMAIN}:587 (STARTTLS)</code></p>
+<p>Bu alan gecici placeholder sayfadir. Dilerseniz Roundcube/SOGo kurabilirsiniz.</p>
+</body></html>
+EOF
+    NCONF="/etc/nginx/sites-available/panelsar-webmail-${DOMAIN}.conf"
+    cat > "$NCONF" <<EOF
+server {
+  listen 80;
+  server_name webmail.${DOMAIN};
+  root ${WEBROOT};
+  index index.html;
+  location / { try_files \$uri \$uri/ /index.html; }
+}
+EOF
+    ln -sfn "$NCONF" "/etc/nginx/sites-enabled/panelsar-webmail-${DOMAIN}.conf"
+    nginx -t >/tmp/panelsar-nginx-test.log 2>&1 || { cat /tmp/panelsar-nginx-test.log; exit 1; }
+    systemctl reload nginx >/dev/null 2>&1 || true
+    echo "[6/6] done"
+    echo "ok"
+    ;;
   *)
-    echo "usage: panelsar-security fail2ban-status|fail2ban-set <on|off>|fail2ban-install|fail2ban-jail-get|fail2ban-jail-set <bantime> <findtime> <maxretry>|clamav-status|clamav-set <on|off>|clamav-scan <abs-dir>|modsec-status|modsec-set <on|off>|modsec-install|apache-modules-list|apache-module-set <module> <on|off>|nginx-config-get <main|panel>|nginx-config-set <main|panel> <tmpfile> <reload:0|1>" >&2
+    echo "usage: panelsar-security fail2ban-status|fail2ban-set <on|off>|fail2ban-install|fail2ban-jail-get|fail2ban-jail-set <bantime> <findtime> <maxretry>|clamav-status|clamav-set <on|off>|clamav-scan <abs-dir>|modsec-status|modsec-set <on|off>|modsec-install|apache-modules-list|apache-module-set <module> <on|off>|nginx-config-get <main|panel>|nginx-config-set <main|panel> <tmpfile> <reload:0|1>|mail-stack-setup <domain>" >&2
     exit 1
     ;;
 esac

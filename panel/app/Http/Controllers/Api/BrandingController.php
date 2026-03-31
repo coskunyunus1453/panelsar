@@ -59,91 +59,125 @@ class BrandingController extends Controller
 
     public function update(Request $request): JsonResponse
     {
+        $errRef = 'branding-'.bin2hex(random_bytes(4));
         if (! Schema::hasTable('panel_settings')) {
             return response()->json([
                 'message' => __('settings.branding_table_missing'),
+                'error_ref' => $errRef,
             ], 503);
         }
 
-        $maxKb = $this->maxUploadKb();
-        $request->validate([
-            'logo_customer' => 'nullable|image|max:'.$maxKb,
-            'logo_admin' => 'nullable|image|max:'.$maxKb,
-        ]);
-        if (! $request->hasFile('logo_customer') && ! $request->hasFile('logo_admin')) {
-            $contentLen = (int) ($request->server('CONTENT_LENGTH') ?? 0);
-            $phpUploadBytes = $this->iniSizeToBytes((string) ini_get('upload_max_filesize'));
-            $phpPostBytes = $this->iniSizeToBytes((string) ini_get('post_max_size'));
-            if ($contentLen > 0 && ($contentLen > $phpUploadBytes || $contentLen > $phpPostBytes)) {
+        try {
+            $maxKb = $this->maxUploadKb();
+            $request->validate([
+                'logo_customer' => 'nullable|image|max:'.$maxKb,
+                'logo_admin' => 'nullable|image|max:'.$maxKb,
+            ]);
+            if (! $request->hasFile('logo_customer') && ! $request->hasFile('logo_admin')) {
+                $contentLen = (int) ($request->server('CONTENT_LENGTH') ?? 0);
+                $phpUploadBytes = $this->iniSizeToBytes((string) ini_get('upload_max_filesize'));
+                $phpPostBytes = $this->iniSizeToBytes((string) ini_get('post_max_size'));
+                if ($contentLen > 0 && ($contentLen > $phpUploadBytes || $contentLen > $phpPostBytes)) {
+                    return response()->json([
+                        'message' => __('settings.branding_upload_failed'),
+                        'hint' => sprintf(
+                            'Dosya isteği PHP limitini aştı (upload_max_filesize=%s, post_max_size=%s). php.ini değerlerini artırın ve php-fpm/nginx yeniden başlatın.',
+                            (string) ini_get('upload_max_filesize'),
+                            (string) ini_get('post_max_size')
+                        ),
+                        'php_upload_max_filesize' => (string) ini_get('upload_max_filesize'),
+                        'php_post_max_size' => (string) ini_get('post_max_size'),
+                        'content_length' => $contentLen,
+                        'error_ref' => $errRef,
+                    ], 413);
+                }
                 return response()->json([
                     'message' => __('settings.branding_upload_failed'),
-                    'hint' => sprintf(
-                        'Dosya isteği PHP limitini aştı (upload_max_filesize=%s, post_max_size=%s). php.ini değerlerini artırın ve php-fpm/nginx yeniden başlatın.',
-                        (string) ini_get('upload_max_filesize'),
-                        (string) ini_get('post_max_size')
-                    ),
-                    'php_upload_max_filesize' => (string) ini_get('upload_max_filesize'),
-                    'php_post_max_size' => (string) ini_get('post_max_size'),
-                    'content_length' => $contentLen,
-                ], 413);
+                    'hint' => 'En az bir logo dosyası seçin (logo_customer veya logo_admin).',
+                    'error_ref' => $errRef,
+                ], 422);
             }
-            return response()->json([
-                'message' => __('settings.branding_upload_failed'),
-                'hint' => 'En az bir logo dosyası seçin (logo_customer veya logo_admin).',
-            ], 422);
-        }
 
-        $disk = 'public';
-        $publicRoot = storage_path('app/public');
-        try {
-            if (! File::isDirectory($publicRoot)) {
-                File::makeDirectory($publicRoot, 0755, true, true);
+            $disk = 'public';
+            $publicRoot = storage_path('app/public');
+            try {
+                if (! File::isDirectory($publicRoot)) {
+                    File::makeDirectory($publicRoot, 0755, true, true);
+                }
+                Storage::disk($disk)->makeDirectory('branding');
+            } catch (Throwable $e) {
+                report($e);
+                Log::error('branding.storage.prepare.failed', [
+                    'ref' => $errRef,
+                    'message' => $e->getMessage(),
+                    'public_root' => $publicRoot,
+                ]);
+
+                return response()->json([
+                    'message' => __('settings.branding_storage_not_writable'),
+                    'error_ref' => $errRef,
+                ], 507);
             }
-            Storage::disk($disk)->makeDirectory('branding');
+
+            $save = function (string $key, $file) use ($disk): void {
+                if ($file === null) {
+                    return;
+                }
+                $path = $file->store('branding', $disk);
+                if ($path === false || $path === '') {
+                    throw new \RuntimeException('branding file store failed');
+                }
+                $basename = basename($path);
+                $url = $this->brandingFilePublicPath($basename);
+                PanelSetting::query()->updateOrCreate(['key' => $key], ['value' => $url]);
+            };
+
+            try {
+                $save('branding.logo_customer_url', $request->file('logo_customer'));
+                $save('branding.logo_admin_url', $request->file('logo_admin'));
+            } catch (Throwable $e) {
+                report($e);
+                Log::error('branding.upload.failed', [
+                    'ref' => $errRef,
+                    'message' => $e->getMessage(),
+                    'trace' => $e->getTraceAsString(),
+                    'logo_customer_error' => $request->file('logo_customer')?->getError(),
+                    'logo_admin_error' => $request->file('logo_admin')?->getError(),
+                ]);
+
+                return response()->json([
+                    'message' => __('settings.branding_upload_failed'),
+                    'max_upload_kb' => $maxKb,
+                    'hint' => __('settings.branding_storage_not_writable'),
+                    'debug_error' => config('app.debug') ? $e->getMessage() : null,
+                    'error_ref' => $errRef,
+                ], 500);
+            }
+
+            return response()->json([
+                'message' => __('settings.branding_saved'),
+                'branding' => $this->brandingPayload(),
+                'max_upload_kb' => $maxKb,
+            ]);
         } catch (Throwable $e) {
             report($e);
-
-            return response()->json([
-                'message' => __('settings.branding_storage_not_writable'),
-            ], 507);
-        }
-
-        $save = function (string $key, $file) use ($disk): void {
-            if ($file === null) {
-                return;
-            }
-            $path = $file->store('branding', $disk);
-            if ($path === false || $path === '') {
-                throw new \RuntimeException('branding file store failed');
-            }
-            $basename = basename($path);
-            $url = $this->brandingFilePublicPath($basename);
-            PanelSetting::query()->updateOrCreate(['key' => $key], ['value' => $url]);
-        };
-
-        try {
-            $save('branding.logo_customer_url', $request->file('logo_customer'));
-            $save('branding.logo_admin_url', $request->file('logo_admin'));
-        } catch (Throwable $e) {
-            report($e);
-            Log::error('branding.upload.failed', [
+            Log::critical('branding.update.unhandled', [
+                'ref' => $errRef,
                 'message' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
+                'content_length' => (int) ($request->server('CONTENT_LENGTH') ?? 0),
+                'php_upload_max_filesize' => (string) ini_get('upload_max_filesize'),
+                'php_post_max_size' => (string) ini_get('post_max_size'),
+                'tmp_dir' => (string) (ini_get('upload_tmp_dir') ?: sys_get_temp_dir()),
             ]);
 
             return response()->json([
                 'message' => __('settings.branding_upload_failed'),
-                'max_upload_kb' => $maxKb,
-                'hint' => __('settings.branding_storage_not_writable'),
+                'hint' => 'Beklenmeyen sunucu hatası. error_ref ile logdan takip edin.',
                 'debug_error' => config('app.debug') ? $e->getMessage() : null,
+                'error_ref' => $errRef,
             ], 500);
         }
-
-        return response()->json([
-            'message' => __('settings.branding_saved'),
-            'branding' => $this->brandingPayload(),
-            'max_upload_kb' => $maxKb,
-        ]);
     }
 
     public function config(): JsonResponse

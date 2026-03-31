@@ -33,6 +33,22 @@ class EmailAccountController extends Controller
         $webmailHost = 'webmail.'.$domain->name;
         $dnsIps = @gethostbynamel($webmailHost);
         $webmailDnsOk = is_array($dnsIps) && count($dnsIps) > 0 && $dnsIps[0] !== $webmailHost;
+        $webmailScheme = null;
+        if ($webmailDnsOk) {
+            $errno = 0;
+            $errstr = '';
+            $s443 = @fsockopen($webmailHost, 443, $errno, $errstr, 1.5);
+            if (is_resource($s443)) {
+                fclose($s443);
+                $webmailScheme = 'https';
+            } else {
+                $s80 = @fsockopen($webmailHost, 80, $errno, $errstr, 1.5);
+                if (is_resource($s80)) {
+                    fclose($s80);
+                    $webmailScheme = 'http';
+                }
+            }
+        }
 
         return response()->json([
             'mail' => $this->engine->mailOverview($domain->name),
@@ -46,13 +62,14 @@ class EmailAccountController extends Controller
                 })
                 ->orderBy('source')
                 ->get(),
-            'webmail_url' => $webmailDnsOk ? sprintf('https://%s', $webmailHost) : null,
+            'webmail_url' => ($webmailDnsOk && $webmailScheme) ? sprintf('%s://%s', $webmailScheme, $webmailHost) : null,
             'webmail_status' => [
                 'host' => $webmailHost,
                 'dns_ok' => $webmailDnsOk,
                 'ips' => $webmailDnsOk ? $dnsIps : [],
+                'scheme' => $webmailScheme,
                 'hint' => $webmailDnsOk
-                    ? null
+                    ? ($webmailScheme ? null : 'DNS var ancak 80/443 portlarında webmail servisi görünmüyor.')
                     : 'webmail alt alan adı için DNS kaydı bulunamadı. DNS panelinden webmail A kaydı ekleyin.',
             ],
         ]);

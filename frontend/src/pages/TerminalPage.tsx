@@ -159,68 +159,75 @@ export default function TerminalPage() {
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <TerminalSquare className="h-8 w-8 text-indigo-500" />
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-              {t('terminal.title')}
-            </h1>
-            <p className="text-gray-500 dark:text-gray-400 text-sm max-w-2xl">
-              {t('terminal.subtitle')}
-            </p>
+    <div className="space-y-5">
+      <div className="card p-4 sm:p-5">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="rounded-xl bg-indigo-500/10 p-2.5">
+              <TerminalSquare className="h-7 w-7 text-indigo-500" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+                {t('terminal.title')}
+              </h1>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <span
+              className={`rounded-full px-2.5 py-1 text-xs font-medium ${
+                status === 'open'
+                  ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
+                  : status === 'connecting'
+                    ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300'
+                    : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400'
+              }`}
+            >
+              {status === 'open'
+                ? t('terminal.status_online')
+                : status === 'connecting'
+                  ? t('terminal.status_connecting')
+                  : t('terminal.status_offline')}
+            </span>
+            <button type="button" className="btn-secondary text-sm" onClick={connect}>
+              {t('terminal.reconnect')}
+            </button>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <span
-            className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-              status === 'open'
-                ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
-                : status === 'connecting'
-                  ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300'
-                  : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400'
-            }`}
-          >
-            {status === 'open'
-              ? t('terminal.status_online')
-              : status === 'connecting'
-                ? t('terminal.status_connecting')
-                : t('terminal.status_offline')}
-          </span>
-          <button type="button" className="btn-secondary text-sm" onClick={connect}>
-            {t('terminal.reconnect')}
-          </button>
+      </div>
+
+      <div className="card p-2">
+        <div
+          ref={containerRef}
+          className="h-[min(72vh,620px)] w-full overflow-hidden rounded-lg border border-gray-200 bg-slate-950 p-2 dark:border-gray-700"
+        />
+      </div>
+
+      <div className="space-y-3">
+        <div className="card p-4">
+          <label className="flex cursor-pointer items-start gap-3">
+            <input
+              type="checkbox"
+              className="mt-1 h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-gray-600"
+              checked={settingsQ.data?.use_root ?? true}
+              disabled={settingsQ.isLoading || saveRootM.isPending}
+              onChange={(e) => saveRootM.mutate(e.target.checked)}
+            />
+            <span>
+              <span className="font-medium text-gray-900 dark:text-white">{t('terminal.use_root_label')}</span>
+              <span className="mt-1 block text-sm text-gray-500 dark:text-gray-400">
+                {t('terminal.use_root_hint')}
+              </span>
+            </span>
+          </label>
+        </div>
+
+        <div className="flex gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-100">
+          <AlertCircle className="h-5 w-5 shrink-0" />
+          <div>
+            <p>{settingsQ.data?.use_root ?? true ? t('terminal.warning') : t('terminal.warning_limited')}</p>
+          </div>
         </div>
       </div>
-
-      <div className="card p-4">
-        <label className="flex cursor-pointer items-start gap-3">
-          <input
-            type="checkbox"
-            className="mt-1 h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-gray-600"
-            checked={settingsQ.data?.use_root ?? true}
-            disabled={settingsQ.isLoading || saveRootM.isPending}
-            onChange={(e) => saveRootM.mutate(e.target.checked)}
-          />
-          <span>
-            <span className="font-medium text-gray-900 dark:text-white">{t('terminal.use_root_label')}</span>
-            <span className="mt-1 block text-sm text-gray-500 dark:text-gray-400">
-              {t('terminal.use_root_hint')}
-            </span>
-          </span>
-        </label>
-      </div>
-
-      <div className="flex gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-100">
-        <AlertCircle className="h-5 w-5 shrink-0" />
-        <p>{settingsQ.data?.use_root ?? true ? t('terminal.warning') : t('terminal.warning_limited')}</p>
-      </div>
-
-      <div
-        ref={containerRef}
-        className="h-[min(70vh,560px)] w-full overflow-hidden rounded-lg border border-gray-200 bg-slate-950 p-2 dark:border-gray-700"
-      />
     </div>
   )
 }

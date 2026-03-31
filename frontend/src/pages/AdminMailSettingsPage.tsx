@@ -50,6 +50,11 @@ export default function AdminMailSettingsPage() {
   const [wizardProgress, setWizardProgress] = useState(0)
   const [wizardTick, setWizardTick] = useState(0)
   const [dnsCopyText, setDnsCopyText] = useState('')
+  const [stackProgress, setStackProgress] = useState(0)
+  const [stackTick, setStackTick] = useState(0)
+  const [stackOutput, setStackOutput] = useState('')
+  const [stackValidation, setStackValidation] = useState<Array<{ key: string; label: string; ok: boolean; detail: string }>>([])
+  const [stackRemediations, setStackRemediations] = useState<string[]>([])
 
   useEffect(() => {
     if (!q.data) return
@@ -193,6 +198,40 @@ export default function AdminMailSettingsPage() {
     },
   })
 
+  const setupStackM = useMutation({
+    mutationFn: async () =>
+      (
+        await api.post<{
+          message: string
+          output?: string
+          dns?: { created?: Array<unknown>; skipped?: Array<unknown>; errors?: Array<unknown> }
+          validation?: { checks?: Array<{ key: string; label: string; ok: boolean; detail: string }> }
+          remediations?: string[]
+        }>('/admin/settings/mail/setup-stack', { domain: wizardDomain.trim() })
+      ).data,
+    onSuccess: (d) => {
+      setStackProgress(100)
+      setStackOutput(d.output ?? '')
+      setStackValidation(d.validation?.checks ?? [])
+      setStackRemediations(d.remediations ?? [])
+      const c = d.dns?.created?.length ?? 0
+      const s = d.dns?.skipped?.length ?? 0
+      const e = d.dns?.errors?.length ?? 0
+      const msg = `${d.message} | DNS eklendi=${c}, atlandı=${s}, hata=${e}`
+      if (e > 0) toast.error(msg, { duration: 9000 })
+      else toast.success(msg, { duration: 9000 })
+      void wizardM.mutate()
+    },
+    onError: (err: unknown) => {
+      setStackProgress(100)
+      const ax = err as { response?: { data?: { message?: string; output?: string } } }
+      setStackOutput(ax.response?.data?.output ?? '')
+      setStackValidation([])
+      setStackRemediations([])
+      toast.error(ax.response?.data?.message ?? String(err))
+    },
+  })
+
   useEffect(() => {
     if (!wizardM.isPending) return
     setWizardProgress(7)
@@ -202,6 +241,16 @@ export default function AdminMailSettingsPage() {
     }, 180)
     return () => window.clearInterval(id)
   }, [wizardM.isPending])
+
+  useEffect(() => {
+    if (!setupStackM.isPending) return
+    setStackProgress(8)
+    const id = window.setInterval(() => {
+      setStackTick((s) => s + 1)
+      setStackProgress((p) => (p >= 90 ? p : p + 3))
+    }, 220)
+    return () => window.clearInterval(id)
+  }, [setupStackM.isPending])
 
   const runningLabel = useMemo(() => {
     const steps = [
@@ -214,6 +263,18 @@ export default function AdminMailSettingsPage() {
     ]
     return steps[wizardTick % steps.length]
   }, [wizardTick])
+
+  const stackRunningLabel = useMemo(() => {
+    const steps = [
+      'Mail paketleri hazırlanıyor...',
+      'Postfix ve Dovecot kuruluyor...',
+      'Servisler etkinleştiriliyor...',
+      'Firewall portları açılıyor...',
+      'Webmail host yapılandırılıyor...',
+      'DNS otomatik kayıtları uygulanıyor...',
+    ]
+    return steps[stackTick % steps.length]
+  }, [stackTick])
 
   useEffect(() => {
     const rows = wizardM.data?.dns_suggestions ?? []
@@ -404,14 +465,24 @@ export default function AdminMailSettingsPage() {
           <div className="rounded-xl border border-primary-200 bg-primary-50/60 p-4 dark:border-primary-900/40 dark:bg-primary-950/20 space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="text-sm font-semibold text-gray-900 dark:text-white">Mail Kurulum Sihirbazı</p>
-              <button
-                type="button"
-                className="btn-primary"
-                disabled={wizardM.isPending || !wizardDomain.trim()}
-                onClick={() => wizardM.mutate()}
-              >
-                {wizardM.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Kontrol Et'}
-              </button>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  className="btn-primary"
+                  disabled={wizardM.isPending || setupStackM.isPending || !wizardDomain.trim()}
+                  onClick={() => wizardM.mutate()}
+                >
+                  {wizardM.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Kontrol Et'}
+                </button>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  disabled={wizardM.isPending || setupStackM.isPending || !wizardDomain.trim()}
+                  onClick={() => setupStackM.mutate()}
+                >
+                  {setupStackM.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Mail Stack Kur'}
+                </button>
+              </div>
             </div>
             <div>
               <label className="label">Domain</label>
@@ -428,6 +499,43 @@ export default function AdminMailSettingsPage() {
             <p className="text-xs text-gray-600 dark:text-gray-300">
               {wizardM.isPending ? runningLabel : 'DNS, SMTP, IMAP ve webmail kontrolleri gerçek bağlantı testi ile yapılır.'}
             </p>
+            {(setupStackM.isPending || stackOutput) && (
+              <div className="rounded-lg border border-blue-200 bg-blue-50/70 p-3 text-xs text-blue-900 dark:border-blue-900/40 dark:bg-blue-950/20 dark:text-blue-200">
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <span className="font-medium">Kurulum durumu</span>
+                  <span>{setupStackM.isPending ? stackRunningLabel : 'Tamamlandı'}</span>
+                </div>
+                <div className="h-2 w-full rounded bg-blue-100 dark:bg-blue-900/50 overflow-hidden">
+                  <div className="h-full bg-blue-600 transition-all duration-200" style={{ width: `${stackProgress}%` }} />
+                </div>
+                {stackOutput && (
+                  <pre className="mt-2 max-h-44 overflow-auto rounded bg-black p-2 text-[11px] text-green-200 whitespace-pre-wrap">{stackOutput}</pre>
+                )}
+                {stackValidation.length > 0 && (
+                  <div className="mt-2 space-y-1">
+                    {stackValidation.map((c) => (
+                      <div key={`sv-${c.key}`} className="flex items-start gap-2 rounded border border-blue-200/60 dark:border-blue-900/40 px-2 py-1">
+                        {c.ok ? <CheckCircle2 className="h-3.5 w-3.5 mt-0.5 text-emerald-500" /> : <XCircle className="h-3.5 w-3.5 mt-0.5 text-red-500" />}
+                        <div>
+                          <div className="text-[11px] font-semibold">{c.label}</div>
+                          <div className="text-[11px] opacity-90">{c.detail}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {stackRemediations.length > 0 && (
+                  <div className="mt-2 rounded border border-amber-200/70 dark:border-amber-900/40 bg-amber-50/70 dark:bg-amber-950/20 p-2">
+                    <div className="text-[11px] font-semibold mb-1">Onarım önerileri</div>
+                    <ul className="text-[11px] space-y-0.5 list-disc pl-4">
+                      {stackRemediations.map((r, i) => (
+                        <li key={`rm-${i}`}>{r}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            )}
 
             {wizardM.data?.checks && (
               <div className="space-y-2">

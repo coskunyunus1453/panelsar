@@ -272,6 +272,7 @@ Route::middleware(['auth:sanctum', 'abilities:access:customer-panel'])->group(fu
         Route::post('settings/mail/diagnostics', [OutboundMailSettingsController::class, 'diagnostics']);
         Route::post('settings/mail/wizard-checks', [OutboundMailSettingsController::class, 'wizardChecks']);
         Route::post('settings/mail/wizard-apply-dns', [OutboundMailSettingsController::class, 'wizardApplyDns']);
+        Route::post('settings/mail/setup-stack', [OutboundMailSettingsController::class, 'setupMailStack']);
         Route::get('settings/terminal', [TerminalSettingsController::class, 'show']);
         Route::put('settings/terminal', [TerminalSettingsController::class, 'update']);
         Route::apiResource('users', UserController::class);

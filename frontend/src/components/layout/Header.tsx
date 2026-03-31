@@ -2,6 +2,7 @@ import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../../store/authStore'
 import { useThemeStore } from '../../store/themeStore'
+import { useUiModeStore } from '../../store/uiModeStore'
 import { useNotificationsStore } from '../../store/notificationsStore'
 import { authService } from '../../services/authService'
 import { useQuery } from '@tanstack/react-query'
@@ -14,6 +15,7 @@ import {
   Globe,
   User,
   Menu,
+  SlidersHorizontal,
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
@@ -30,6 +32,8 @@ export default function Header() {
   const navigate = useNavigate()
   const { user, logout: logoutStore } = useAuthStore()
   const { isDark, toggleTheme, openMobileSidebar } = useThemeStore()
+  const { mode, setMode, advancedTipsSeen, markAdvancedTipsSeen } = useUiModeStore()
+  const [showAdvancedTips, setShowAdvancedTips] = useState(false)
   const [showLangMenu, setShowLangMenu] = useState(false)
   const [showNotifMenu, setShowNotifMenu] = useState(false)
   const { items, markAllRead, clear, remove, mergeFromServer } = useNotificationsStore()
@@ -68,6 +72,12 @@ export default function Header() {
     setShowLangMenu(false)
   }
 
+  useEffect(() => {
+    if (mode === 'advanced' && !advancedTipsSeen) {
+      setShowAdvancedTips(true)
+    }
+  }, [mode, advancedTipsSeen])
+
   return (
     <header className="flex h-16 shrink-0 items-center justify-between border-b border-gray-200 bg-white px-4 dark:border-gray-800 dark:bg-gray-900 sm:px-6">
       <div className="flex min-w-0 flex-1 items-center gap-3">
@@ -82,6 +92,75 @@ export default function Header() {
       </div>
 
       <div className="flex items-center gap-3">
+        <button
+          onClick={() => {
+            const next = mode === 'easy' ? 'advanced' : 'easy'
+            setMode(next)
+            if (next === 'easy') {
+              setShowAdvancedTips(false)
+            }
+          }}
+          className="px-3 py-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-300 text-xs font-semibold inline-flex items-center gap-1.5 border border-gray-200 dark:border-gray-700"
+          title={mode === 'easy' ? 'Gelişmiş Moda Geç' : 'Kolay Moda Geç'}
+        >
+          <SlidersHorizontal className="h-3.5 w-3.5" />
+          {mode === 'easy' ? 'Kolay Mod' : 'Gelişmiş Mod'}
+        </button>
+        {mode === 'easy' && (
+          <span className="px-2 py-1 rounded-full text-[10px] font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300">
+            Basit görünüm aktif
+          </span>
+        )}
+        {showAdvancedTips && (
+          <>
+            <div className="hidden md:block absolute right-4 top-16 z-50 w-80 rounded-xl border border-primary-200 dark:border-primary-900/40 bg-white dark:bg-gray-900 shadow-lg p-3">
+              <p className="text-sm font-semibold text-gray-900 dark:text-white">Gelişmiş Mod İpuçları</p>
+              <ul className="mt-2 text-xs text-gray-600 dark:text-gray-300 list-disc pl-4 space-y-1">
+                <li>Security, Monitoring, Cron ve Deploy araçları görünür.</li>
+                <li>Admin/teknik ayarlarda değişiklikler canlı sistemi etkileyebilir.</li>
+                <li>Temel işlemler için istediğin zaman Kolay Moda dönebilirsin.</li>
+              </ul>
+              <div className="mt-3 flex justify-end">
+                <button
+                  type="button"
+                  className="btn-secondary py-1.5 text-xs"
+                  onClick={() => {
+                    markAdvancedTipsSeen()
+                    setShowAdvancedTips(false)
+                  }}
+                >
+                  Anladım
+                </button>
+              </div>
+            </div>
+
+            <div className="md:hidden fixed inset-0 z-50 bg-black/40" onClick={() => { markAdvancedTipsSeen(); setShowAdvancedTips(false) }}>
+              <div
+                className="absolute inset-x-0 bottom-0 rounded-t-2xl border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-4 shadow-2xl"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="mx-auto mb-3 h-1.5 w-12 rounded-full bg-gray-300 dark:bg-gray-700" />
+                <p className="text-sm font-semibold text-gray-900 dark:text-white">Gelişmiş Mod İpuçları</p>
+                <ul className="mt-2 text-xs text-gray-600 dark:text-gray-300 list-disc pl-4 space-y-1">
+                  <li>Security, Monitoring, Cron ve Deploy araçları görünür.</li>
+                  <li>Admin/teknik ayarlarda değişiklikler canlı sistemi etkileyebilir.</li>
+                  <li>Temel işlemler için istediğin zaman Kolay Moda dönebilirsin.</li>
+                </ul>
+                <button
+                  type="button"
+                  className="btn-primary mt-4 w-full"
+                  onClick={() => {
+                    markAdvancedTipsSeen()
+                    setShowAdvancedTips(false)
+                  }}
+                >
+                  Anladım
+                </button>
+              </div>
+            </div>
+          </>
+        )}
+
         <button
           onClick={toggleTheme}
           className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400"
@@ -133,8 +212,10 @@ export default function Header() {
             {unread > 0 && <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />}
           </button>
           {showNotifMenu && (
-            <div className="absolute right-0 mt-2 w-80 max-h-[420px] overflow-y-auto bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50">
-              <div className="flex items-center justify-between px-3 py-2 border-b border-gray-200 dark:border-gray-700">
+            <>
+              <div className="md:hidden fixed inset-0 z-40 bg-black/40" onClick={() => setShowNotifMenu(false)} />
+              <div className="fixed md:absolute z-50 inset-x-3 bottom-3 md:inset-auto md:right-0 md:bottom-auto md:mt-2 w-auto md:w-80 max-h-[70vh] md:max-h-[420px] overflow-y-auto bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl md:rounded-lg shadow-lg">
+              <div className="sticky top-0 flex items-center justify-between px-3 py-2 border-b border-gray-200 dark:border-gray-700 bg-white/95 dark:bg-gray-800/95 backdrop-blur">
                 <span className="text-sm font-semibold text-gray-700 dark:text-gray-200">Bildirimler</span>
                 <div className="flex items-center gap-2">
                   <select
@@ -185,7 +266,8 @@ export default function Header() {
                   </div>
                 ))}
               </div>
-            </div>
+              </div>
+            </>
           )}
         </div>
 

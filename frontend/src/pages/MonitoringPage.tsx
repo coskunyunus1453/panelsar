@@ -392,12 +392,12 @@ export default function MonitoringPage() {
       </div>
 
       {/* Özet kartlar */}
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2 sm:gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {summaryCards.map((c) => (
           <div
             key={c.label}
             className={clsx(
-              'group card relative overflow-hidden p-5 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md',
+              'group card relative overflow-hidden p-3 sm:p-5 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md',
             )}
           >
             <div
@@ -409,16 +409,18 @@ export default function MonitoringPage() {
             <div className="relative">
               <div
                 className={clsx(
-                  'mb-3 inline-flex rounded-xl p-2.5 transition-transform duration-300 group-hover:scale-105',
+                  'mb-2 sm:mb-3 inline-flex rounded-lg sm:rounded-xl p-2 sm:p-2.5 transition-transform duration-300 group-hover:scale-105',
                   c.iconBg,
                 )}
               >
-                <c.icon className="h-6 w-6" />
+                <c.icon className="h-4 w-4 sm:h-6 sm:w-6" />
               </div>
-              <p className="text-3xl font-bold tabular-nums text-gray-900 dark:text-white">
+              <p className="text-lg sm:text-3xl font-bold tabular-nums text-gray-900 dark:text-white leading-tight">
                 {summaryQ.isLoading ? '…' : c.value}
               </p>
-              <p className="mt-1 text-sm font-medium text-gray-600 dark:text-gray-400">{c.label}</p>
+              <p className="mt-1 text-[11px] sm:text-sm font-medium text-gray-600 dark:text-gray-400 line-clamp-2">
+                {c.label}
+              </p>
             </div>
           </div>
         ))}

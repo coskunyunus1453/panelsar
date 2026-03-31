@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useThemeStore } from '../../store/themeStore'
+import { useUiModeStore } from '../../store/uiModeStore'
 import { useAuthStore } from '../../store/authStore'
 import { tokenHasAbility } from '../../lib/abilities'
 import { useBranding } from '../../hooks/useBranding'
@@ -64,6 +65,7 @@ export default function Sidebar() {
   } = useThemeStore()
   const location = useLocation()
   const user = useAuthStore((s) => s.user)
+  const mode = useUiModeStore((s) => s.mode)
   const abilities = user?.abilities
   const isAdmin = user?.roles?.some((r) => r.name === 'admin')
   const canWebserverSettings =
@@ -165,16 +167,38 @@ export default function Sidebar() {
     'admin-access': true,
   })
 
+  const easyHiddenPaths = new Set([
+    '/dns',
+    '/ftp',
+    '/monitoring',
+    '/security',
+    '/cron',
+    '/site-tools',
+    '/deploy',
+    '/plugins',
+    '/ai-advisor',
+    '/billing',
+    '/reseller',
+  ])
+
   const visibleCustomerGroups = customerGroups
-    .map((g) => ({ ...g, items: g.items.filter((item) => navOk(item.ability, item.path)) }))
+    .map((g) => ({
+      ...g,
+      items: g.items.filter((item) => {
+        if (!navOk(item.ability, item.path)) return false
+        if (mode === 'easy' && easyHiddenPaths.has(item.path)) return false
+        return true
+      }),
+    }))
     .filter((g) => g.items.length > 0)
 
   const visibleAdminMenus = useMemo(
     () =>
       adminSubmenus
         .map((m) => ({ ...m, items: m.items.filter((i) => i.allow) }))
+        .map((m) => ({ ...m, items: mode === 'easy' ? [] : m.items }))
         .filter((m) => m.items.length > 0),
-    [isAdmin, canWebserverSettings, canPhpSettings],
+    [isAdmin, canWebserverSettings, canPhpSettings, mode],
   )
 
   useEffect(() => {
