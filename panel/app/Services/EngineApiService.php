@@ -156,6 +156,15 @@ class EngineApiService
         return $this->postLongChecked('/api/v1/ssl/revoke', ['domain' => $domain], 120);
     }
 
+    public function uploadManualSSL(string $domain, string $certificate, string $privateKey): array
+    {
+        return $this->postLongChecked('/api/v1/ssl/manual', [
+            'domain' => $domain,
+            'certificate' => $certificate,
+            'private_key' => $privateKey,
+        ], 120);
+    }
+
     public function reloadNginx(): array
     {
         return $this->post('/api/v1/nginx/reload');
@@ -193,6 +202,16 @@ class EngineApiService
     public function rebootSystem(): array
     {
         return $this->post('/api/v1/system/reboot');
+    }
+
+    public function getProcesses(): array
+    {
+        return $this->get('/api/v1/system/processes')['processes'] ?? [];
+    }
+
+    public function killProcess(int $pid): array
+    {
+        return $this->post('/api/v1/system/processes/kill', ['pid' => $pid]);
     }
 
     public function getPhpVersions(): array
@@ -294,6 +313,42 @@ class EngineApiService
             'domain' => $domain,
             'from' => $from,
             'to' => $to,
+        ]);
+    }
+
+    public function copyFile(string $domain, string $from, string $to): array
+    {
+        return $this->postEngineJsonChecked('/api/v1/files/copy', [
+            'domain' => $domain,
+            'from' => $from,
+            'to' => $to,
+        ]);
+    }
+
+    public function chmodFile(string $domain, string $path, string $mode): array
+    {
+        return $this->postEngineJsonChecked('/api/v1/files/chmod', [
+            'domain' => $domain,
+            'path' => $path,
+            'mode' => $mode,
+        ]);
+    }
+
+    public function zipPath(string $domain, string $source, string $target): array
+    {
+        return $this->postEngineJsonChecked('/api/v1/files/zip', [
+            'domain' => $domain,
+            'source' => $source,
+            'target' => $target,
+        ]);
+    }
+
+    public function unzipPath(string $domain, string $archive, string $targetDir): array
+    {
+        return $this->postEngineJsonChecked('/api/v1/files/unzip', [
+            'domain' => $domain,
+            'archive' => $archive,
+            'target_dir' => $targetDir,
         ]);
     }
 
@@ -485,6 +540,25 @@ class EngineApiService
         return $this->delete('/api/v1/mail/'.rawurlencode($domain).'/mailbox?'.$q);
     }
 
+    public function mailDeleteDomainState(string $domain): array
+    {
+        return $this->delete('/api/v1/mail/'.rawurlencode($domain));
+    }
+
+    /**
+     * @param  array{source: string, destination: string}  $data
+     */
+    public function mailAddForwarder(string $domain, array $data): array
+    {
+        return $this->post('/api/v1/mail/'.rawurlencode($domain).'/forwarder', $data);
+    }
+
+    public function mailDeleteForwarder(string $domain, string $source, string $destination): array
+    {
+        $q = http_build_query(['source' => $source, 'destination' => $destination]);
+        return $this->delete('/api/v1/mail/'.rawurlencode($domain).'/forwarder?'.$q);
+    }
+
     /**
      * @param  array{email: string, password?: string, quota_mb?: int}  $data
      * @return array<string, mixed>
@@ -502,6 +576,48 @@ class EngineApiService
     public function applyFirewallRule(array $payload): array
     {
         return $this->post('/api/v1/security/firewall/rule', $payload);
+    }
+
+    public function toggleFail2ban(bool $enabled): array
+    {
+        return $this->post('/api/v1/security/fail2ban/toggle', ['enabled' => $enabled]);
+    }
+
+    public function updateFail2banJail(int $bantime, int $findtime, int $maxretry): array
+    {
+        return $this->post('/api/v1/security/fail2ban/jail', [
+            'bantime' => $bantime,
+            'findtime' => $findtime,
+            'maxretry' => $maxretry,
+        ]);
+    }
+
+    public function toggleModSecurity(bool $enabled): array
+    {
+        return $this->post('/api/v1/security/modsecurity/toggle', ['enabled' => $enabled]);
+    }
+
+    public function toggleClamav(bool $enabled): array
+    {
+        return $this->post('/api/v1/security/clamav/toggle', ['enabled' => $enabled]);
+    }
+
+    public function runClamavScan(?string $target = null): array
+    {
+        $payload = [];
+        if (is_string($target) && trim($target) !== '') {
+            $payload['target'] = trim($target);
+        }
+        return $this->postLongChecked('/api/v1/security/clamav/scan', $payload, 1800);
+    }
+
+    public function reconcileMailState(bool $dryRun = true, ?string $confirm = null): array
+    {
+        $payload = ['dry_run' => $dryRun];
+        if ($confirm !== null && trim($confirm) !== '') {
+            $payload['confirm'] = trim($confirm);
+        }
+        return $this->postLongChecked('/api/v1/security/mail/reconcile', $payload, 120);
     }
 
     public function installerApps(): array
@@ -553,6 +669,16 @@ class EngineApiService
     public function engineCronUpdate(string $id, array $payload): array
     {
         return $this->patchJson('/api/v1/cron/'.rawurlencode($id), $payload);
+    }
+
+    /**
+     * @return array{domain?: string, logs?: array<int, array<string, mixed>>, error?: string}
+     */
+    public function getSiteLogs(string $domain, int $lines = 200): array
+    {
+        $lines = max(20, min(1000, $lines));
+
+        return $this->get('/api/v1/sites/'.rawurlencode($domain).'/logs?lines='.$lines);
     }
 
     /**

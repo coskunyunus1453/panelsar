@@ -4,10 +4,13 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\CronJob;
+use App\Models\CronJobRun;
 use App\Services\EngineApiService;
 use App\Services\HostingQuotaService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Symfony\Component\Process\Exception\ProcessTimedOutException;
+use Symfony\Component\Process\Process;
 
 class CronJobController extends Controller
 {
@@ -69,9 +72,7 @@ class CronJobController extends Controller
 
     public function update(Request $request, CronJob $cronJob): JsonResponse
     {
-        if ($cronJob->user_id !== $request->user()->id && ! $request->user()->isAdmin()) {
-            abort(403);
-        }
+        $this->assertCanAccess($request, $cronJob);
 
         $validated = $request->validate([
             'schedule' => ['required', 'string', 'max:80', $this->cronScheduleRule()],
@@ -111,9 +112,7 @@ class CronJobController extends Controller
 
     public function destroy(Request $request, CronJob $cronJob): JsonResponse
     {
-        if ($cronJob->user_id !== $request->user()->id && ! $request->user()->isAdmin()) {
-            abort(403);
-        }
+        $this->assertCanAccess($request, $cronJob);
         $eid = $cronJob->engine_job_id;
         if ($eid === null || $eid === '') {
             $eid = (string) $cronJob->id;
@@ -123,6 +122,71 @@ class CronJobController extends Controller
         return response()->json([
             'message' => __('cron.deleted'),
             'engine' => $this->engine->engineCronDelete($eid),
+        ]);
+    }
+
+    public function runNow(Request $request, CronJob $cronJob): JsonResponse
+    {
+        $this->assertCanAccess($request, $cronJob);
+
+        $run = CronJobRun::create([
+            'cron_job_id' => $cronJob->id,
+            'user_id' => $request->user()->id,
+            'status' => 'running',
+            'started_at' => now(),
+        ]);
+
+        $process = Process::fromShellCommandline($cronJob->command);
+        $process->setTimeout(180);
+        $process->setIdleTimeout(120);
+
+        try {
+            $process->mustRun();
+            $run->update([
+                'status' => 'success',
+                'exit_code' => $process->getExitCode(),
+                'output' => trim($process->getOutput()."\n".$process->getErrorOutput()),
+                'finished_at' => now(),
+            ]);
+        } catch (ProcessTimedOutException $e) {
+            $run->update([
+                'status' => 'timeout',
+                'exit_code' => $process->getExitCode(),
+                'output' => trim(($process->getOutput() ?? '')."\n".($process->getErrorOutput() ?? '')."\n".$e->getMessage()),
+                'finished_at' => now(),
+            ]);
+
+            return response()->json([
+                'message' => __('cron.run_timeout'),
+                'run' => $run->fresh(),
+            ], 408);
+        } catch (\Throwable $e) {
+            $run->update([
+                'status' => 'failed',
+                'exit_code' => $process->getExitCode(),
+                'output' => trim(($process->getOutput() ?? '')."\n".($process->getErrorOutput() ?? '')."\n".$e->getMessage()),
+                'finished_at' => now(),
+            ]);
+
+            return response()->json([
+                'message' => __('cron.run_failed'),
+                'run' => $run->fresh(),
+            ], 422);
+        }
+
+        return response()->json([
+            'message' => __('cron.run_success'),
+            'run' => $run->fresh(),
+        ]);
+    }
+
+    public function runs(Request $request, CronJob $cronJob): JsonResponse
+    {
+        $this->assertCanAccess($request, $cronJob);
+        $runs = $cronJob->runs()->latest()->limit(20)->get();
+
+        return response()->json([
+            'data' => $runs,
         ]);
     }
 
@@ -142,5 +206,12 @@ class CronJobController extends Controller
                 $fail(__('cron.invalid_schedule'));
             }
         };
+    }
+
+    private function assertCanAccess(Request $request, CronJob $cronJob): void
+    {
+        if ($cronJob->user_id !== $request->user()->id && ! $request->user()->isAdmin()) {
+            abort(403);
+        }
     }
 }

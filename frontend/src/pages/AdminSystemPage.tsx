@@ -15,6 +15,8 @@ import {
   RotateCw,
   Activity,
   AlertCircle,
+  ListTree,
+  Ban,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import clsx from 'clsx'
@@ -39,6 +41,15 @@ type ServiceRow = {
   pid?: number
   memory?: number
   cpu?: number
+}
+
+type ProcessRow = {
+  pid: number
+  ppid: number
+  cpu: number
+  memory: number
+  command: string
+  args: string
 }
 
 function formatBytes(n?: number): string {
@@ -88,6 +99,15 @@ export default function AdminSystemPage() {
     enabled: !!isAdmin,
     refetchInterval: 15_000,
   })
+  const processesQ = useQuery({
+    queryKey: ['admin-system-processes'],
+    queryFn: async () => {
+      const { data } = await api.get('/system/processes')
+      return (data?.processes ?? []) as ProcessRow[]
+    },
+    enabled: !!isAdmin,
+    refetchInterval: 20_000,
+  })
 
   const serviceM = useMutation({
     mutationFn: async ({ name, action }: { name: string; action: string }) =>
@@ -110,6 +130,17 @@ export default function AdminSystemPage() {
     onError: (err: unknown) => {
       const ax = err as { response?: { data?: { message?: string } } }
       toast.error(ax.response?.data?.message ?? String(err))
+    },
+  })
+  const killM = useMutation({
+    mutationFn: async (pid: number) => api.post('/system/processes/kill', { pid }),
+    onSuccess: (_, pid) => {
+      toast.success(`PID ${pid} durdurma sinyali gonderildi`)
+      qc.invalidateQueries({ queryKey: ['admin-system-processes'] })
+    },
+    onError: (err: unknown) => {
+      const ax = err as { response?: { data?: { message?: string; error?: string } } }
+      toast.error(ax.response?.data?.error ?? ax.response?.data?.message ?? String(err))
     },
   })
 
@@ -157,11 +188,12 @@ export default function AdminSystemPage() {
             onClick={() => {
               void statsQ.refetch()
               void servicesQ.refetch()
+              void processesQ.refetch()
             }}
-            disabled={statsQ.isFetching || servicesQ.isFetching}
+            disabled={statsQ.isFetching || servicesQ.isFetching || processesQ.isFetching}
           >
             <RefreshCw
-              className={clsx('h-4 w-4', (statsQ.isFetching || servicesQ.isFetching) && 'animate-spin')}
+              className={clsx('h-4 w-4', (statsQ.isFetching || servicesQ.isFetching || processesQ.isFetching) && 'animate-spin')}
             />
             {t('common.refresh')}
           </button>
@@ -349,6 +381,66 @@ export default function AdminSystemPage() {
             </table>
           </div>
           {!servicesQ.isLoading && (servicesQ.data?.length ?? 0) === 0 && !servicesError && (
+            <p className="py-10 text-center text-gray-500">{t('common.no_data')}</p>
+          )}
+        </div>
+      </section>
+
+      <section>
+        <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-4 inline-flex items-center gap-2">
+          <ListTree className="h-4 w-4" /> Process List
+        </h2>
+        <div className="card overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-200 dark:border-panel-border bg-gray-50/80 dark:bg-gray-800/50">
+                  <th className="text-left py-3 px-4">PID</th>
+                  <th className="text-left py-3 px-4">PPID</th>
+                  <th className="text-left py-3 px-4">CPU%</th>
+                  <th className="text-left py-3 px-4">MEM%</th>
+                  <th className="text-left py-3 px-4">Command</th>
+                  <th className="text-right py-3 px-4">{t('common.actions')}</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                {processesQ.isLoading && (
+                  <tr>
+                    <td colSpan={6} className="py-10 text-center text-gray-500">
+                      {t('common.loading')}
+                    </td>
+                  </tr>
+                )}
+                {!processesQ.isLoading &&
+                  (processesQ.data ?? []).slice(0, 50).map((p) => (
+                    <tr key={`${p.pid}-${p.command}`} className="hover:bg-gray-50/80 dark:hover:bg-gray-800/30">
+                      <td className="py-3 px-4 font-mono text-xs">{p.pid}</td>
+                      <td className="py-3 px-4 font-mono text-xs">{p.ppid}</td>
+                      <td className="py-3 px-4 font-mono text-xs">{p.cpu?.toFixed?.(1) ?? p.cpu}</td>
+                      <td className="py-3 px-4 font-mono text-xs">{p.memory?.toFixed?.(1) ?? p.memory}</td>
+                      <td className="py-3 px-4">
+                        <div className="max-w-[520px] truncate">
+                          <span className="font-mono text-xs">{p.args || p.command}</span>
+                        </div>
+                      </td>
+                      <td className="py-3 px-4 text-right">
+                        <button
+                          type="button"
+                          className="inline-flex items-center gap-1 rounded-lg border border-red-200 dark:border-red-900/40 px-2 py-1 text-xs font-medium text-red-700 dark:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/20"
+                          onClick={() => {
+                            if (window.confirm(`PID ${p.pid} sonlandirilacak. Emin misiniz?`)) killM.mutate(p.pid)
+                          }}
+                          disabled={killM.isPending}
+                        >
+                          <Ban className="h-3 w-3" /> Kill
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+          </div>
+          {!processesQ.isLoading && (processesQ.data?.length ?? 0) === 0 && (
             <p className="py-10 text-center text-gray-500">{t('common.no_data')}</p>
           )}
         </div>

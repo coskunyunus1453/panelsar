@@ -111,4 +111,57 @@ class SslController extends Controller
             'engine' => $engine,
         ]);
     }
+
+    public function manual(Request $request, Domain $domain): JsonResponse
+    {
+        if (! $this->userOwnsDomain($request, $domain)) {
+            abort(403);
+        }
+        $validated = $request->validate([
+            'certificate' => 'required|string|min:64',
+            'private_key' => 'required|string|min:64',
+        ]);
+        $engine = $this->engine->uploadManualSSL(
+            $domain->name,
+            $validated['certificate'],
+            $validated['private_key']
+        );
+        if (! empty($engine['error'])) {
+            return response()->json(['message' => $engine['error']], 422);
+        }
+
+        $issuedAt = null;
+        $expiresAt = null;
+        $parsed = @openssl_x509_parse($validated['certificate']);
+        if (is_array($parsed)) {
+            if (isset($parsed['validFrom_time_t']) && is_numeric($parsed['validFrom_time_t'])) {
+                $issuedAt = date('Y-m-d H:i:s', (int) $parsed['validFrom_time_t']);
+            }
+            if (isset($parsed['validTo_time_t']) && is_numeric($parsed['validTo_time_t'])) {
+                $expiresAt = date('Y-m-d H:i:s', (int) $parsed['validTo_time_t']);
+            }
+        }
+
+        $cert = SslCertificate::updateOrCreate(
+            ['domain_id' => $domain->id],
+            [
+                'provider' => 'manual',
+                'type' => 'uploaded',
+                'status' => 'active',
+                'issued_at' => $issuedAt ?? now(),
+                'expires_at' => $expiresAt,
+                'auto_renew' => false,
+            ]
+        );
+        $domain->update([
+            'ssl_enabled' => true,
+            'ssl_expiry' => $cert->expires_at,
+        ]);
+
+        return response()->json([
+            'message' => __('ssl.manual_uploaded'),
+            'certificate' => $cert->fresh(),
+            'engine' => $engine,
+        ]);
+    }
 }

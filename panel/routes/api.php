@@ -9,12 +9,14 @@ use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Admin\PhpSettingsController;
 use App\Http\Controllers\Admin\WebServerSettingsController;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\AiAdvisorController;
 use App\Http\Controllers\Api\BackupController;
 use App\Http\Controllers\Api\BillingController;
 use App\Http\Controllers\Api\BrandingController;
 use App\Http\Controllers\Api\CronJobController;
 use App\Http\Controllers\Api\DatabaseController;
 use App\Http\Controllers\Api\DnsRecordController;
+use App\Http\Controllers\Api\DeploymentController;
 use App\Http\Controllers\Api\DomainController;
 use App\Http\Controllers\Api\EmailAccountController;
 use App\Http\Controllers\Api\FileManagerController;
@@ -22,7 +24,9 @@ use App\Http\Controllers\Api\FtpController;
 use App\Http\Controllers\Api\InstallerController;
 use App\Http\Controllers\Api\LicenseController;
 use App\Http\Controllers\Api\MonitoringController;
+use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\ProfileController;
+use App\Http\Controllers\Api\PluginStoreController;
 use App\Http\Controllers\Api\SecurityController;
 use App\Http\Controllers\Api\SiteController;
 use App\Http\Controllers\Api\SiteToolsController;
@@ -73,6 +77,7 @@ Route::middleware(['auth:sanctum', 'abilities:access:customer-panel'])->group(fu
     Route::middleware('ability:domains:read')->group(function () {
         Route::get('domains', [DomainController::class, 'index']);
         Route::get('domains/{domain}', [DomainController::class, 'show']);
+        Route::get('domains/{domain}/logs', [DomainController::class, 'logs']);
     });
     Route::middleware('ability:domains:write')->group(function () {
         Route::post('domains', [DomainController::class, 'store']);
@@ -106,17 +111,31 @@ Route::middleware(['auth:sanctum', 'abilities:access:customer-panel'])->group(fu
             Route::post('upload', [FileManagerController::class, 'upload'])->middleware('throttle:files-upload');
             Route::post('rename', [FileManagerController::class, 'rename'])->middleware('throttle:files-write');
             Route::post('move', [FileManagerController::class, 'move'])->middleware('throttle:files-write');
+            Route::post('copy', [FileManagerController::class, 'copy'])->middleware('throttle:files-write');
+            Route::post('chmod', [FileManagerController::class, 'chmod'])->middleware('throttle:files-write');
+            Route::post('zip', [FileManagerController::class, 'zip'])->middleware('throttle:files-write');
+            Route::post('unzip', [FileManagerController::class, 'unzip'])->middleware('throttle:files-write');
         });
     });
 
     Route::middleware('ability:backups:read')->group(function () {
         Route::get('backups', [BackupController::class, 'index']);
         Route::get('backups/engine/snapshot', [BackupController::class, 'engineSnapshot']);
+        Route::get('backups/destinations', [BackupController::class, 'destinations']);
+        Route::get('backups/schedules', [BackupController::class, 'schedules']);
     });
     Route::middleware('ability:backups:write')->group(function () {
-        Route::post('backups', [BackupController::class, 'store']);
-        Route::delete('backups/{backup}', [BackupController::class, 'destroy']);
-        Route::post('backups/{backup}/restore', [BackupController::class, 'restore']);
+        Route::post('backups', [BackupController::class, 'store'])->middleware('throttle:backups-write');
+        Route::delete('backups/{backup}', [BackupController::class, 'destroy'])->middleware('throttle:backups-write');
+        Route::post('backups/{backup}/restore', [BackupController::class, 'restore'])->middleware('throttle:backups-write');
+        Route::post('backups/{backup}/sync', [BackupController::class, 'sync'])->middleware('throttle:backups-write');
+        Route::post('backups/destinations', [BackupController::class, 'storeDestination'])->middleware('throttle:backups-write');
+        Route::patch('backups/destinations/{backupDestination}', [BackupController::class, 'updateDestination'])->middleware('throttle:backups-write');
+        Route::delete('backups/destinations/{backupDestination}', [BackupController::class, 'destroyDestination'])->middleware('throttle:backups-write');
+        Route::post('backups/schedules', [BackupController::class, 'storeSchedule'])->middleware('throttle:backups-write');
+        Route::patch('backups/schedules/{backupSchedule}', [BackupController::class, 'updateSchedule'])->middleware('throttle:backups-write');
+        Route::delete('backups/schedules/{backupSchedule}', [BackupController::class, 'destroySchedule'])->middleware('throttle:backups-write');
+        Route::post('backups/schedules/{backupSchedule}/run', [BackupController::class, 'runSchedule'])->middleware('throttle:backups-write');
     });
 
     Route::middleware('ability:ftp:read')->get('domains/{domain}/ftp', [FtpController::class, 'index']);
@@ -128,8 +147,10 @@ Route::middleware(['auth:sanctum', 'abilities:access:customer-panel'])->group(fu
     Route::middleware('ability:email:read')->get('domains/{domain}/email', [EmailAccountController::class, 'index']);
     Route::middleware('ability:email:write')->group(function () {
         Route::post('domains/{domain}/email', [EmailAccountController::class, 'store']);
+        Route::post('domains/{domain}/email/forwarders', [EmailAccountController::class, 'storeForwarder']);
         Route::patch('email/{emailAccount}', [EmailAccountController::class, 'update']);
         Route::delete('email/{emailAccount}', [EmailAccountController::class, 'destroy']);
+        Route::delete('email/forwarders/{emailForwarder}', [EmailAccountController::class, 'destroyForwarder']);
     });
 
     Route::middleware('ability:dns:read')->get('domains/{domain}/dns', [DnsRecordController::class, 'index']);
@@ -143,6 +164,7 @@ Route::middleware(['auth:sanctum', 'abilities:access:customer-panel'])->group(fu
         Route::post('domains/{domain}/ssl/issue', [SslController::class, 'issue']);
         Route::post('domains/{domain}/ssl/renew', [SslController::class, 'renew']);
         Route::post('domains/{domain}/ssl/revoke', [SslController::class, 'revoke']);
+        Route::post('domains/{domain}/ssl/manual', [SslController::class, 'manual']);
     });
 
     Route::middleware('ability:cron:read')->group(function () {
@@ -153,18 +175,57 @@ Route::middleware(['auth:sanctum', 'abilities:access:customer-panel'])->group(fu
         Route::post('cron', [CronJobController::class, 'store']);
         Route::patch('cron/{cronJob}', [CronJobController::class, 'update']);
         Route::delete('cron/{cronJob}', [CronJobController::class, 'destroy']);
+        Route::post('cron/{cronJob}/run-now', [CronJobController::class, 'runNow']);
     });
+    Route::middleware('ability:cron:read')->get('cron/{cronJob}/runs', [CronJobController::class, 'runs']);
 
     Route::middleware('ability:monitoring:read')->get('monitoring/summary', [MonitoringController::class, 'userSummary']);
     Route::middleware('ability:monitoring:server')->get('monitoring/server', [MonitoringController::class, 'server']);
 
+    Route::middleware('ability:dashboard:read')->group(function () {
+        Route::get('ai/cron-backup', [AiAdvisorController::class, 'cronBackup']);
+        Route::get('ai/monitoring', [AiAdvisorController::class, 'monitoring']);
+        Route::get('ai/access', [AiAdvisorController::class, 'access']);
+        Route::get('notifications/feed', [NotificationController::class, 'feed']);
+    });
+    Route::middleware('ability:files:read')->post('domains/{domain}/ai/file-editor', [AiAdvisorController::class, 'fileEditor']);
+    Route::middleware('ability:tools:run')->get('domains/{domain}/ai/deploy', [AiAdvisorController::class, 'deploy']);
+
     Route::middleware('ability:security:read')->get('security/overview', [SecurityController::class, 'overview']);
-    Route::middleware(['role:admin', 'ability:security:write'])->post('security/firewall', [SecurityController::class, 'firewall']);
+    Route::middleware(['role:admin', 'ability:security:write'])->group(function () {
+        Route::post('security/firewall', [SecurityController::class, 'firewall']);
+        Route::post('security/fail2ban/toggle', [SecurityController::class, 'toggleFail2ban']);
+        Route::post('security/fail2ban/jail', [SecurityController::class, 'updateFail2banJail']);
+        Route::post('security/modsecurity/toggle', [SecurityController::class, 'toggleModSecurity']);
+        Route::post('security/clamav/toggle', [SecurityController::class, 'toggleClamav']);
+        Route::post('security/clamav/scan', [SecurityController::class, 'scanClamav']);
+        Route::post('security/mail/reconcile', [SecurityController::class, 'reconcileMailState']);
+    });
 
     Route::middleware('ability:installer:read')->get('installer/apps', [InstallerController::class, 'apps']);
+    Route::middleware('ability:installer:read')->get('installer/runs', [InstallerController::class, 'runs']);
+    Route::middleware('ability:installer:read')->get('installer/runs/{installerRun}', [InstallerController::class, 'runShow']);
     Route::middleware('ability:installer:write')->post('domains/{domain}/installer', [InstallerController::class, 'install']);
 
     Route::middleware('ability:tools:run')->post('domains/{domain}/tools', [SiteToolsController::class, 'run']);
+    Route::middleware('ability:tools:run')->group(function () {
+        Route::get('domains/{domain}/deployment', [DeploymentController::class, 'show']);
+        Route::put('domains/{domain}/deployment', [DeploymentController::class, 'update'])->middleware('throttle:deploy-run');
+        Route::post('domains/{domain}/deployment/run', [DeploymentController::class, 'run'])->middleware('throttle:deploy-run');
+        Route::post('domains/{domain}/deployment/rollback', [DeploymentController::class, 'rollback'])->middleware('throttle:deploy-run');
+        Route::get('domains/{domain}/deployment/runs', [DeploymentController::class, 'runs']);
+    });
+
+    Route::middleware('ability:dashboard:read')->get('plugins/store', [PluginStoreController::class, 'index']);
+    Route::middleware('ability:dashboard:read')->get('plugins/migrations/runs', [PluginStoreController::class, 'runs']);
+    Route::middleware('ability:tools:run')->group(function () {
+        Route::post('plugins/{pluginModule}/install', [PluginStoreController::class, 'install'])->middleware('throttle:plugins-write');
+        Route::post('plugins/{pluginModule}/activate', [PluginStoreController::class, 'activate'])->middleware('throttle:plugins-write');
+        Route::post('plugins/{pluginModule}/deactivate', [PluginStoreController::class, 'deactivate'])->middleware('throttle:plugins-write');
+        Route::post('plugins/{pluginModule}/migrations/discover', [PluginStoreController::class, 'discover'])->middleware('throttle:plugins-write');
+        Route::post('plugins/{pluginModule}/migrations/preflight', [PluginStoreController::class, 'preflight'])->middleware('throttle:plugins-write');
+        Route::post('plugins/{pluginModule}/migrations/start', [PluginStoreController::class, 'startMigration'])->middleware('throttle:plugins-write');
+    });
 
     Route::middleware('role:admin')->post('license/validate', [LicenseController::class, 'validateWithKey']);
 
@@ -179,6 +240,8 @@ Route::middleware(['auth:sanctum', 'abilities:access:customer-panel'])->group(fu
     Route::middleware('role:admin')->prefix('system')->group(function () {
         Route::get('stats', [SystemController::class, 'stats']);
         Route::get('services', [SystemController::class, 'services']);
+        Route::get('processes', [SystemController::class, 'processes']);
+        Route::post('processes/kill', [SystemController::class, 'killProcess']);
         Route::post('services/{name}', [SystemController::class, 'serviceAction']);
         Route::post('reboot', [SystemController::class, 'reboot']);
         Route::post('nginx/reload', function (EngineApiService $engine) {
@@ -188,6 +251,8 @@ Route::middleware(['auth:sanctum', 'abilities:access:customer-panel'])->group(fu
 
     Route::middleware('role:admin')->prefix('admin')->group(function () {
         Route::post('settings/branding', [BrandingController::class, 'update']);
+        Route::get('settings/branding', [BrandingController::class, 'config']);
+        Route::put('settings/branding', [BrandingController::class, 'updateConfig']);
         Route::get('abilities/registry', [RoleController::class, 'registry']);
         Route::apiResource('roles', RoleController::class)->except(['show']);
         Route::get('stack/modules', [StackController::class, 'modules']);
@@ -222,7 +287,7 @@ Route::middleware(['auth:sanctum', 'abilities:access:customer-panel'])->group(fu
         Route::patch('settings/php/{version}/modules', [PhpSettingsController::class, 'updateModules']);
     });
 
-    Route::middleware('role:reseller')->prefix('reseller')->group(function () {
+    Route::middleware('role:reseller|admin')->prefix('reseller')->group(function () {
         Route::middleware('ability:reseller:users')->group(function () {
             Route::get('users', [UserController::class, 'index']);
             Route::post('users', [UserController::class, 'store']);
@@ -240,6 +305,8 @@ Route::middleware(['auth:sanctum', 'abilities:access:customer-panel'])->group(fu
 
 Route::post('billing/webhook', [BillingController::class, 'webhook'])
     ->middleware('throttle:webhooks');
+Route::post('deployment/webhook/{domain}', [DeploymentController::class, 'webhook'])
+    ->middleware(['throttle:webhooks', 'throttle:deploy-run']);
 
 Route::get('health', fn () => response()->json([
     'status' => 'ok',

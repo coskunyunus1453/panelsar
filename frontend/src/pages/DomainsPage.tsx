@@ -7,6 +7,7 @@ import toast from 'react-hot-toast'
 import clsx from 'clsx'
 import {
   ExternalLink,
+  FileText,
   Globe,
   Loader2,
   Plus,
@@ -28,6 +29,14 @@ type DomainRow = {
   ssl_enabled?: boolean
 }
 
+type DomainLogEntry = {
+  type: string
+  path: string
+  exists: boolean
+  content: string
+  error?: string
+}
+
 type Busy = {
   php?: boolean
   server?: boolean
@@ -47,6 +56,8 @@ export default function DomainsPage() {
   const [deleteTarget, setDeleteTarget] = useState<DomainRow | null>(null)
   const [busy, setBusy] = useState<Record<number, Busy>>({})
   const [sslProgress, setSslProgress] = useState<Record<number, SslProgress>>({})
+  const [logTarget, setLogTarget] = useState<DomainRow | null>(null)
+  const [logLines, setLogLines] = useState(200)
   const sslTimers = useRef<Record<number, number>>({})
 
   const domainsQ = useQuery({
@@ -183,6 +194,16 @@ export default function DomainsPage() {
   const list: DomainRow[] = domainsQ.data?.data ?? []
   const total = (domainsQ.data?.total as number | undefined) ?? list.length
   const filtered = list.filter((d) => d.name.toLowerCase().includes(search.toLowerCase()))
+  const logsQ = useQuery({
+    queryKey: ['domain-logs', logTarget?.id ?? 0, logLines],
+    enabled: !!logTarget?.id,
+    queryFn: async () => {
+      const { data } = await api.get<{ logs: DomainLogEntry[] }>(
+        `/domains/${logTarget?.id}/logs?lines=${logLines}`,
+      )
+      return data
+    },
+  })
 
   return (
     <div className="space-y-6">
@@ -209,6 +230,62 @@ export default function DomainsPage() {
         onClose={() => setDeleteTarget(null)}
         onDeleted={() => setDeleteTarget(null)}
       />
+
+      {logTarget && (
+        <div className="fixed inset-0 z-[55] flex items-center justify-center bg-black/50 p-4">
+          <div className="card max-h-[90vh] w-full max-w-6xl overflow-y-auto bg-white p-5 dark:bg-gray-900">
+            <div className="mb-4 flex items-center justify-between gap-2">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{t('domains.logs_title')}</h2>
+                <p className="font-mono text-xs text-gray-500">{logTarget.name}</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <select
+                  className="input h-9 text-sm"
+                  value={logLines}
+                  onChange={(e) => setLogLines(Number(e.target.value))}
+                >
+                  <option value={100}>100</option>
+                  <option value={200}>200</option>
+                  <option value={500}>500</option>
+                </select>
+                <button type="button" className="btn-secondary" onClick={() => void logsQ.refetch()}>
+                  {t('domains.logs_refresh')}
+                </button>
+                <button type="button" className="btn-secondary" onClick={() => setLogTarget(null)}>
+                  {t('common.cancel')}
+                </button>
+              </div>
+            </div>
+
+            {logsQ.isLoading && <p className="py-4 text-sm text-gray-500">{t('common.loading')}</p>}
+            {!logsQ.isLoading && (logsQ.data?.logs ?? []).length === 0 && (
+              <p className="py-4 text-sm text-gray-500">{t('domains.logs_empty')}</p>
+            )}
+
+            <div className="grid gap-4 lg:grid-cols-2">
+              {(logsQ.data?.logs ?? []).map((entry) => (
+                <div key={entry.type} className="overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700">
+                  <div className="flex items-center justify-between bg-gray-50 px-3 py-2 dark:bg-gray-800/70">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-gray-700 dark:text-gray-300">
+                        {entry.type}
+                      </p>
+                      <p className="text-[11px] text-gray-500">{entry.path}</p>
+                    </div>
+                    {!entry.exists && <span className="text-xs text-amber-600">{t('domains.logs_not_found')}</span>}
+                  </div>
+                  <pre className="max-h-[360px] overflow-auto bg-black p-3 text-xs text-green-200 whitespace-pre-wrap">
+                    {entry.error
+                      ? `${t('domains.logs_read_error')}: ${entry.error}`
+                      : entry.content?.trim() || t('domains.logs_no_content')}
+                  </pre>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {showAdd && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
@@ -488,6 +565,14 @@ export default function DomainsPage() {
                             onClick={() => setDeleteTarget(domain)}
                           >
                             <Trash2 className="h-4 w-4" />
+                          </button>
+                          <button
+                            type="button"
+                            title={t('domains.logs_button')}
+                            className="p-1.5 rounded-lg hover:bg-indigo-50 dark:hover:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400"
+                            onClick={() => setLogTarget(domain)}
+                          >
+                            <FileText className="h-4 w-4" />
                           </button>
                         </div>
                       </td>

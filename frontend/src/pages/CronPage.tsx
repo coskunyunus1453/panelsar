@@ -6,8 +6,11 @@ import {
   BookOpen,
   Clock,
   Info,
+  Loader2,
   Pencil,
+  Play,
   Plus,
+  TerminalSquare,
   Trash2,
   Wand2,
 } from 'lucide-react'
@@ -22,6 +25,15 @@ type CronRow = {
   description: string | null
   status: string
   engine_job_id?: string | null
+}
+
+type CronRun = {
+  id: number
+  status: 'running' | 'success' | 'failed' | 'timeout' | string
+  output?: string | null
+  exit_code?: number | null
+  started_at?: string | null
+  finished_at?: string | null
 }
 
 type QuotaSummary = {
@@ -40,6 +52,8 @@ export default function CronPage() {
   const [fields, setFields] = useState(['*/5', '*', '*', '*', '*'])
   const [command, setCommand] = useState('')
   const [description, setDescription] = useState('')
+  const [logJob, setLogJob] = useState<CronRow | null>(null)
+  const [logFilter, setLogFilter] = useState<'all' | 'success' | 'failed' | 'running' | 'timeout'>('all')
 
   const q = useQuery({
     queryKey: ['cron'],
@@ -147,6 +161,36 @@ export default function CronPage() {
       toast.error(ax.response?.data?.message ?? String(err))
     },
   })
+
+  const runNowM = useMutation({
+    mutationFn: async (id: number) => api.post(`/cron/${id}/run-now`),
+    onSuccess: (_, id) => {
+      toast.success(t('cron.run_now_success'))
+      qc.invalidateQueries({ queryKey: ['cron-runs', id] })
+    },
+    onError: (err: unknown) => {
+      const ax = err as { response?: { data?: { message?: string } } }
+      toast.error(ax.response?.data?.message ?? String(err))
+    },
+  })
+
+  const runsQ = useQuery({
+    queryKey: ['cron-runs', logJob?.id ?? 0],
+    enabled: !!logJob?.id,
+    queryFn: async () => {
+      const { data } = await api.get<{ data: CronRun[] }>(`/cron/${logJob?.id}/runs`)
+      return data
+    },
+    refetchInterval: (qCtx) => {
+      const list = (qCtx.state.data as { data?: CronRun[] } | undefined)?.data ?? []
+      return list.some((r) => r.status === 'running') ? 2000 : false
+    },
+  })
+  const filteredRuns = useMemo(() => {
+    const list = runsQ.data?.data ?? []
+    if (logFilter === 'all') return list
+    return list.filter((r) => r.status === logFilter)
+  }, [runsQ.data, logFilter])
 
   const rows: CronRow[] = q.data?.data ?? []
   const quota = sumQ.data?.quota
@@ -285,6 +329,23 @@ export default function CronPage() {
                     {job.engine_job_id?.trim() ? job.engine_job_id : '—'}
                   </td>
                   <td className="px-4 py-2 text-right whitespace-nowrap">
+                    <button
+                      type="button"
+                      className="mr-1 inline-flex p-1.5 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400"
+                      title={t('cron.run_now')}
+                      onClick={() => runNowM.mutate(job.id)}
+                      disabled={runNowM.isPending}
+                    >
+                      {runNowM.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
+                    </button>
+                    <button
+                      type="button"
+                      className="mr-1 inline-flex p-1.5 rounded-lg hover:bg-indigo-50 dark:hover:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400"
+                      title={t('cron.logs')}
+                      onClick={() => setLogJob(job)}
+                    >
+                      <TerminalSquare className="h-4 w-4" />
+                    </button>
                     <button
                       type="button"
                       className="mr-1 inline-flex p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800"
@@ -477,6 +538,97 @@ export default function CronPage() {
               >
                 {modal === 'edit' ? t('common.save') : t('common.create')}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {logJob && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 overflow-y-auto">
+          <div className="card my-8 max-w-4xl w-full p-6 space-y-4 bg-white dark:bg-gray-900 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{t('cron.log_modal_title')}</h2>
+                <p className="text-xs font-mono text-gray-500">{logJob.command}</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <select
+                  className="input h-9 text-sm"
+                  value={logFilter}
+                  onChange={(e) => setLogFilter(e.target.value as typeof logFilter)}
+                >
+                  <option value="all">{t('cron.filter_all')}</option>
+                  <option value="success">{t('cron.status_success')}</option>
+                  <option value="failed">{t('cron.status_failed')}</option>
+                  <option value="running">{t('cron.status_running')}</option>
+                  <option value="timeout">{t('cron.status_timeout')}</option>
+                </select>
+                <button
+                  type="button"
+                  className="btn-primary flex items-center gap-2"
+                  onClick={() => runNowM.mutate(logJob.id)}
+                  disabled={runNowM.isPending}
+                >
+                  {runNowM.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
+                  {t('cron.run_now')}
+                </button>
+                <button type="button" className="btn-secondary" onClick={() => setLogJob(null)}>
+                  {t('common.cancel')}
+                </button>
+              </div>
+            </div>
+
+            {runsQ.isLoading && <p className="text-sm text-gray-500">{t('common.loading')}</p>}
+            {!runsQ.isLoading && filteredRuns.length === 0 && (
+              <p className="text-sm text-gray-500">{t('cron.no_logs')}</p>
+            )}
+
+            <div className="space-y-3">
+              {filteredRuns.map((run) => (
+                <div key={run.id} className="rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+                  <div className="flex items-center justify-between px-3 py-2 bg-gray-50 dark:bg-gray-800/70">
+                    <div className="text-xs text-gray-600 dark:text-gray-300">
+                      {t('cron.run_started')}: {run.started_at ?? '—'} | {t('cron.run_finished')}: {run.finished_at ?? '—'}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={clsx(
+                          'rounded-full px-2 py-0.5 text-[11px] font-semibold',
+                          run.status === 'success' && 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300',
+                          run.status === 'failed' && 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300',
+                          run.status === 'running' && 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',
+                          run.status === 'timeout' && 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300',
+                          !['success', 'failed', 'running', 'timeout'].includes(run.status) &&
+                            'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-200',
+                        )}
+                      >
+                        {t(`cron.status_${run.status}`, { defaultValue: run.status })}
+                      </span>
+                      <span className="text-xs text-gray-500">
+                        {run.exit_code !== null && run.exit_code !== undefined ? `(code ${run.exit_code})` : ''}
+                      </span>
+                      <button
+                        type="button"
+                        className="rounded border border-gray-300 px-2 py-0.5 text-[11px] hover:bg-gray-100 dark:border-gray-600 dark:hover:bg-gray-700"
+                        onClick={() => {
+                          const blob = new Blob([run.output?.trim() || ''], { type: 'text/plain;charset=utf-8' })
+                          const url = URL.createObjectURL(blob)
+                          const a = document.createElement('a')
+                          a.href = url
+                          a.download = `cron-${logJob.id}-run-${run.id}.log`
+                          a.click()
+                          URL.revokeObjectURL(url)
+                        }}
+                      >
+                        {t('cron.download_log')}
+                      </button>
+                    </div>
+                  </div>
+                  <pre className="max-h-64 overflow-auto bg-black p-3 text-xs text-green-200 whitespace-pre-wrap">
+                    {run.output?.trim() ? run.output : t('cron.empty_output')}
+                  </pre>
+                </div>
+              ))}
             </div>
           </div>
         </div>

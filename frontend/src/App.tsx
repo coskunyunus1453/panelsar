@@ -18,6 +18,7 @@ import MonitoringPage from './pages/MonitoringPage'
 import SecurityPage from './pages/SecurityPage'
 import InstallerPage from './pages/InstallerPage'
 import SiteToolsPage from './pages/SiteToolsPage'
+import DeployPage from './pages/DeployPage'
 import BillingPage from './pages/BillingPage'
 import SettingsPage from './pages/SettingsPage'
 import AdminUsersPage from './pages/AdminUsersPage'
@@ -31,6 +32,8 @@ import AdminRolesPage from './pages/AdminRolesPage'
 import AdminWebServerSettingsPage from './pages/AdminWebServerSettingsPage'
 import AdminPhpSettingsPage from './pages/AdminPhpSettingsPage'
 import ResellerPage from './pages/ResellerPage'
+import AiAdvisorPage from './pages/AiAdvisorPage'
+import PluginsStorePage from './pages/PluginsStorePage'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
@@ -75,8 +78,11 @@ export default function App() {
         <Route path="security" element={<SecurityPage />} />
         <Route path="installer" element={<InstallerPage />} />
         <Route path="site-tools" element={<SiteToolsPage />} />
+        <Route path="deploy" element={<DeployPage />} />
         <Route path="billing" element={<BillingPage />} />
         <Route path="reseller" element={<ResellerPage />} />
+        <Route path="ai-advisor" element={<AiAdvisorPage />} />
+        <Route path="plugins" element={<PluginsStorePage />} />
         <Route path="admin/users" element={<AdminUsersPage />} />
         <Route path="admin/roles" element={<AdminRolesPage />} />
         <Route path="admin/packages" element={<AdminPackagesPage />} />

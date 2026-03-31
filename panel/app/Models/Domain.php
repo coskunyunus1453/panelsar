@@ -85,4 +85,14 @@ class Domain extends Model
     {
         return $this->hasMany(SiteDomainAlias::class, 'domain_id');
     }
+
+    public function deploymentConfig()
+    {
+        return $this->hasOne(DeploymentConfig::class);
+    }
+
+    public function deploymentRuns()
+    {
+        return $this->hasMany(DeploymentRun::class);
+    }
 }

@@ -1,5 +1,6 @@
 import axios from 'axios'
 import { useAuthStore } from '../store/authStore'
+import { useNotificationsStore } from '../store/notificationsStore'
 
 const api = axios.create({
   baseURL: '/api',
@@ -27,6 +28,13 @@ api.interceptors.response.use(
     if (error.response?.status === 401) {
       useAuthStore.getState().logout()
       window.location.href = '/login'
+    } else {
+      const msg = error.response?.data?.message || error.message || 'API error'
+      useNotificationsStore.getState().add({
+        level: 'error',
+        title: 'API Hatası',
+        message: String(msg),
+      })
     }
     return Promise.reject(error)
   }

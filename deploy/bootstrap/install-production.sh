@@ -251,11 +251,15 @@ fi
 if [[ -f "$REPO_ROOT/deploy/host/panelsar-php-ini" ]]; then
   install -m 755 "$REPO_ROOT/deploy/host/panelsar-php-ini" /usr/local/sbin/panelsar-php-ini
 fi
+if [[ -f "$REPO_ROOT/deploy/host/panelsar-security" ]]; then
+  install -m 755 "$REPO_ROOT/deploy/host/panelsar-security" /usr/local/sbin/panelsar-security
+fi
 cat > /etc/sudoers.d/panelsar-engine <<'SUDOERS'
 www-data ALL=(root) NOPASSWD: /usr/local/sbin/panelsar-nginx-vhost
 www-data ALL=(root) NOPASSWD: /usr/local/sbin/panelsar-stack-install
 www-data ALL=(root) NOPASSWD: /usr/local/sbin/panelsar-terminal-root
 www-data ALL=(root) NOPASSWD: /usr/local/sbin/panelsar-php-ini
+www-data ALL=(root) NOPASSWD: /usr/local/sbin/panelsar-security
 SUDOERS
 chmod 440 /etc/sudoers.d/panelsar-engine
 visudo -cf /etc/sudoers.d/panelsar-engine

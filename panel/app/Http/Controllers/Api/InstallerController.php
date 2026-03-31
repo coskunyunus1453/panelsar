@@ -6,9 +6,12 @@ use App\Http\Controllers\Concerns\AuthorizesUserDomain;
 use App\Http\Controllers\Controller;
 use App\Models\Database;
 use App\Models\Domain;
+use App\Models\InstallerRun;
+use App\Jobs\RunInstallerJob;
 use App\Services\EngineApiService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 use Throwable;
@@ -90,30 +93,54 @@ class InstallerController extends Controller
                 'db_password' => $dbPassword,
                 'table_prefix' => $prefix,
             ];
+            $run = InstallerRun::query()->create([
+                'user_id' => $request->user()->id,
+                'domain_id' => $domain->id,
+                'app' => 'wordpress',
+                'status' => 'queued',
+                'message' => __('installer.started'),
+            ]);
 
-            $engine = $this->engine->installerRun('wordpress', $domain->name, $payload);
+            $isSyncQueue = (string) config('queue.default', 'sync') === 'sync';
+            if ($isSyncQueue) {
+                // Queue worker yoksa kullanıcıyı yanıltmamak için aynı requestte çalıştır.
+                (new RunInstallerJob($run->id, $domain->name, 'wordpress', $payload))->handle($this->engine);
 
-            if (! empty($engine['error'])) {
-                if (EngineApiService::isLikelyConnectionFailure($engine['error'])) {
+                $run->refresh();
+                if ($run->status === 'failed') {
+                    if (EngineApiService::isLikelyConnectionFailure($run->message)) {
+                        return response()->json([
+                            'message' => __('installer.engine_unreachable', [
+                                'url' => config('panelsar.engine_url'),
+                            ]),
+                            'hint' => __('installer.engine_start_hint'),
+                            'run_id' => $run->id,
+                            'background' => false,
+                        ], 503);
+                    }
+
                     return response()->json([
-                        'message' => __('installer.engine_unreachable', [
-                            'url' => config('panelsar.engine_url'),
-                        ]),
-                        'hint' => __('installer.engine_start_hint'),
-                        'engine' => $engine,
-                    ], 503);
+                        'message' => $run->message ?: __('installer.unexpected_error'),
+                        'run_id' => $run->id,
+                        'background' => false,
+                    ], 502);
                 }
 
                 return response()->json([
-                    'message' => $engine['error'],
-                    'engine' => $engine,
-                ], 502);
+                    'message' => __('installer.completed_sync'),
+                    'run_id' => $run->id,
+                    'status' => $run->status,
+                    'background' => false,
+                ]);
             }
 
+            Bus::dispatch(new RunInstallerJob($run->id, $domain->name, 'wordpress', $payload))->afterResponse();
             return response()->json([
-                'message' => __('installer.completed'),
-                'engine' => $engine,
-            ], 200);
+                'message' => __('installer.started_background'),
+                'run_id' => $run->id,
+                'status' => 'queued',
+                'background' => true,
+            ], 202);
         } catch (ValidationException $e) {
             throw $e;
         } catch (Throwable $e) {
@@ -129,5 +156,37 @@ class InstallerController extends Controller
 
             return response()->json(['message' => $message], 500);
         }
+    }
+
+    public function runs(Request $request): JsonResponse
+    {
+        $runs = InstallerRun::query()
+            ->where('user_id', $request->user()->id)
+            ->latest('id')
+            ->limit(20)
+            ->get(['id', 'domain_id', 'app', 'status', 'message', 'started_at', 'finished_at', 'created_at']);
+
+        return response()->json(['runs' => $runs]);
+    }
+
+    public function runShow(Request $request, InstallerRun $installerRun): JsonResponse
+    {
+        if ((int) $installerRun->user_id !== (int) $request->user()->id) {
+            abort(403);
+        }
+
+        return response()->json([
+            'run' => [
+                'id' => $installerRun->id,
+                'domain_id' => $installerRun->domain_id,
+                'app' => $installerRun->app,
+                'status' => $installerRun->status,
+                'message' => $installerRun->message,
+                'output' => $installerRun->output,
+                'started_at' => optional($installerRun->started_at)->toIso8601String(),
+                'finished_at' => optional($installerRun->finished_at)->toIso8601String(),
+                'created_at' => optional($installerRun->created_at)->toIso8601String(),
+            ],
+        ]);
     }
 }

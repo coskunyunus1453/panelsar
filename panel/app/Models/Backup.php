@@ -12,6 +12,7 @@ class Backup extends Model
     protected $fillable = [
         'user_id',
         'domain_id',
+        'destination_id',
         'type',
         'file_path',
         'engine_backup_id',
@@ -37,5 +38,10 @@ class Backup extends Model
     public function domain()
     {
         return $this->belongsTo(Domain::class);
+    }
+
+    public function destination()
+    {
+        return $this->belongsTo(BackupDestination::class, 'destination_id');
     }
 }

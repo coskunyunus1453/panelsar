@@ -88,6 +88,12 @@ class DomainService
                 $ftp->delete();
             }
 
+            try {
+                $this->engineApi->mailDeleteDomainState($domain->name);
+            } catch (\Throwable $e) {
+                report($e);
+            }
+
             foreach ($domain->siteSubdomains as $sub) {
                 try {
                     $rm = $this->engineApi->siteRemoveSubdomain($domain->name, $sub->path_segment);

@@ -6,4 +6,5 @@ return [
     'renewed' => 'SSL certificate renewed',
     'revoked' => 'SSL certificate revoked',
     'missing' => 'No SSL certificate for this domain',
+    'manual_uploaded' => 'Manual SSL certificate uploaded',
 ];

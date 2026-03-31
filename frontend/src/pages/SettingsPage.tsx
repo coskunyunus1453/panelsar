@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useThemeStore } from '../store/themeStore'
 import { useAuthStore } from '../store/authStore'
 import { useBranding } from '../hooks/useBranding'
@@ -28,6 +28,11 @@ export default function SettingsPage() {
   const updateUser = useAuthStore((s) => s.updateUser)
   const isAdmin = user?.roles?.some((r) => r.name === 'admin')
   const { data: branding } = useBranding()
+  const brandingCfgQ = useQuery({
+    queryKey: ['branding-config'],
+    enabled: isAdmin,
+    queryFn: async () => (await api.get('/admin/settings/branding')).data as { max_upload_kb: number },
+  })
 
   const profileM = useMutation({
     mutationFn: async (payload: { name: string; email: string; locale?: string }) =>
@@ -53,10 +58,53 @@ export default function SettingsPage() {
       qc.invalidateQueries({ queryKey: ['branding'] })
     },
     onError: (err: unknown) => {
+      const ax = err as { response?: { data?: { message?: string }; status?: number } }
+      if (ax.response?.status === 413) {
+        toast.error(t('settings.branding_413_hint'))
+        return
+      }
+      toast.error(ax.response?.data?.message ?? String(err))
+    },
+  })
+  const brandCfgM = useMutation({
+    mutationFn: async (max_upload_kb: number) => api.put('/admin/settings/branding', { max_upload_kb }),
+    onSuccess: () => {
+      toast.success(t('settings.branding_limit_saved'))
+      qc.invalidateQueries({ queryKey: ['branding-config'] })
+    },
+    onError: (err: unknown) => {
       const ax = err as { response?: { data?: { message?: string } } }
       toast.error(ax.response?.data?.message ?? String(err))
     },
   })
+
+  const optimizeImageToLimit = async (file: File, maxKb: number): Promise<File> => {
+    if (!file.type.startsWith('image/')) return file
+    const maxBytes = Math.max(64 * 1024, maxKb * 1024)
+    if (file.size <= maxBytes) return file
+    const bmp = await createImageBitmap(file)
+    let w = bmp.width
+    let h = bmp.height
+    const canvas = document.createElement('canvas')
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return file
+    let quality = 0.88
+    let out: Blob | null = null
+    for (let i = 0; i < 8; i += 1) {
+      canvas.width = Math.max(1, Math.round(w))
+      canvas.height = Math.max(1, Math.round(h))
+      ctx.clearRect(0, 0, canvas.width, canvas.height)
+      ctx.drawImage(bmp, 0, 0, canvas.width, canvas.height)
+      // eslint-disable-next-line no-await-in-loop
+      out = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/jpeg', quality))
+      if (out && out.size <= maxBytes) break
+      quality = Math.max(0.52, quality - 0.08)
+      w *= 0.9
+      h *= 0.9
+    }
+    if (!out) return file
+    return new File([out], file.name.replace(/\.[^.]+$/, '') + '.jpg', { type: 'image/jpeg' })
+  }
 
   const passM = useMutation({
     mutationFn: async (payload: {
@@ -111,9 +159,21 @@ export default function SettingsPage() {
           )}
           <form
             className="space-y-4 max-w-xl"
-            onSubmit={(ev) => {
+            onSubmit={async (ev) => {
               ev.preventDefault()
-              const fd = new FormData(ev.currentTarget)
+              const form = ev.currentTarget
+              const maxKb = brandingCfgQ.data?.max_upload_kb ?? 900
+              const inCustomer = form.elements.namedItem('logo_customer') as HTMLInputElement | null
+              const inAdmin = form.elements.namedItem('logo_admin') as HTMLInputElement | null
+              const fd = new FormData()
+              const customerFile = inCustomer?.files?.[0]
+              const adminFile = inAdmin?.files?.[0]
+              if (customerFile) fd.append('logo_customer', await optimizeImageToLimit(customerFile, maxKb))
+              if (adminFile) fd.append('logo_admin', await optimizeImageToLimit(adminFile, maxKb))
+              if (!fd.has('logo_customer') && !fd.has('logo_admin')) {
+                toast.error(t('settings.branding_choose_file'))
+                return
+              }
               brandM.mutate(fd)
               ev.currentTarget.reset()
             }}
@@ -129,7 +189,35 @@ export default function SettingsPage() {
             <button type="submit" className="btn-primary" disabled={brandM.isPending}>
               {t('common.save')}
             </button>
+            <p className="text-xs text-gray-500">
+              {t('settings.branding_limit_hint', { kb: brandingCfgQ.data?.max_upload_kb ?? 900 })}
+            </p>
           </form>
+          <div className="mt-5 border-t pt-4 max-w-xl">
+            <label className="label">{t('settings.branding_limit_label')}</label>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                min={128}
+                max={2048}
+                className="input w-36"
+                defaultValue={brandingCfgQ.data?.max_upload_kb ?? 900}
+                id="branding-max-upload-kb"
+              />
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => {
+                  const el = document.getElementById('branding-max-upload-kb') as HTMLInputElement | null
+                  const v = Number(el?.value || brandingCfgQ.data?.max_upload_kb || 900)
+                  brandCfgM.mutate(v)
+                }}
+                disabled={brandCfgM.isPending}
+              >
+                {t('settings.branding_limit_save')}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

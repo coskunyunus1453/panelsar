@@ -1,0 +1,127 @@
+#!/bin/bash
+# Panelsar engine (www-data) tarafindan sudo ile cagirilir.
+set -euo pipefail
+
+ACTION="${1:-}"
+ARG1="${2:-}"
+ARG2="${3:-}"
+ARG3="${4:-}"
+
+service_active() {
+  local svc="$1"
+  if systemctl is-active --quiet "$svc"; then
+    echo "enabled"
+  else
+    echo "disabled"
+  fi
+}
+
+case "$ACTION" in
+  fail2ban-jail-get)
+    CONF="/etc/fail2ban/jail.local"
+    if [[ ! -f "$CONF" ]]; then
+      echo "bantime=600 findtime=600 maxretry=5"
+      exit 0
+    fi
+    B="$(awk -F= '/^[[:space:]]*bantime[[:space:]]*=/{gsub(/[[:space:]]/, "", $2); print $2; exit}' "$CONF")"
+    F="$(awk -F= '/^[[:space:]]*findtime[[:space:]]*=/{gsub(/[[:space:]]/, "", $2); print $2; exit}' "$CONF")"
+    M="$(awk -F= '/^[[:space:]]*maxretry[[:space:]]*=/{gsub(/[[:space:]]/, "", $2); print $2; exit}' "$CONF")"
+    [[ "$B" =~ ^[0-9]+$ ]] || B=600
+    [[ "$F" =~ ^[0-9]+$ ]] || F=600
+    [[ "$M" =~ ^[0-9]+$ ]] || M=5
+    echo "bantime=$B findtime=$F maxretry=$M"
+    ;;
+  fail2ban-jail-set)
+    B="$ARG1"; F="$ARG2"; M="$ARG3"
+    [[ "$B" =~ ^[0-9]+$ ]] || { echo "invalid bantime" >&2; exit 1; }
+    [[ "$F" =~ ^[0-9]+$ ]] || { echo "invalid findtime" >&2; exit 1; }
+    [[ "$M" =~ ^[0-9]+$ ]] || { echo "invalid maxretry" >&2; exit 1; }
+    [[ "$B" -ge 60 && "$B" -le 604800 ]] || { echo "bantime out of range" >&2; exit 1; }
+    [[ "$F" -ge 60 && "$F" -le 604800 ]] || { echo "findtime out of range" >&2; exit 1; }
+    [[ "$M" -ge 1 && "$M" -le 20 ]] || { echo "maxretry out of range" >&2; exit 1; }
+    CONF="/etc/fail2ban/jail.local"
+    cat > "$CONF" <<EOF
+[DEFAULT]
+bantime = $B
+findtime = $F
+maxretry = $M
+
+[sshd]
+enabled = true
+
+[panelsar-auth]
+enabled = true
+EOF
+    chmod 644 "$CONF"
+    systemctl restart fail2ban || true
+    echo "ok"
+    ;;
+  fail2ban-status)
+    service_active "fail2ban"
+    ;;
+  fail2ban-set)
+    [[ "$ARG1" == "on" || "$ARG1" == "off" ]] || { echo "invalid state" >&2; exit 1; }
+    if [[ "$ARG1" == "on" ]]; then
+      systemctl enable --now fail2ban
+    else
+      systemctl disable --now fail2ban
+    fi
+    service_active "fail2ban"
+    ;;
+  clamav-status)
+    if systemctl is-active --quiet clamav-daemon || systemctl is-active --quiet clamav-freshclam; then
+      echo "enabled"
+    else
+      echo "disabled"
+    fi
+    ;;
+  clamav-set)
+    [[ "$ARG1" == "on" || "$ARG1" == "off" ]] || { echo "invalid state" >&2; exit 1; }
+    if [[ "$ARG1" == "on" ]]; then
+      systemctl enable --now clamav-freshclam || true
+      systemctl enable --now clamav-daemon || true
+    else
+      systemctl disable --now clamav-daemon || true
+      systemctl disable --now clamav-freshclam || true
+    fi
+    if systemctl is-active --quiet clamav-daemon || systemctl is-active --quiet clamav-freshclam; then
+      echo "enabled"
+    else
+      echo "disabled"
+    fi
+    ;;
+  clamav-scan)
+    TARGET="${ARG1:-/var/www}"
+    [[ "$TARGET" == /* ]] || { echo "target must be absolute path" >&2; exit 1; }
+    [[ -d "$TARGET" ]] || { echo "scan target not found: $TARGET" >&2; exit 1; }
+    clamscan -ri --stdout "$TARGET"
+    ;;
+  modsec-status)
+    CONF="/etc/modsecurity/modsecurity.conf"
+    if [[ -f "$CONF" ]] && grep -Eq '^\s*SecRuleEngine\s+On\b' "$CONF"; then
+      echo "enabled"
+    else
+      echo "disabled"
+    fi
+    ;;
+  modsec-set)
+    [[ "$ARG1" == "on" || "$ARG1" == "off" ]] || { echo "invalid state" >&2; exit 1; }
+    CONF="/etc/modsecurity/modsecurity.conf"
+    [[ -f "$CONF" ]] || { echo "missing $CONF" >&2; exit 1; }
+    if [[ "$ARG1" == "on" ]]; then
+      sed -i -E 's/^\s*SecRuleEngine\s+.*/SecRuleEngine On/' "$CONF"
+    else
+      sed -i -E 's/^\s*SecRuleEngine\s+.*/SecRuleEngine Off/' "$CONF"
+    fi
+    systemctl reload apache2 || true
+    if grep -Eq '^\s*SecRuleEngine\s+On\b' "$CONF"; then
+      echo "enabled"
+    else
+      echo "disabled"
+    fi
+    ;;
+  *)
+    echo "usage: panelsar-security fail2ban-status|fail2ban-set <on|off>|fail2ban-jail-get|fail2ban-jail-set <bantime> <findtime> <maxretry>|clamav-status|clamav-set <on|off>|clamav-scan <abs-dir>|modsec-status|modsec-set <on|off>" >&2
+    exit 1
+    ;;
+esac

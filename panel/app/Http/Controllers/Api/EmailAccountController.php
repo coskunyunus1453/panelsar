@@ -6,6 +6,7 @@ use App\Http\Controllers\Concerns\AuthorizesUserDomain;
 use App\Http\Controllers\Controller;
 use App\Models\Domain;
 use App\Models\EmailAccount;
+use App\Models\EmailForwarder;
 use App\Services\EngineApiService;
 use App\Services\HostingQuotaService;
 use Illuminate\Http\JsonResponse;
@@ -32,6 +33,16 @@ class EmailAccountController extends Controller
         return response()->json([
             'mail' => $this->engine->mailOverview($domain->name),
             'accounts' => $request->user()->emailAccounts()->where('domain_id', $domain->id)->get(),
+            'forwarders' => EmailForwarder::query()
+                ->where('domain_id', $domain->id)
+                ->where(function ($q) use ($request) {
+                    if (! $request->user()->isAdmin()) {
+                        $q->where('user_id', $request->user()->id);
+                    }
+                })
+                ->orderBy('source')
+                ->get(),
+            'webmail_url' => sprintf('https://webmail.%s', $domain->name),
         ]);
     }
 
@@ -149,5 +160,53 @@ class EmailAccountController extends Controller
         $emailAccount->delete();
 
         return response()->json(['message' => __('email.deleted')]);
+    }
+
+    public function storeForwarder(Request $request, Domain $domain): JsonResponse
+    {
+        if (! $this->userOwnsDomain($request, $domain)) {
+            abort(403);
+        }
+        $validated = $request->validate([
+            'source' => 'required|string|max:128',
+            'destination' => 'required|email:rfc,dns|max:255',
+            'keep_copy' => 'sometimes|boolean',
+        ]);
+        $source = strtolower(trim($validated['source']));
+        if (! str_contains($source, '@')) {
+            $source .= '@'.$domain->name;
+        }
+        if (! str_ends_with($source, '@'.$domain->name)) {
+            return response()->json(['message' => __('email.forwarder_domain_mismatch')], 422);
+        }
+        $forwarder = EmailForwarder::create([
+            'user_id' => $request->user()->id,
+            'domain_id' => $domain->id,
+            'source' => $source,
+            'destination' => strtolower(trim($validated['destination'])),
+            'keep_copy' => (bool) ($validated['keep_copy'] ?? false),
+        ]);
+        $this->engine->mailAddForwarder($domain->name, [
+            'source' => $forwarder->source,
+            'destination' => $forwarder->destination,
+        ]);
+        return response()->json([
+            'message' => __('email.forwarder_created'),
+            'forwarder' => $forwarder,
+        ], 201);
+    }
+
+    public function destroyForwarder(Request $request, EmailForwarder $emailForwarder): JsonResponse
+    {
+        if ($emailForwarder->user_id !== $request->user()->id && ! $request->user()->isAdmin()) {
+            abort(403);
+        }
+        $emailForwarder->loadMissing('domain');
+        $domainName = $emailForwarder->domain?->name;
+        if ($domainName !== null) {
+            $this->engine->mailDeleteForwarder($domainName, $emailForwarder->source, $emailForwarder->destination);
+        }
+        $emailForwarder->delete();
+        return response()->json(['message' => __('email.forwarder_deleted')]);
     }
 }

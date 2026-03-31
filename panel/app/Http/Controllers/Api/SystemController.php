@@ -53,6 +53,29 @@ class SystemController extends Controller
         ], 202);
     }
 
+    public function processes(Request $request): JsonResponse
+    {
+        if (! $request->user()?->isAdmin()) {
+            abort(403);
+        }
+        return response()->json([
+            'processes' => $this->engineApi->getProcesses(),
+        ]);
+    }
+
+    public function killProcess(Request $request): JsonResponse
+    {
+        if (! $request->user()?->isAdmin()) {
+            abort(403);
+        }
+        $validated = $request->validate([
+            'pid' => 'required|integer|min:2',
+        ]);
+        $result = $this->engineApi->killProcess((int) $validated['pid']);
+
+        return response()->json($result);
+    }
+
     public function dashboard(Request $request): JsonResponse
     {
         $user = $request->user();

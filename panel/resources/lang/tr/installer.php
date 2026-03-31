@@ -2,6 +2,8 @@
 
 return [
     'started' => 'Kurulum başlatıldı',
+    'started_background' => 'Kurulum arka planda başlatıldı. Bu sayfayı kapatsanız da devam eder.',
+    'completed_sync' => 'Kurulum tamamlandı (arka plan worker kapalı olduğu için eşzamanlı çalıştı).',
     'completed' => 'Kurulum tamamlandı.',
     'automated_only_wordpress' => 'Bu sürümde yalnızca WordPress otomatik kurulur.',
     'wordpress_requires_db' => 'WordPress için bir MySQL veritabanı seçin.',

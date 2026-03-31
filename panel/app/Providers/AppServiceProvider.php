@@ -59,6 +59,21 @@ class AppServiceProvider extends ServiceProvider
             return Limit::perMinute(10)->by($request->user()?->id ?: $request->ip());
         });
 
+        // Deploy tetikleri daha sıkı limitlenir.
+        RateLimiter::for('deploy-run', function (Request $request) {
+            return Limit::perMinute(6)->by($request->user()?->id ?: $request->ip());
+        });
+
+        // Backup yazma/schedule/destination işlemleri.
+        RateLimiter::for('backups-write', function (Request $request) {
+            return Limit::perMinute(20)->by($request->user()?->id ?: $request->ip());
+        });
+
+        // Eklenti mağazası kurulum/aktivasyon/migration başlatma.
+        RateLimiter::for('plugins-write', function (Request $request) {
+            return Limit::perMinute(15)->by($request->user()?->id ?: $request->ip());
+        });
+
         Gate::policy(Domain::class, DomainPolicy::class);
         Gate::policy(Database::class, DatabasePolicy::class);
 

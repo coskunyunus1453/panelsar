@@ -36,6 +36,9 @@ import {
   ServerCog,
   FileCode,
   ChevronDown,
+  Rocket,
+  Sparkles,
+  Store,
 } from 'lucide-react'
 
 type NavLeaf = {
@@ -114,6 +117,9 @@ export default function Sidebar() {
         { path: '/security', icon: Shield, label: 'nav.security', ability: 'security:read' },
         { path: '/installer', icon: Download, label: 'nav.installer', ability: 'installer:read' },
         { path: '/site-tools', icon: Terminal, label: 'nav.site_tools', ability: 'tools:run' },
+        { path: '/deploy', icon: Rocket, label: 'nav.deploy', ability: 'tools:run' },
+        { path: '/plugins', icon: Store, label: 'nav.plugins_store', ability: 'dashboard:read' },
+        { path: '/ai-advisor', icon: Sparkles, label: 'nav.ai_advisor', ability: 'dashboard:read' },
         { path: '/billing', icon: CreditCard, label: 'nav.billing', ability: 'billing:read' },
       ],
     },

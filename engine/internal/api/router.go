@@ -1,7 +1,11 @@
 package api
 
 import (
+	"io"
+	"os"
 	"net/http"
+	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -57,6 +61,7 @@ func NewRouter(cfg *config.Config, d *daemon.Daemon, log *logrus.Logger) *gin.En
 			site.POST("/:domain/activate", handleActivateSite(cfg, d))
 			site.DELETE("/:domain", handleDeleteSite(cfg, d))
 			site.GET("", handleListSites(cfg, d))
+			site.GET("/:domain/logs", handleSiteLogs(cfg, d))
 			site.POST("/:domain/subdomains", handleAddSubdomain(cfg, d))
 			site.DELETE("/:domain/subdomains", handleRemoveSubdomain(cfg, d))
 			site.POST("/:domain/aliases", handleAddSiteAlias(cfg, d))
@@ -68,6 +73,7 @@ func NewRouter(cfg *config.Config, d *daemon.Daemon, log *logrus.Logger) *gin.En
 			ssl.POST("/issue", handleIssueSSL(cfg))
 			ssl.POST("/renew", handleRenewSSL(cfg))
 			ssl.POST("/revoke", handleRevokeSSL(cfg))
+			ssl.POST("/manual", handleManualSSL(cfg))
 		}
 
 		registerModuleRoutes(cfg, d, api, log)
@@ -295,6 +301,103 @@ func handleListSites(cfg *config.Config, d *daemon.Daemon) gin.HandlerFunc {
 	}
 }
 
+func handleSiteLogs(cfg *config.Config, d *daemon.Daemon) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		domain := strings.ToLower(strings.TrimSpace(c.Param("domain")))
+		if domain == "" || strings.Contains(domain, "..") || !nginx.DomainSafe(domain) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid domain"})
+			return
+		}
+		limit := 200
+		if q := strings.TrimSpace(c.Query("lines")); q != "" {
+			if qn, err := strconv.Atoi(q); err == nil {
+				if qn < 20 {
+					qn = 20
+				}
+				if qn > 1000 {
+					qn = 1000
+				}
+				limit = qn
+			}
+		}
+
+		nginxAccess := filepath.Join(cfg.Paths.LogDir, domain+"_access.log")
+		nginxError := filepath.Join(cfg.Paths.LogDir, domain+"_error.log")
+		apacheAccess := filepath.Join("/var/log/apache2", "panelsar-"+domain+"-access.log")
+		apacheError := filepath.Join("/var/log/apache2", "panelsar-"+domain+"-error.log")
+
+		entries := []gin.H{}
+		for _, item := range []struct {
+			name string
+			path string
+		}{
+			{name: "nginx_access", path: nginxAccess},
+			{name: "nginx_error", path: nginxError},
+			{name: "apache_access", path: apacheAccess},
+			{name: "apache_error", path: apacheError},
+		} {
+			content, exists, err := tailFile(item.path, limit, 256*1024)
+			entries = append(entries, gin.H{
+				"type":    item.name,
+				"path":    item.path,
+				"exists":  exists,
+				"content": content,
+				"error":   err,
+			})
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"domain": domain,
+			"logs":   entries,
+		})
+	}
+}
+
+func tailFile(path string, lines int, maxBytes int64) (string, bool, string) {
+	st, err := os.Stat(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return "", false, ""
+		}
+		return "", false, err.Error()
+	}
+	if st.IsDir() {
+		return "", false, "is a directory"
+	}
+	f, err := os.Open(path)
+	if err != nil {
+		return "", true, err.Error()
+	}
+	defer f.Close()
+
+	size := st.Size()
+	start := int64(0)
+	if size > maxBytes {
+		start = size - maxBytes
+	}
+	if _, err := f.Seek(start, 0); err != nil {
+		return "", true, err.Error()
+	}
+	b, err := io.ReadAll(f)
+	if err != nil {
+		return "", true, err.Error()
+	}
+	s := string(b)
+	if start > 0 {
+		if i := strings.IndexByte(s, '\n'); i >= 0 && i+1 < len(s) {
+			s = s[i+1:]
+		}
+	}
+	all := strings.Split(strings.ReplaceAll(s, "\r\n", "\n"), "\n")
+	for len(all) > 0 && strings.TrimSpace(all[len(all)-1]) == "" {
+		all = all[:len(all)-1]
+	}
+	if len(all) > lines {
+		all = all[len(all)-lines:]
+	}
+	return strings.Join(all, "\n"), true, ""
+}
+
 func handleIssueSSL(cfg *config.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var req struct {
@@ -393,6 +496,45 @@ func handleRevokeSSL(cfg *config.Config) gin.HandlerFunc {
 			}
 		}
 		c.JSON(http.StatusOK, gin.H{"message": "SSL removed", "domain": req.Domain})
+	}
+}
+
+func handleManualSSL(cfg *config.Config) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var req struct {
+			Domain     string `json:"domain" binding:"required"`
+			CertPEM    string `json:"certificate" binding:"required"`
+			PrivateKey string `json:"private_key" binding:"required"`
+		}
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		meta, err := sites.ReadSiteMeta(cfg.Paths.WebRoot, req.Domain)
+		if err != nil || meta == nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "site not found"})
+			return
+		}
+		if err := ssl.UploadManual(cfg, req.Domain, req.CertPEM, req.PrivateKey); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		meta.SSLEnabled = true
+		phpSock := ""
+		if cfg.Hosting.PHPFPMmanagePools {
+			phpSock = phpfpmSettings(cfg).SocketForDomain(req.Domain)
+		} else {
+			phpSock = nginx.EffectivePHPSocket(meta.PHPVersion, cfg.Hosting.PHPFPMsocket)
+		}
+		if err := hosting.ApplyWebServer(cfg, req.Domain, meta.DocumentRoot, meta, phpSock); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		if err := sites.WriteSiteMeta(cfg.Paths.WebRoot, req.Domain, meta); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"message": "manual ssl uploaded", "domain": req.Domain, "ssl_enabled": true})
 	}
 }
 

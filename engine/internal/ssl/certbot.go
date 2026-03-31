@@ -1,6 +1,7 @@
 package ssl
 
 import (
+	"crypto/tls"
 	"fmt"
 	"os"
 	"os/exec"
@@ -183,4 +184,32 @@ func PurgeLocalCertTree(cfg *config.Config, certName string) {
 			}
 		}
 	}
+}
+
+// UploadManual cert ve private key PEM içeriklerini domain live dizinine yazar.
+func UploadManual(cfg *config.Config, domain, certPEM, keyPEM string) error {
+	domain = strings.ToLower(strings.TrimSpace(domain))
+	if domain == "" || strings.Contains(domain, "..") {
+		return fmt.Errorf("invalid domain")
+	}
+	certPEM = strings.TrimSpace(certPEM)
+	keyPEM = strings.TrimSpace(keyPEM)
+	if certPEM == "" || keyPEM == "" {
+		return fmt.Errorf("certificate and private_key required")
+	}
+	if _, err := tls.X509KeyPair([]byte(certPEM), []byte(keyPEM)); err != nil {
+		return fmt.Errorf("invalid certificate/key pair: %w", err)
+	}
+	chain, key := LiveCertPaths(cfg, domain)
+	liveDir := filepath.Dir(chain)
+	if err := os.MkdirAll(liveDir, 0o700); err != nil {
+		return err
+	}
+	if err := os.WriteFile(chain, []byte(certPEM+"\n"), 0o644); err != nil {
+		return err
+	}
+	if err := os.WriteFile(key, []byte(keyPEM+"\n"), 0o600); err != nil {
+		return err
+	}
+	return nil
 }

@@ -36,6 +36,13 @@ type EngineMailbox = {
   password?: string
 }
 
+type ForwarderRow = {
+  id: number
+  source: string
+  destination: string
+  keep_copy?: boolean
+}
+
 function ModalFrame({
   title,
   children,
@@ -81,6 +88,7 @@ export default function EmailPage() {
   const domainsQ = useDomainsList()
   const [domainId, setDomainId] = useState<number | ''>('')
   const [showAdd, setShowAdd] = useState(false)
+  const [showAddForwarder, setShowAddForwarder] = useState(false)
   const [editing, setEditing] = useState<MailRow | null>(null)
 
   const [editQuota, setEditQuota] = useState(500)
@@ -187,7 +195,35 @@ export default function EmailPage() {
     },
   })
 
+  const createForwarderM = useMutation({
+    mutationFn: async (payload: { source: string; destination: string; keep_copy?: boolean }) =>
+      api.post(`/domains/${domainId}/email/forwarders`, payload),
+    onSuccess: () => {
+      toast.success(t('email.forwarder_created'))
+      qc.invalidateQueries({ queryKey: ['email', domainId] })
+      setShowAddForwarder(false)
+    },
+    onError: (err: unknown) => {
+      const ax = err as { response?: { data?: { message?: string } } }
+      toast.error(ax.response?.data?.message ?? String(err))
+    },
+  })
+
+  const deleteForwarderM = useMutation({
+    mutationFn: async (id: number) => api.delete(`/email/forwarders/${id}`),
+    onSuccess: () => {
+      toast.success(t('email.forwarder_deleted'))
+      qc.invalidateQueries({ queryKey: ['email', domainId] })
+    },
+    onError: (err: unknown) => {
+      const ax = err as { response?: { data?: { message?: string } } }
+      toast.error(ax.response?.data?.message ?? String(err))
+    },
+  })
+
   const accounts: MailRow[] = q.data?.accounts ?? []
+  const forwarders: ForwarderRow[] = q.data?.forwarders ?? []
+  const webmailUrl: string | undefined = q.data?.webmail_url
   const mailOv = q.data?.mail as
     | { mail_enabled?: boolean; mailboxes?: EngineMailbox[]; spf?: string; dmarc?: string }
     | undefined
@@ -337,6 +373,29 @@ export default function EmailPage() {
               </button>
             </div>
           </div>
+          {webmailUrl && (
+            <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50/70 px-3 py-2 dark:border-emerald-900/40 dark:bg-emerald-950/20">
+              <div className="flex flex-wrap items-center gap-2">
+                <a
+                  href={webmailUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="btn-primary py-1.5 text-xs"
+                >
+                  {t('email.webmail_open')}
+                </a>
+                <code className="text-xs text-emerald-800 dark:text-emerald-200">{webmailUrl}</code>
+                <button
+                  type="button"
+                  className="btn-secondary py-1.5 text-xs"
+                  onClick={() => copyHost(webmailUrl)}
+                >
+                  <Copy className="mr-1 inline h-3 w-3" />
+                  {t('email.copy_host')}
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -456,6 +515,44 @@ export default function EmailPage() {
         </ModalFrame>
       )}
 
+      {showAddForwarder && domainId !== '' && (
+        <ModalFrame title={t('email.forwarder_add_title')} onClose={() => setShowAddForwarder(false)}>
+          <form
+            className="space-y-4"
+            onSubmit={(ev) => {
+              ev.preventDefault()
+              const fd = new FormData(ev.currentTarget)
+              createForwarderM.mutate({
+                source: String(fd.get('source') || '').trim(),
+                destination: String(fd.get('destination') || '').trim(),
+                keep_copy: fd.get('keep_copy') === 'on',
+              })
+            }}
+          >
+            <div>
+              <label className="label">{t('email.forwarder_source')}</label>
+              <input name="source" className="input w-full" required placeholder={`info@${domainName || 'domain.com'}`} />
+            </div>
+            <div>
+              <label className="label">{t('email.forwarder_destination')}</label>
+              <input name="destination" type="email" className="input w-full" required placeholder="target@example.com" />
+            </div>
+            <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+              <input name="keep_copy" type="checkbox" />
+              {t('email.forwarder_keep_copy')}
+            </label>
+            <div className="flex justify-end gap-2 pt-2">
+              <button type="button" className="btn-secondary" onClick={() => setShowAddForwarder(false)}>
+                {t('common.cancel')}
+              </button>
+              <button type="submit" className="btn-primary" disabled={createForwarderM.isPending}>
+                {t('common.create')}
+              </button>
+            </div>
+          </form>
+        </ModalFrame>
+      )}
+
       <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">
         <div className="border-b border-gray-100 bg-gray-50/80 px-4 py-3 dark:border-gray-800 dark:bg-gray-800/40">
           <h3 className="text-sm font-semibold text-gray-900 dark:text-white">{t('nav.email')}</h3>
@@ -520,6 +617,58 @@ export default function EmailPage() {
                         className="inline-flex rounded-lg p-2 text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/40"
                         onClick={() => {
                           if (window.confirm(t('common.confirm_delete'))) deleteM.mutate(a.id)
+                        }}
+                        title={t('common.delete')}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">
+        <div className="flex items-center justify-between border-b border-gray-100 bg-gray-50/80 px-4 py-3 dark:border-gray-800 dark:bg-gray-800/40">
+          <h3 className="text-sm font-semibold text-gray-900 dark:text-white">{t('email.forwarders_title')}</h3>
+          <button
+            type="button"
+            className="btn-primary inline-flex items-center gap-2 py-1.5 text-xs"
+            disabled={domainId === ''}
+            onClick={() => setShowAddForwarder(true)}
+          >
+            <Plus className="h-3.5 w-3.5" />
+            {t('email.forwarder_add')}
+          </button>
+        </div>
+        {domainId === '' ? (
+          <p className="p-6 text-center text-gray-500 dark:text-gray-400">{t('email.no_domain')}</p>
+        ) : forwarders.length === 0 ? (
+          <p className="p-6 text-center text-gray-500 dark:text-gray-400">{t('email.forwarders_empty')}</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-100 bg-gray-50/50 text-left dark:border-gray-800 dark:bg-gray-800/30">
+                  <th className="px-4 py-3 font-medium text-gray-600 dark:text-gray-400">{t('email.forwarder_source')}</th>
+                  <th className="px-4 py-3 font-medium text-gray-600 dark:text-gray-400">{t('email.forwarder_destination')}</th>
+                  <th className="w-28 px-4 py-3 text-right font-medium text-gray-600 dark:text-gray-400">{t('common.actions')}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {forwarders.map((f) => (
+                  <tr key={f.id} className="border-b border-gray-50 dark:border-gray-800">
+                    <td className="px-4 py-3 font-mono text-gray-900 dark:text-gray-100">{f.source}</td>
+                    <td className="px-4 py-3 font-mono text-gray-700 dark:text-gray-300">{f.destination}</td>
+                    <td className="px-4 py-3 text-right">
+                      <button
+                        type="button"
+                        className="inline-flex rounded-lg p-2 text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/40"
+                        onClick={() => {
+                          if (window.confirm(t('common.confirm_delete'))) deleteForwarderM.mutate(f.id)
                         }}
                         title={t('common.delete')}
                       >

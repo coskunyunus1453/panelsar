@@ -1,10 +1,11 @@
 package files
 
 import (
+	"archive/zip"
 	"errors"
 	"fmt"
-	"io/fs"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"sort"
@@ -245,6 +246,184 @@ func Remove(root, rel string) error {
 		return err
 	}
 	return os.RemoveAll(base)
+}
+
+func Copy(root, fromRel, toRel string) error {
+	fromAbs, err := ResolveUnderRoot(root, fromRel)
+	if err != nil {
+		return err
+	}
+	toAbs, err := ResolveUnderRoot(root, toRel)
+	if err != nil {
+		return err
+	}
+	if _, err := os.Stat(toAbs); err == nil {
+		return fmt.Errorf("target already exists")
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+	st, err := os.Stat(fromAbs)
+	if err != nil {
+		return err
+	}
+	if st.IsDir() {
+		return copyDir(fromAbs, toAbs)
+	}
+	return copyFile(fromAbs, toAbs, st.Mode().Perm())
+}
+
+func copyDir(src, dst string) error {
+	return filepath.WalkDir(src, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		rel, err := filepath.Rel(src, path)
+		if err != nil {
+			return err
+		}
+		target := filepath.Join(dst, rel)
+		if d.IsDir() {
+			return os.MkdirAll(target, 0o755)
+		}
+		info, err := d.Info()
+		if err != nil {
+			return err
+		}
+		return copyFile(path, target, info.Mode().Perm())
+	})
+}
+
+func Chmod(root, rel string, mode fs.FileMode) error {
+	abs, err := ResolveUnderRoot(root, rel)
+	if err != nil {
+		return err
+	}
+	return os.Chmod(abs, mode)
+}
+
+func ZipPath(root, sourceRel, targetRel string) error {
+	src, err := ResolveUnderRoot(root, sourceRel)
+	if err != nil {
+		return err
+	}
+	dst, err := ResolveUnderRoot(root, targetRel)
+	if err != nil {
+		return err
+	}
+	if _, err := os.Stat(dst); err == nil {
+		return fmt.Errorf("target already exists")
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
+		return err
+	}
+	out, err := os.OpenFile(dst, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o644)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+	zw := zip.NewWriter(out)
+	defer zw.Close()
+
+	srcInfo, err := os.Stat(src)
+	if err != nil {
+		return err
+	}
+	baseName := filepath.Base(src)
+	if srcInfo.IsDir() {
+		return filepath.Walk(src, func(path string, info fs.FileInfo, err error) error {
+			if err != nil {
+				return err
+			}
+			rel, err := filepath.Rel(src, path)
+			if err != nil {
+				return err
+			}
+			zipName := filepath.ToSlash(filepath.Join(baseName, rel))
+			if info.IsDir() {
+				if rel == "." {
+					return nil
+				}
+				_, err = zw.Create(zipName + "/")
+				return err
+			}
+			return writeZipFile(zw, path, zipName, info)
+		})
+	}
+	return writeZipFile(zw, src, baseName, srcInfo)
+}
+
+func writeZipFile(zw *zip.Writer, srcPath, zipName string, info fs.FileInfo) error {
+	h, err := zip.FileInfoHeader(info)
+	if err != nil {
+		return err
+	}
+	h.Name = zipName
+	h.Method = zip.Deflate
+	w, err := zw.CreateHeader(h)
+	if err != nil {
+		return err
+	}
+	in, err := os.Open(srcPath)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+	_, err = io.Copy(w, in)
+	return err
+}
+
+func UnzipPath(root, archiveRel, targetDirRel string) error {
+	arc, err := ResolveUnderRoot(root, archiveRel)
+	if err != nil {
+		return err
+	}
+	targetDir, err := ResolveUnderRoot(root, targetDirRel)
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(targetDir, 0o755); err != nil {
+		return err
+	}
+	r, err := zip.OpenReader(arc)
+	if err != nil {
+		return err
+	}
+	defer r.Close()
+	for _, f := range r.File {
+		name := strings.ReplaceAll(f.Name, "\\", "/")
+		if strings.Contains(name, "..") {
+			return fmt.Errorf("archive entry escapes target")
+		}
+		dst := filepath.Join(targetDir, filepath.FromSlash(name))
+		if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
+			return err
+		}
+		if f.FileInfo().IsDir() {
+			if err := os.MkdirAll(dst, 0o755); err != nil {
+				return err
+			}
+			continue
+		}
+		rc, err := f.Open()
+		if err != nil {
+			return err
+		}
+		out, err := os.OpenFile(dst, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, f.Mode())
+		if err != nil {
+			rc.Close()
+			return err
+		}
+		if _, err := io.Copy(out, rc); err != nil {
+			out.Close()
+			rc.Close()
+			return err
+		}
+		out.Close()
+		rc.Close()
+	}
+	return nil
 }
 
 // IsExecutionRiskFile returns true for file extensions that could be executed by the server.

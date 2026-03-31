@@ -6,4 +6,5 @@ return [
     'renewed' => 'SSL sertifikası yenilendi',
     'revoked' => 'SSL sertifikası iptal edildi',
     'missing' => 'Bu alan adı için SSL kaydı yok',
+    'manual_uploaded' => 'Manuel SSL sertifikası yüklendi',
 ];

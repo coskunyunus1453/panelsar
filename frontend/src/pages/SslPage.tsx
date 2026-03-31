@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useState } from 'react'
 import api from '../services/api'
 import { Lock, RefreshCw, ShieldOff } from 'lucide-react'
 import toast from 'react-hot-toast'
@@ -18,6 +19,9 @@ type DomainOpt = { id: number; name: string }
 export default function SslPage() {
   const { t } = useTranslation()
   const qc = useQueryClient()
+  const [manualDomainId, setManualDomainId] = useState<number | null>(null)
+  const [manualCert, setManualCert] = useState('')
+  const [manualKey, setManualKey] = useState('')
 
   const sslQ = useQuery({
     queryKey: ['ssl'],
@@ -65,6 +69,25 @@ export default function SslPage() {
     mutationFn: async (id: number) => api.post(`/domains/${id}/ssl/revoke`),
     onSuccess: () => {
       toast.success(t('ssl.revoked'))
+      qc.invalidateQueries({ queryKey: ['ssl'] })
+    },
+    onError: (err: unknown) => {
+      const ax = err as { response?: { data?: { message?: string } } }
+      toast.error(ax.response?.data?.message ?? String(err))
+    },
+  })
+
+  const manualM = useMutation({
+    mutationFn: async (vars: { id: number; certificate: string; private_key: string }) =>
+      api.post(`/domains/${vars.id}/ssl/manual`, {
+        certificate: vars.certificate,
+        private_key: vars.private_key,
+      }),
+    onSuccess: () => {
+      toast.success(t('ssl.manual_uploaded'))
+      setManualDomainId(null)
+      setManualCert('')
+      setManualKey('')
       qc.invalidateQueries({ queryKey: ['ssl'] })
     },
     onError: (err: unknown) => {
@@ -137,6 +160,13 @@ export default function SslPage() {
                       >
                         <ShieldOff className="h-3 w-3 inline" /> Revoke
                       </button>
+                      <button
+                        type="button"
+                        className="btn-secondary text-xs py-1 px-2"
+                        onClick={() => setManualDomainId(d.id)}
+                      >
+                        {t('ssl.manual_upload')}
+                      </button>
                     </td>
                   </tr>
                 )
@@ -148,6 +178,62 @@ export default function SslPage() {
           <p className="p-6 text-center text-gray-500">{t('common.no_data')}</p>
         )}
       </div>
+
+      {manualDomainId !== null && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="card w-full max-w-3xl bg-white p-6 dark:bg-gray-900">
+            <h3 className="mb-4 text-lg font-semibold text-gray-900 dark:text-white">{t('ssl.manual_upload')}</h3>
+            <div className="space-y-3">
+              <div>
+                <label className="label">Certificate (PEM)</label>
+                <textarea
+                  className="input min-h-[140px] w-full font-mono text-xs"
+                  value={manualCert}
+                  onChange={(e) => setManualCert(e.target.value)}
+                  placeholder="-----BEGIN CERTIFICATE-----"
+                />
+              </div>
+              <div>
+                <label className="label">Private Key (PEM)</label>
+                <textarea
+                  className="input min-h-[140px] w-full font-mono text-xs"
+                  value={manualKey}
+                  onChange={(e) => setManualKey(e.target.value)}
+                  placeholder="-----BEGIN PRIVATE KEY-----"
+                />
+              </div>
+            </div>
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => {
+                  setManualDomainId(null)
+                  setManualCert('')
+                  setManualKey('')
+                }}
+              >
+                {t('common.cancel')}
+              </button>
+              <button
+                type="button"
+                className="btn-primary"
+                disabled={manualM.isPending || !manualCert.trim() || !manualKey.trim()}
+                onClick={() => {
+                  if (manualDomainId === null) return
+                  manualM.mutate({
+                    id: manualDomainId,
+                    certificate: manualCert.trim(),
+                    private_key: manualKey.trim(),
+                  })
+                }}
+              >
+                {t('common.save')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

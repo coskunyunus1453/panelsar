@@ -11,6 +11,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/panelsar/engine/internal/config"
+	"github.com/panelsar/engine/internal/sites"
 )
 
 var mu sync.Mutex
@@ -69,6 +70,38 @@ func writeSlice(path string, v []map[string]interface{}) error {
 	return os.WriteFile(path, b, 0o640)
 }
 
+func readKV(path string) (map[string]string, error) {
+	b, err := os.ReadFile(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return map[string]string{}, nil
+		}
+		return nil, err
+	}
+	var out map[string]string
+	if len(strings.TrimSpace(string(b))) == 0 {
+		return map[string]string{}, nil
+	}
+	if err := json.Unmarshal(b, &out); err != nil {
+		return nil, err
+	}
+	if out == nil {
+		return map[string]string{}, nil
+	}
+	return out, nil
+}
+
+func writeKV(path string, v map[string]string) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
+		return err
+	}
+	b, err := json.MarshalIndent(v, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(path, b, 0o640)
+}
+
 func idStr(v interface{}) string {
 	if v == nil {
 		return ""
@@ -101,6 +134,29 @@ func DNSRecords(cfg *config.Config, domain string) ([]gin.H, error) {
 		out = append(out, gin.H(r))
 	}
 	return out, nil
+}
+
+func SecurityGetValue(cfg *config.Config, key string) (string, error) {
+	mu.Lock()
+	defer mu.Unlock()
+	path := filepath.Join(dir(cfg), "security.json")
+	kv, err := readKV(path)
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(kv[key]), nil
+}
+
+func SecuritySetValue(cfg *config.Config, key, value string) error {
+	mu.Lock()
+	defer mu.Unlock()
+	path := filepath.Join(dir(cfg), "security.json")
+	kv, err := readKV(path)
+	if err != nil {
+		return err
+	}
+	kv[key] = value
+	return writeKV(path, kv)
 }
 
 func DNSAdd(cfg *config.Config, domain string, body map[string]interface{}) error {
@@ -432,6 +488,7 @@ func FTPDelete(cfg *config.Config, domain, username string) error {
 type mailState struct {
 	MailEnabled bool                     `json:"mail_enabled"`
 	Mailboxes   []map[string]interface{} `json:"mailboxes"`
+	Forwarders  []map[string]interface{} `json:"forwarders"`
 	SPF         string                   `json:"spf"`
 	DMARC       string                   `json:"dmarc"`
 	DKIM        gin.H                    `json:"dkim"`
@@ -444,6 +501,7 @@ func readMail(path string) (*mailState, error) {
 			return &mailState{
 				MailEnabled: true,
 				Mailboxes:   nil,
+				Forwarders:  nil,
 				DKIM:        gin.H{"enabled": false},
 			}, nil
 		}
@@ -493,6 +551,13 @@ func MailOverview(cfg *config.Config, domain string) (gin.H, error) {
 	return gin.H{
 		"mail_enabled": s.MailEnabled,
 		"mailboxes":    boxes,
+		"forwarders": func() []gin.H {
+			out := make([]gin.H, 0, len(s.Forwarders))
+			for _, f := range s.Forwarders {
+				out = append(out, gin.H(cloneMap(f)))
+			}
+			return out
+		}(),
 		"dkim":         s.DKIM,
 		"spf":          s.SPF,
 		"dmarc":        s.DMARC,
@@ -538,6 +603,89 @@ func MailDeleteMailbox(cfg *config.Config, domain, email string) error {
 	return writeMail(path, s)
 }
 
+// MailDeleteDomain domain'e ait mail state dosyasini tamamen temizler (idempotent).
+func MailDeleteDomain(cfg *config.Config, domain string) error {
+	d := safeDomain(domain)
+	if d == "" {
+		return fmt.Errorf("invalid domain")
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	path := filepath.Join(dir(cfg), "mail", d+".json")
+	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	return nil
+}
+
+// MailReconcile panelde olmayan domain'lere ait engine-state/mail/*.json kalintilarini raporlar/siler.
+func MailReconcile(cfg *config.Config, dryRun bool) (gin.H, error) {
+	mu.Lock()
+	defer mu.Unlock()
+
+	active, err := sites.ListDomains(cfg.Paths.WebRoot)
+	if err != nil {
+		return nil, err
+	}
+	activeSet := map[string]struct{}{}
+	for _, d := range active {
+		activeSet[strings.ToLower(strings.TrimSpace(d))] = struct{}{}
+	}
+
+	mailDir := filepath.Join(dir(cfg), "mail")
+	entries, err := os.ReadDir(mailDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return gin.H{
+				"dry_run":        dryRun,
+				"mail_state_dir": mailDir,
+				"active_domains": len(activeSet),
+				"scanned":        0,
+				"orphans":        []string{},
+				"removed":        []string{},
+			}, nil
+		}
+		return nil, err
+	}
+
+	orphans := make([]string, 0)
+	removed := make([]string, 0)
+	scanned := 0
+	for _, e := range entries {
+		if e.IsDir() {
+			continue
+		}
+		name := e.Name()
+		if !strings.HasSuffix(name, ".json") {
+			continue
+		}
+		scanned++
+		domain := strings.TrimSuffix(strings.ToLower(strings.TrimSpace(name)), ".json")
+		if domain == "" {
+			continue
+		}
+		if _, ok := activeSet[domain]; ok {
+			continue
+		}
+		orphans = append(orphans, domain)
+		if dryRun {
+			continue
+		}
+		if err := os.Remove(filepath.Join(mailDir, name)); err == nil || os.IsNotExist(err) {
+			removed = append(removed, domain)
+		}
+	}
+
+	return gin.H{
+		"dry_run":        dryRun,
+		"mail_state_dir": mailDir,
+		"active_domains": len(activeSet),
+		"scanned":        scanned,
+		"orphans":        orphans,
+		"removed":        removed,
+	}, nil
+}
+
 // MailPatchMailbox updates fields (password, quota_mb, etc.) for one mailbox by email address.
 func MailPatchMailbox(cfg *config.Config, domain, mailboxEmail string, patch map[string]interface{}) error {
 	d := safeDomain(domain)
@@ -571,6 +719,62 @@ func MailPatchMailbox(cfg *config.Config, domain, mailboxEmail string, patch map
 	if !found {
 		return fmt.Errorf("mailbox not found")
 	}
+	return writeMail(path, s)
+}
+
+func MailAddForwarder(cfg *config.Config, domain string, entry map[string]interface{}) error {
+	d := safeDomain(domain)
+	if d == "" {
+		return fmt.Errorf("invalid domain")
+	}
+	source := strings.ToLower(strings.TrimSpace(fmt.Sprint(entry["source"])))
+	dest := strings.ToLower(strings.TrimSpace(fmt.Sprint(entry["destination"])))
+	if source == "" || dest == "" {
+		return fmt.Errorf("source and destination required")
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	path := filepath.Join(dir(cfg), "mail", d+".json")
+	s, err := readMail(path)
+	if err != nil {
+		return err
+	}
+	for _, f := range s.Forwarders {
+		if strings.EqualFold(fmt.Sprint(f["source"]), source) && strings.EqualFold(fmt.Sprint(f["destination"]), dest) {
+			return nil
+		}
+	}
+	entry["source"] = source
+	entry["destination"] = dest
+	s.Forwarders = append(s.Forwarders, entry)
+	return writeMail(path, s)
+}
+
+func MailDeleteForwarder(cfg *config.Config, domain, source, destination string) error {
+	d := safeDomain(domain)
+	if d == "" {
+		return fmt.Errorf("invalid domain")
+	}
+	source = strings.ToLower(strings.TrimSpace(source))
+	destination = strings.ToLower(strings.TrimSpace(destination))
+	if source == "" || destination == "" {
+		return fmt.Errorf("source and destination required")
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	path := filepath.Join(dir(cfg), "mail", d+".json")
+	s, err := readMail(path)
+	if err != nil {
+		return err
+	}
+	next := make([]map[string]interface{}, 0, len(s.Forwarders))
+	for _, f := range s.Forwarders {
+		if strings.EqualFold(fmt.Sprint(f["source"]), source) && strings.EqualFold(fmt.Sprint(f["destination"]), destination) {
+			continue
+		}
+		next = append(next, f)
+	}
+	s.Forwarders = next
 	return writeMail(path, s)
 }
 

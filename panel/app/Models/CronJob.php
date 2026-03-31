@@ -32,4 +32,9 @@ class CronJob extends Model
     {
         return $this->belongsTo(User::class);
     }
+
+    public function runs()
+    {
+        return $this->hasMany(CronJobRun::class);
+    }
 }

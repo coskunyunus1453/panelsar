@@ -1,12 +1,20 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import api from '../services/api'
 import { Download } from 'lucide-react'
-import toast from 'react-hot-toast'
 import { useDomainsList } from '../hooks/useDomains'
+import { notify } from '../lib/notify'
 
 type AppRow = { id: string; name: string; version: string; automated?: boolean }
+type InstallerRun = {
+  id: number
+  app: string
+  status: 'queued' | 'running' | 'success' | 'failed'
+  message?: string
+  created_at?: string
+}
+type InstallerRunDetail = InstallerRun & { output?: string; started_at?: string; finished_at?: string }
 
 const FALLBACK_APPS: AppRow[] = [
   { id: 'wordpress', name: 'WordPress', version: 'latest', automated: true },
@@ -23,6 +31,9 @@ export default function InstallerPage() {
   const [domainId, setDomainId] = useState<number | ''>('')
   const [wpDatabaseId, setWpDatabaseId] = useState<number | ''>('')
   const [tablePrefix, setTablePrefix] = useState('wp_')
+  const [activeRunId, setActiveRunId] = useState<number | null>(null)
+  const [seenFinalRuns, setSeenFinalRuns] = useState<number[]>([])
+  const [detailRunId, setDetailRunId] = useState<number | null>(null)
 
   const databasesQ = useQuery({
     queryKey: ['databases', 'paginated'],
@@ -33,15 +44,34 @@ export default function InstallerPage() {
     queryKey: ['installer-apps'],
     queryFn: async () => (await api.get('/installer/apps')).data as { apps: AppRow[] },
   })
+  const runsQ = useQuery({
+    queryKey: ['installer-runs'],
+    queryFn: async () => (await api.get('/installer/runs')).data as { runs: InstallerRun[] },
+    refetchInterval: 3000,
+  })
+  const runDetailQ = useQuery({
+    queryKey: ['installer-run-detail', detailRunId],
+    queryFn: async () =>
+      (await api.get(`/installer/runs/${detailRunId}`)).data as { run: InstallerRunDetail },
+    enabled: detailRunId !== null,
+  })
 
   const installM = useMutation({
     mutationFn: async (payload: { app: string; database_id?: number; table_prefix?: string }) => {
       const { data } = await api.post(`/domains/${domainId}/installer`, payload)
-      return data as { message?: string }
+      return data as { message?: string; run_id?: number; background?: boolean; status?: string }
     },
     onSuccess: (data) => {
-      toast.success(data.message ?? t('installer.done'))
+      if (typeof data.run_id === 'number') {
+        setActiveRunId(data.run_id)
+      }
+      if (data.background === true) {
+        notify('info', t('installer.started'), data.message)
+      } else {
+        notify('success', t('installer.done'), data.message)
+      }
       qc.invalidateQueries({ queryKey: ['domains'] })
+      qc.invalidateQueries({ queryKey: ['installer-runs'] })
     },
     onError: (err: unknown) => {
       const ax = err as {
@@ -49,12 +79,33 @@ export default function InstallerPage() {
       }
       const d = ax.response?.data
       const msg = d?.message ?? String(err)
-      toast.error([msg, d?.hint].filter(Boolean).join(' — '), { duration: 10000 })
+      notify('error', 'Kurulum hatası', [msg, d?.hint].filter(Boolean).join(' — '))
     },
   })
 
   const apps = q.data?.apps?.length ? q.data.apps : FALLBACK_APPS
   const mysqlDbs = (databasesQ.data?.data ?? []).filter((d) => d.type === 'mysql')
+  const latestRun = (runsQ.data?.runs ?? [])[0]
+  const activeRun =
+    (runsQ.data?.runs ?? []).find((r) => r.id === activeRunId) ??
+    (latestRun && ['queued', 'running'].includes(latestRun.status) ? latestRun : null)
+  const hasRunningInstall = !!activeRun
+
+  useEffect(() => {
+    const runs = runsQ.data?.runs ?? []
+    if (!activeRunId) return
+    const target = runs.find((r) => r.id === activeRunId)
+    if (!target) return
+    if (!['success', 'failed'].includes(target.status)) return
+    if (seenFinalRuns.includes(target.id)) return
+    if (target.status === 'success') {
+      notify('success', t('installer.done'), target.message || undefined)
+    } else {
+      notify('error', 'Kurulum başarısız', target.message || undefined)
+    }
+    setSeenFinalRuns((s) => [...s, target.id])
+    setActiveRunId(null)
+  }, [runsQ.data, activeRunId, seenFinalRuns, t])
 
   return (
     <div className="space-y-6">
@@ -65,6 +116,22 @@ export default function InstallerPage() {
           <p className="text-gray-500 dark:text-gray-400 text-sm">{t('installer.subtitle')}</p>
         </div>
       </div>
+
+      {hasRunningInstall && (
+        <div className="card p-4 border border-indigo-200 dark:border-indigo-700">
+          <div className="flex items-center gap-3">
+            <span className="inline-flex h-3 w-3 rounded-full bg-indigo-500 animate-ping" />
+            <div>
+              <p className="text-sm font-medium text-indigo-700 dark:text-indigo-300">
+                {t('installer.running_bg')}
+              </p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                {activeRun?.message || t('installer.waiting_status')}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="card p-4 flex flex-wrap gap-4 items-end">
         <div>
@@ -115,6 +182,7 @@ export default function InstallerPage() {
           const disabled =
             !domainId ||
             installM.isPending ||
+            hasRunningInstall ||
             !auto ||
             (wp && !wpDatabaseId)
           return (
@@ -140,6 +208,54 @@ export default function InstallerPage() {
           )
         })}
       </div>
+
+      <div className="card p-4">
+        <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">{t('installer.recent_runs')}</h3>
+        <div className="space-y-2">
+          {(runsQ.data?.runs ?? []).map((r) => (
+            <div key={r.id} className="rounded-md border border-gray-200 dark:border-gray-700 p-2 text-xs">
+              <div className="flex items-center gap-2">
+                <span className="font-medium">{r.app}</span>
+                <span className="text-gray-500">#{r.id}</span>
+                <span className="ml-auto">{r.status}</span>
+                <button
+                  type="button"
+                  className="btn-secondary py-1 px-2 text-[10px]"
+                  onClick={() => setDetailRunId(r.id)}
+                >
+                  {t('common.details')}
+                </button>
+              </div>
+              {r.message && <p className="text-gray-500 mt-1">{r.message}</p>}
+            </div>
+          ))}
+          {(runsQ.data?.runs ?? []).length === 0 && (
+            <p className="text-xs text-gray-500">{t('installer.no_runs')}</p>
+          )}
+        </div>
+      </div>
+
+      {detailRunId !== null && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-2xl rounded-lg bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 p-4">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
+                Installer Run #{detailRunId}
+              </h3>
+              <button type="button" className="btn-secondary py-1 px-2 text-xs" onClick={() => setDetailRunId(null)}>
+                {t('common.close')}
+              </button>
+            </div>
+            <div className="text-xs text-gray-500 space-y-1 mb-3">
+              <p>{runDetailQ.data?.run.status}</p>
+              {runDetailQ.data?.run.message && <p>{runDetailQ.data.run.message}</p>}
+            </div>
+            <pre className="max-h-[360px] overflow-auto rounded-md bg-gray-50 dark:bg-gray-800 p-3 text-[11px] text-gray-700 dark:text-gray-200 whitespace-pre-wrap">
+{runDetailQ.data?.run.output || '-'}
+            </pre>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

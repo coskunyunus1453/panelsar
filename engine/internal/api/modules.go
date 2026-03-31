@@ -12,6 +12,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/panelsar/engine/internal/config"
@@ -22,6 +23,7 @@ import (
 	"github.com/panelsar/engine/internal/panelmirror"
 	"github.com/panelsar/engine/internal/phpfpm"
 	"github.com/panelsar/engine/internal/phpini"
+	"github.com/panelsar/engine/internal/security"
 	"github.com/panelsar/engine/internal/stack"
 	"github.com/panelsar/engine/internal/tools"
 	"github.com/sirupsen/logrus"
@@ -66,6 +68,10 @@ func registerModuleRoutes(cfg *config.Config, d *daemon.Daemon, api *gin.RouterG
 	api.POST("/files/create", handleFileCreate(cfg))
 	api.POST("/files/rename", handleFileRename(cfg))
 	api.POST("/files/move", handleFileMove(cfg))
+	api.POST("/files/copy", handleFileCopy(cfg))
+	api.POST("/files/chmod", handleFileChmod(cfg))
+	api.POST("/files/zip", handleFileZip(cfg))
+	api.POST("/files/unzip", handleFileUnzip(cfg))
 	api.GET("/files/download", handleFileDownload(cfg))
 	api.POST("/files/upload", handleFileUpload(cfg))
 
@@ -187,6 +193,38 @@ func registerModuleRoutes(cfg *config.Config, d *daemon.Daemon, api *gin.RouterG
 		}
 		c.JSON(http.StatusOK, gin.H{"message": "mailbox removed"})
 	})
+	api.POST("/mail/:domain/forwarder", func(c *gin.Context) {
+		var body map[string]interface{}
+		if err := c.ShouldBindJSON(&body); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		if err := panelmirror.MailAddForwarder(cfg, c.Param("domain"), body); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusCreated, gin.H{"message": "forwarder stored"})
+	})
+	api.DELETE("/mail/:domain/forwarder", func(c *gin.Context) {
+		source := strings.TrimSpace(c.Query("source"))
+		destination := strings.TrimSpace(c.Query("destination"))
+		if source == "" || destination == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "source and destination query required"})
+			return
+		}
+		if err := panelmirror.MailDeleteForwarder(cfg, c.Param("domain"), source, destination); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"message": "forwarder removed"})
+	})
+	api.DELETE("/mail/:domain", func(c *gin.Context) {
+		if err := panelmirror.MailDeleteDomain(cfg, c.Param("domain")); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"message": "mail state removed"})
+	})
 	api.PATCH("/mail/:domain/mailbox", func(c *gin.Context) {
 		var body struct {
 			Email    string  `json:"email" binding:"required"`
@@ -217,11 +255,142 @@ func registerModuleRoutes(cfg *config.Config, d *daemon.Daemon, api *gin.RouterG
 
 	api.GET("/security/overview", func(c *gin.Context) {
 		rules, _ := panelmirror.FirewallRulesList(cfg)
+		fail2banOn, fail2banErr := security.EnabledStatus("fail2ban")
+		modsecOn, modsecErr := security.EnabledStatus("modsec")
+		clamavOn, clamavErr := security.EnabledStatus("clamav")
+		clamavLast, _ := panelmirror.SecurityGetValue(cfg, "clamav_last_scan")
+
 		c.JSON(http.StatusOK, gin.H{
-			"fail2ban":      gin.H{"enabled": cfg.Security.Fail2banEnabled, "jails": []string{"sshd", "panelsar-auth"}},
-			"firewall":      gin.H{"backend": "iptables", "default_policy": "DROP", "recent_rules": rules},
-			"modsecurity":   gin.H{"enabled": false},
-			"clamav":        gin.H{"last_scan": nil},
+			"fail2ban": gin.H{
+				"enabled": fail2banOn,
+				"jails":   []string{"sshd", "panelsar-auth"},
+				"settings": func() gin.H {
+					b, f, m, e := security.Fail2banJailGet()
+					return gin.H{
+						"bantime":  b,
+						"findtime": f,
+						"maxretry": m,
+						"error":    errMsg(e),
+					}
+				}(),
+				"error":   errMsg(fail2banErr),
+			},
+			"firewall": gin.H{"backend": "iptables", "default_policy": "DROP", "recent_rules": rules},
+			"modsecurity": gin.H{
+				"enabled": modsecOn,
+				"error":   errMsg(modsecErr),
+			},
+			"clamav": gin.H{
+				"enabled":   clamavOn,
+				"last_scan": nullIfEmpty(clamavLast),
+				"error":     errMsg(clamavErr),
+			},
+		})
+	})
+	api.POST("/security/fail2ban/toggle", func(c *gin.Context) {
+		var req struct {
+			Enabled bool `json:"enabled"`
+		}
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		enabled, err := security.SetEnabled("fail2ban", req.Enabled)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"message": "fail2ban updated", "enabled": enabled})
+	})
+	api.POST("/security/fail2ban/jail", func(c *gin.Context) {
+		var req struct {
+			Bantime  int `json:"bantime" binding:"required"`
+			Findtime int `json:"findtime" binding:"required"`
+			Maxretry int `json:"maxretry" binding:"required"`
+		}
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		if err := security.Fail2banJailSet(req.Bantime, req.Findtime, req.Maxretry); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"message": "fail2ban jail updated"})
+	})
+	api.POST("/security/modsecurity/toggle", func(c *gin.Context) {
+		var req struct {
+			Enabled bool `json:"enabled"`
+		}
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		enabled, err := security.SetEnabled("modsec", req.Enabled)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"message": "modsecurity updated", "enabled": enabled})
+	})
+	api.POST("/security/clamav/toggle", func(c *gin.Context) {
+		var req struct {
+			Enabled bool `json:"enabled"`
+		}
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		enabled, err := security.SetEnabled("clamav", req.Enabled)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"message": "clamav updated", "enabled": enabled})
+	})
+	api.POST("/security/clamav/scan", func(c *gin.Context) {
+		var req struct {
+			Target string `json:"target"`
+		}
+		_ = c.ShouldBindJSON(&req)
+		out, err := security.RunClamAVScan(req.Target)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "output": out})
+			return
+		}
+		ts := time.Now().UTC().Format(time.RFC3339)
+		_ = panelmirror.SecuritySetValue(cfg, "clamav_last_scan", ts)
+		c.JSON(http.StatusOK, gin.H{
+			"message":   "clamav scan completed",
+			"last_scan": ts,
+			"output":    out,
+		})
+	})
+	api.POST("/security/mail/reconcile", func(c *gin.Context) {
+		var req struct {
+			DryRun  *bool  `json:"dry_run"`
+			Confirm string `json:"confirm"`
+		}
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		dry := true
+		if req.DryRun != nil {
+			dry = *req.DryRun
+		}
+		if !dry && strings.TrimSpace(req.Confirm) != "DELETE_ORPHAN_MAIL_STATE" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "confirmation phrase required"})
+			return
+		}
+		report, err := panelmirror.MailReconcile(cfg, dry)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{
+			"message": "mail reconcile completed",
+			"report":  report,
 		})
 	})
 	api.POST("/security/firewall/rule", func(c *gin.Context) {
@@ -689,7 +858,34 @@ func registerModuleRoutes(cfg *config.Config, d *daemon.Daemon, api *gin.RouterG
 	})
 
 	api.GET("/system/processes", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{"processes": []gin.H{}})
+		procs, err := listProcesses()
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"processes": procs})
+	})
+	api.POST("/system/processes/kill", func(c *gin.Context) {
+		var req struct {
+			PID int `json:"pid" binding:"required"`
+		}
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		if req.PID <= 1 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid pid"})
+			return
+		}
+		out, err := exec.Command("kill", "-TERM", strconv.Itoa(req.PID)).CombinedOutput()
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error":  err.Error(),
+				"output": strings.TrimSpace(string(out)),
+			})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"message": "process kill signal sent", "pid": req.PID})
 	})
 
 	api.POST("/system/reboot", func(c *gin.Context) {
@@ -732,6 +928,66 @@ func registerModuleRoutes(cfg *config.Config, d *daemon.Daemon, api *gin.RouterG
 
 	_ = d
 	_ = log
+}
+
+func errMsg(err error) string {
+	if err == nil {
+		return ""
+	}
+	return err.Error()
+}
+
+func nullIfEmpty(s string) interface{} {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return nil
+	}
+	return s
+}
+
+func listProcesses() ([]gin.H, error) {
+	out, err := exec.Command("ps", "-eo", "pid,ppid,pcpu,pmem,comm,args", "--no-headers").CombinedOutput()
+	if err != nil {
+		return nil, err
+	}
+	lines := strings.Split(strings.ReplaceAll(string(out), "\r\n", "\n"), "\n")
+	procs := make([]gin.H, 0, len(lines))
+	for _, ln := range lines {
+		ln = strings.TrimSpace(ln)
+		if ln == "" {
+			continue
+		}
+		fields := strings.Fields(ln)
+		if len(fields) < 6 {
+			continue
+		}
+		pid, _ := strconv.Atoi(fields[0])
+		ppid, _ := strconv.Atoi(fields[1])
+		pcpu, _ := strconv.ParseFloat(fields[2], 64)
+		pmem, _ := strconv.ParseFloat(fields[3], 64)
+		command := fields[4]
+		args := strings.Join(fields[5:], " ")
+		procs = append(procs, gin.H{
+			"pid":     pid,
+			"ppid":    ppid,
+			"cpu":     pcpu,
+			"memory":  pmem,
+			"command": command,
+			"args":    args,
+		})
+		if len(procs) >= 250 {
+			break
+		}
+	}
+	sort.Slice(procs, func(i, j int) bool {
+		ai := procs[i]["cpu"].(float64)
+		aj := procs[j]["cpu"].(float64)
+		if ai == aj {
+			return procs[i]["pid"].(int) < procs[j]["pid"].(int)
+		}
+		return ai > aj
+	})
+	return procs, nil
 }
 
 func handleInstallerInstall(cfg *config.Config) gin.HandlerFunc {
@@ -976,6 +1232,91 @@ func handleFileRename(cfg *config.Config) gin.HandlerFunc {
 func handleFileMove(cfg *config.Config) gin.HandlerFunc {
 	// Currently “move” is the same as rename within the engine root.
 	return handleFileRename(cfg)
+}
+
+func handleFileCopy(cfg *config.Config) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var req struct {
+			Domain string `json:"domain" binding:"required"`
+			From   string `json:"from" binding:"required"`
+			To     string `json:"to" binding:"required"`
+		}
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		root := cfg.Paths.WebRoot + "/" + req.Domain
+		if err := files.Copy(root, req.From, req.To); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"message": "copied"})
+	}
+}
+
+func handleFileChmod(cfg *config.Config) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var req struct {
+			Domain string `json:"domain" binding:"required"`
+			Path   string `json:"path" binding:"required"`
+			Mode   string `json:"mode" binding:"required"`
+		}
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		m, err := strconv.ParseUint(strings.TrimSpace(req.Mode), 8, 32)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid mode"})
+			return
+		}
+		root := cfg.Paths.WebRoot + "/" + req.Domain
+		if err := files.Chmod(root, req.Path, os.FileMode(m)); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"message": "chmod applied"})
+	}
+}
+
+func handleFileZip(cfg *config.Config) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var req struct {
+			Domain string `json:"domain" binding:"required"`
+			Source string `json:"source" binding:"required"`
+			Target string `json:"target" binding:"required"`
+		}
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		root := cfg.Paths.WebRoot + "/" + req.Domain
+		if err := files.ZipPath(root, req.Source, req.Target); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"message": "zip created"})
+	}
+}
+
+func handleFileUnzip(cfg *config.Config) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var req struct {
+			Domain    string `json:"domain" binding:"required"`
+			Archive   string `json:"archive" binding:"required"`
+			TargetDir string `json:"target_dir" binding:"required"`
+		}
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		root := cfg.Paths.WebRoot + "/" + req.Domain
+		if err := files.UnzipPath(root, req.Archive, req.TargetDir); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"message": "unzip completed"})
+	}
 }
 
 func handleFileDownload(cfg *config.Config) gin.HandlerFunc {

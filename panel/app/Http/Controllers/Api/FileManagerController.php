@@ -319,6 +319,97 @@ class FileManagerController extends Controller
         }
     }
 
+    public function copy(Request $request, Domain $domain): JsonResponse
+    {
+        if (! $this->userOwnsDomain($request, $domain)) {
+            abort(403);
+        }
+        $validated = $request->validate([
+            'from' => 'required|string',
+            'to' => 'required|string',
+        ]);
+        $from = $validated['from'];
+        $to = $validated['to'];
+        $engineFrom = $this->panelRelToEngineRel($domain, $from);
+        $engineTo = $this->panelRelToEngineRel($domain, $to);
+        $result = $this->engine->copyFile($domain->name, $engineFrom, $engineTo);
+        if (! empty($result['error'])) {
+            $this->logFileAction($request, $domain, 'copy', $from, $to, false, $result['error']);
+            return response()->json(['message' => $result['error']], 422);
+        }
+        $this->logFileAction($request, $domain, 'copy', $from, $to, true, null);
+        return response()->json($result);
+    }
+
+    public function chmod(Request $request, Domain $domain): JsonResponse
+    {
+        if (! $this->userOwnsDomain($request, $domain)) {
+            abort(403);
+        }
+        $validated = $request->validate([
+            'path' => 'required|string',
+            'mode' => 'required|string|regex:/^[0-7]{3,4}$/',
+        ]);
+        $path = $validated['path'];
+        $mode = $validated['mode'];
+        $enginePath = $this->panelRelToEngineRel($domain, $path);
+        $result = $this->engine->chmodFile($domain->name, $enginePath, $mode);
+        if (! empty($result['error'])) {
+            $this->logFileAction($request, $domain, 'chmod', $path, null, false, $result['error']);
+            return response()->json(['message' => $result['error']], 422);
+        }
+        $this->logFileAction($request, $domain, 'chmod', $path, null, true, null);
+        return response()->json($result);
+    }
+
+    public function zip(Request $request, Domain $domain): JsonResponse
+    {
+        if (! $this->userOwnsDomain($request, $domain)) {
+            abort(403);
+        }
+        $validated = $request->validate([
+            'source' => 'required|string',
+            'target' => 'required|string',
+        ]);
+        $source = $validated['source'];
+        $target = $validated['target'];
+        $result = $this->engine->zipPath(
+            $domain->name,
+            $this->panelRelToEngineRel($domain, $source),
+            $this->panelRelToEngineRel($domain, $target)
+        );
+        if (! empty($result['error'])) {
+            $this->logFileAction($request, $domain, 'zip', $source, $target, false, $result['error']);
+            return response()->json(['message' => $result['error']], 422);
+        }
+        $this->logFileAction($request, $domain, 'zip', $source, $target, true, null);
+        return response()->json($result);
+    }
+
+    public function unzip(Request $request, Domain $domain): JsonResponse
+    {
+        if (! $this->userOwnsDomain($request, $domain)) {
+            abort(403);
+        }
+        $validated = $request->validate([
+            'archive' => 'required|string',
+            'target_dir' => 'required|string',
+        ]);
+        $archive = $validated['archive'];
+        $targetDir = $validated['target_dir'];
+        $result = $this->engine->unzipPath(
+            $domain->name,
+            $this->panelRelToEngineRel($domain, $archive),
+            $this->panelRelToEngineRel($domain, $targetDir)
+        );
+        if (! empty($result['error'])) {
+            $this->logFileAction($request, $domain, 'unzip', $archive, $targetDir, false, $result['error']);
+            return response()->json(['message' => $result['error']], 422);
+        }
+        $this->logFileAction($request, $domain, 'unzip', $archive, $targetDir, true, null);
+        return response()->json($result);
+    }
+
     public function download(Request $request, Domain $domain)
     {
         if (! $this->userOwnsDomain($request, $domain)) {

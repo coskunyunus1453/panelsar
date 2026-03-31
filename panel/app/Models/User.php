@@ -100,6 +100,13 @@ class User extends Authenticatable
         return $this->hasMany(FtpAccount::class);
     }
 
+    public function pluginModules()
+    {
+        return $this->belongsToMany(PluginModule::class, 'user_plugin_modules')
+            ->withPivot(['status', 'is_active', 'installed_at', 'activated_at'])
+            ->withTimestamps();
+    }
+
     public function isAdmin(): bool
     {
         return $this->hasRole('admin');

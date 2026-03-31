@@ -15,6 +15,7 @@ class DomainController extends Controller
     public function __construct(
         private DomainService $domainService,
         private HostingQuotaService $quota,
+        private EngineApiService $engine,
     ) {}
 
     public function index(Request $request): JsonResponse
@@ -60,6 +61,22 @@ class DomainController extends Controller
                 'dnsRecords', 'backups',
             ]),
         ]);
+    }
+
+    public function logs(Request $request, Domain $domain): JsonResponse
+    {
+        $this->authorize('view', $domain);
+        $lines = (int) $request->integer('lines', 200);
+        $lines = max(20, min(1000, $lines));
+
+        $result = $this->engine->getSiteLogs($domain->name, $lines);
+        if (! empty($result['error'])) {
+            return response()->json([
+                'message' => (string) $result['error'],
+            ], 502);
+        }
+
+        return response()->json($result);
     }
 
     public function destroy(Request $request, Domain $domain): JsonResponse

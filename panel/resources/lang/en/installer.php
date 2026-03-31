@@ -2,6 +2,8 @@
 
 return [
     'started' => 'Application installation started',
+    'started_background' => 'Installation started in the background. It will continue even if you leave this page.',
+    'completed_sync' => 'Installation completed (ran synchronously because background worker is not active).',
     'completed' => 'Installation completed.',
     'automated_only_wordpress' => 'Only WordPress can be installed automatically in this version.',
     'wordpress_requires_db' => 'Select a MySQL database for WordPress.',

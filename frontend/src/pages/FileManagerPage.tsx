@@ -566,6 +566,61 @@ export default function FileManagerPage() {
     },
   })
 
+  const copyM = useMutation({
+    mutationFn: async (vars: { from: string; to: string }) =>
+      api.post(`/domains/${domainId}/files/copy`, vars),
+    onSuccess: () => {
+      toast.success(t('files.copied'))
+      qc.invalidateQueries({ queryKey: ['files', domainId, path] })
+      setOffset(0)
+    },
+    onError: (err: unknown) => {
+      const ax = err as { response?: { data?: { message?: string } } }
+      toast.error(ax.response?.data?.message ?? String(err))
+    },
+  })
+
+  const chmodM = useMutation({
+    mutationFn: async (vars: { path: string; mode: string }) =>
+      api.post(`/domains/${domainId}/files/chmod`, vars),
+    onSuccess: () => {
+      toast.success(t('files.chmod_ok'))
+      qc.invalidateQueries({ queryKey: ['files', domainId, path] })
+    },
+    onError: (err: unknown) => {
+      const ax = err as { response?: { data?: { message?: string } } }
+      toast.error(ax.response?.data?.message ?? String(err))
+    },
+  })
+
+  const zipM = useMutation({
+    mutationFn: async (vars: { source: string; target: string }) =>
+      api.post(`/domains/${domainId}/files/zip`, vars),
+    onSuccess: () => {
+      toast.success(t('files.zip_ok'))
+      qc.invalidateQueries({ queryKey: ['files', domainId, path] })
+      setOffset(0)
+    },
+    onError: (err: unknown) => {
+      const ax = err as { response?: { data?: { message?: string } } }
+      toast.error(ax.response?.data?.message ?? String(err))
+    },
+  })
+
+  const unzipM = useMutation({
+    mutationFn: async (vars: { archive: string; target_dir: string }) =>
+      api.post(`/domains/${domainId}/files/unzip`, vars),
+    onSuccess: () => {
+      toast.success(t('files.unzip_ok'))
+      qc.invalidateQueries({ queryKey: ['files', domainId, path] })
+      setOffset(0)
+    },
+    onError: (err: unknown) => {
+      const ax = err as { response?: { data?: { message?: string } } }
+      toast.error(ax.response?.data?.message ?? String(err))
+    },
+  })
+
   const searchM = useMutation({
     mutationFn: async (q: string) => {
       const basePath = searchIncludeSubdirs ? '' : path
@@ -900,6 +955,69 @@ export default function FileManagerPage() {
                     >
                       <RefreshCw className="h-4 w-4" />
                       {t('files.op_refresh')}
+                    </button>
+                    <button
+                      type="button"
+                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-800"
+                      onClick={() => {
+                        setFileOpsOpen(false)
+                        const base = selected ? joinRel(path, selected) : ''
+                        const from = window.prompt(t('files.copy_source_prompt'), base)
+                        if (!from?.trim() || !isSafeRelativePath(from.trim())) return
+                        const to = window.prompt(t('files.copy_target_prompt'), `${from.trim()}-copy`)
+                        if (!to?.trim() || !isSafeRelativePath(to.trim())) return
+                        copyM.mutate({ from: from.trim(), to: to.trim() })
+                      }}
+                    >
+                      {t('files.op_copy')}
+                    </button>
+                    <button
+                      type="button"
+                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-800"
+                      onClick={() => {
+                        setFileOpsOpen(false)
+                        const rel = selected ? joinRel(path, selected) : path
+                        const target = window.prompt(t('files.chmod_path_prompt'), rel)
+                        if (!target?.trim() || !isSafeRelativePath(target.trim())) return
+                        const mode = window.prompt(t('files.chmod_mode_prompt'), '644')
+                        if (!mode?.trim()) return
+                        chmodM.mutate({ path: target.trim(), mode: mode.trim() })
+                      }}
+                    >
+                      <Unlock className="h-4 w-4" />
+                      {t('files.op_chmod')}
+                    </button>
+                    <button
+                      type="button"
+                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-800"
+                      onClick={() => {
+                        setFileOpsOpen(false)
+                        const sourceDefault = selected ? joinRel(path, selected) : path
+                        const source = window.prompt(t('files.zip_source_prompt'), sourceDefault)
+                        if (!source?.trim() || !isSafeRelativePath(source.trim())) return
+                        const defaultZip = `${source.trim().replace(/\/+$/g, '') || 'archive'}.zip`
+                        const target = window.prompt(t('files.zip_target_prompt'), defaultZip)
+                        if (!target?.trim() || !isSafeRelativePath(target.trim())) return
+                        zipM.mutate({ source: source.trim(), target: target.trim() })
+                      }}
+                    >
+                      {t('files.op_zip')}
+                    </button>
+                    <button
+                      type="button"
+                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-800"
+                      onClick={() => {
+                        setFileOpsOpen(false)
+                        const archiveDefault = selected ? joinRel(path, selected) : ''
+                        const archive = window.prompt(t('files.unzip_archive_prompt'), archiveDefault)
+                        if (!archive?.trim() || !isSafeRelativePath(archive.trim())) return
+                        const targetDir = window.prompt(t('files.unzip_target_prompt'), path || '')
+                        if (targetDir === null) return
+                        if (!isSafeRelativePath(targetDir.trim())) return
+                        unzipM.mutate({ archive: archive.trim(), target_dir: targetDir.trim() })
+                      }}
+                    >
+                      {t('files.op_unzip')}
                     </button>
                   </div>
                 )}
