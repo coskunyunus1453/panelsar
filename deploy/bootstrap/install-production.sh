@@ -53,6 +53,13 @@ PANELSAR_HOME="${PANELSAR_HOME:-/var/www/panelsar}"
 SERVER_NAME="${SERVER_NAME:-_}"
 LETS_ENCRYPT_EMAIL="${LETS_ENCRYPT_EMAIL:-admin@localhost}"
 APP_PROFILE="${APP_PROFILE:-customer}"
+if [[ "${ENFORCE_ADMIN_2FA:-}" == "" ]]; then
+  if [[ "$APP_PROFILE" == "vendor" ]]; then
+    ENFORCE_ADMIN_2FA=true
+  else
+    ENFORCE_ADMIN_2FA=false
+  fi
+fi
 
 if [[ ! -d "$REPO_ROOT/panel" ]] || [[ ! -d "$REPO_ROOT/engine" ]]; then
   echo "Hata: panel/ veya engine/ bulunamadı. Bu betiği repo kökünden çalıştırın (PANELSAR_HOME=$PANELSAR_HOME)." >&2
@@ -337,6 +344,7 @@ update_env() {
 update_env "APP_ENV" "production"
 update_env "APP_DEBUG" "false"
 update_env "APP_PROFILE" "$APP_PROFILE"
+update_env "ENFORCE_ADMIN_2FA" "$ENFORCE_ADMIN_2FA"
 update_env "APP_URL" "http://$(hostname -I 2>/dev/null | awk '{print $1}' || echo localhost)"
 update_env "ENGINE_API_URL" "http://127.0.0.1:9090"
 update_env "ENGINE_INTERNAL_KEY" "$INTERNAL_KEY"
