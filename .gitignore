@@ -63,3 +63,9 @@ docker/redis/data/
 *.key
 *.crt
 !docker/nginx/ssl/.gitkeep
+
+dist-artifacts/
+
+dist-artifacts/
+
+dist-artifacts/

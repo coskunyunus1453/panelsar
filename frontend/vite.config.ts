@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react'
 import path from 'path'
 
 export default defineConfig({
+  base: '/panelsar/panel/public/',
   plugins: [react()],
   resolve: {
     alias: {

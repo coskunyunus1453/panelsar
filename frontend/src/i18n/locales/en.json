@@ -42,7 +42,8 @@
     "group_operations": "Operations",
     "group_account": "Account",
     "admin_server": "Server management",
-    "admin_access": "Access & management"
+    "admin_access": "Access & management",
+    "vendor_control": "Vendor control center"
   },
   "roles": {
     "title": "Roles & permissions",

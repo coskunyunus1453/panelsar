@@ -17,10 +17,12 @@ const queryClient = new QueryClient({
   },
 })
 
+const routerBase = (import.meta as any).env?.BASE_URL || '/'
+
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
+      <BrowserRouter basename={routerBase}>
         <App />
         <Toaster
           position="top-right"

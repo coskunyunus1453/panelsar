@@ -1,5 +1,5 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
-import { useEffect } from 'react'
+import { lazy, Suspense, useEffect } from 'react'
 import { useAuthStore } from './store/authStore'
 import { useThemeStore } from './store/themeStore'
 import { useUiModeStore } from './store/uiModeStore'
@@ -35,6 +35,9 @@ import AdminPhpSettingsPage from './pages/AdminPhpSettingsPage'
 import ResellerPage from './pages/ResellerPage'
 import AiAdvisorPage from './pages/AiAdvisorPage'
 import PluginsStorePage from './pages/PluginsStorePage'
+import { isVendorProfile } from './config/profile'
+
+const AdminVendorControlPage = lazy(() => import('./pages/AdminVendorControlPage'))
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
@@ -72,6 +75,7 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+      {isVendorProfile && <Route path="/vendor/login" element={<LoginPage />} />}
       <Route
         path="/"
         element={
@@ -110,6 +114,18 @@ export default function App() {
         <Route path="admin/mail-settings" element={<AdvancedRoute><AdminMailSettingsPage /></AdvancedRoute>} />
         <Route path="admin/webserver" element={<AdvancedRoute><AdminWebServerSettingsPage /></AdvancedRoute>} />
         <Route path="admin/php-settings" element={<AdvancedRoute><AdminPhpSettingsPage /></AdvancedRoute>} />
+        {isVendorProfile && (
+          <Route
+            path="admin/vendor-control"
+            element={<AdvancedRoute><Suspense fallback={null}><AdminVendorControlPage /></Suspense></AdvancedRoute>}
+          />
+        )}
+        {isVendorProfile && (
+          <Route
+            path="vendor/control"
+            element={<AdvancedRoute><Suspense fallback={null}><AdminVendorControlPage /></Suspense></AdvancedRoute>}
+          />
+        )}
         <Route path="settings" element={<SettingsPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

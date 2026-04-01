@@ -11,6 +11,9 @@ use Spatie\Permission\Middleware\PermissionMiddleware;
 use Spatie\Permission\Middleware\RoleMiddleware;
 use Spatie\Permission\Middleware\RoleOrPermissionMiddleware;
 use App\Http\Middleware\EnsureTokenAbility;
+use App\Http\Middleware\EnforceVendorHost;
+use App\Http\Middleware\RequireTwoFactorForAdmin;
+use App\Http\Middleware\SecureHeaders;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -32,12 +35,15 @@ return Application::configure(basePath: dirname(__DIR__))
         )));
         $middleware->trustProxies(at: $trustedProxies);
         $middleware->throttleApi();
+        $middleware->append(SecureHeaders::class);
         $middleware->alias([
             'abilities' => CheckAbilities::class,
             'ability' => EnsureTokenAbility::class,
             'role' => RoleMiddleware::class,
             'permission' => PermissionMiddleware::class,
             'role_or_permission' => RoleOrPermissionMiddleware::class,
+            'require_admin_2fa' => RequireTwoFactorForAdmin::class,
+            'vendor_host' => EnforceVendorHost::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {

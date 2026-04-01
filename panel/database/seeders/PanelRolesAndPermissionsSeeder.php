@@ -10,6 +10,7 @@ class PanelRolesAndPermissionsSeeder extends Seeder
 {
     public function run(): void
     {
+        $vendorEnabled = (bool) config('panelsar.vendor_enabled', false);
         $registry = config('panelsar_abilities', []);
         if (! is_array($registry)) {
             return;
@@ -49,6 +50,10 @@ class PanelRolesAndPermissionsSeeder extends Seeder
         $resellerAllow = array_values(array_diff($allNames, $resellerDeny));
 
         $admin = Role::query()->where('name', 'admin')->where('guard_name', 'web')->first();
+        $vendorAdmin = Role::query()->where('name', 'vendor_admin')->where('guard_name', 'web')->first();
+        $vendorSupport = Role::query()->where('name', 'vendor_support')->where('guard_name', 'web')->first();
+        $vendorFinance = Role::query()->where('name', 'vendor_finance')->where('guard_name', 'web')->first();
+        $vendorDevops = Role::query()->where('name', 'vendor_devops')->where('guard_name', 'web')->first();
         $reseller = Role::query()->where('name', 'reseller')->where('guard_name', 'web')->first();
         $user = Role::query()->where('name', 'user')->where('guard_name', 'web')->first();
 
@@ -59,6 +64,50 @@ class PanelRolesAndPermissionsSeeder extends Seeder
                 'assignable_by_reseller' => false,
                 'display_name' => 'Yönetici',
             ]);
+        }
+        if ($vendorEnabled && $vendorAdmin) {
+            $vendorAllow = [
+                'dashboard:read',
+                'vendor:read',
+                'vendor:write',
+                'vendor:nodes',
+                'vendor:billing',
+                'vendor:support',
+                'vendor:audit',
+            ];
+            $vendorAdmin->syncPermissions(Permission::query()->whereIn('name', $vendorAllow)->where('guard_name', 'web')->get());
+            $vendorAdmin->update([
+                'is_system' => true,
+                'assignable_by_reseller' => false,
+                'display_name' => 'Vendor Yonetici',
+            ]);
+        }
+        if ($vendorEnabled && $vendorSupport) {
+            $vendorSupport->syncPermissions(Permission::query()->whereIn('name', [
+                'dashboard:read',
+                'vendor:read',
+                'vendor:support',
+                'vendor:audit',
+            ])->where('guard_name', 'web')->get());
+            $vendorSupport->update(['is_system' => true, 'assignable_by_reseller' => false, 'display_name' => 'Vendor Support']);
+        }
+        if ($vendorEnabled && $vendorFinance) {
+            $vendorFinance->syncPermissions(Permission::query()->whereIn('name', [
+                'dashboard:read',
+                'vendor:read',
+                'vendor:billing',
+                'vendor:audit',
+            ])->where('guard_name', 'web')->get());
+            $vendorFinance->update(['is_system' => true, 'assignable_by_reseller' => false, 'display_name' => 'Vendor Finance']);
+        }
+        if ($vendorEnabled && $vendorDevops) {
+            $vendorDevops->syncPermissions(Permission::query()->whereIn('name', [
+                'dashboard:read',
+                'vendor:read',
+                'vendor:nodes',
+                'vendor:audit',
+            ])->where('guard_name', 'web')->get());
+            $vendorDevops->update(['is_system' => true, 'assignable_by_reseller' => false, 'display_name' => 'Vendor DevOps']);
         }
         if ($reseller) {
             $reseller->syncPermissions(Permission::query()->whereIn('name', $resellerAllow)->where('guard_name', 'web')->get());

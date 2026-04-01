@@ -42,7 +42,8 @@
     "group_operations": "Operasyon",
     "group_account": "Hesap",
     "admin_server": "Sunucu yönetimi",
-    "admin_access": "Erişim ve yönetim"
+    "admin_access": "Erişim ve yönetim",
+    "vendor_control": "Vendor kontrol merkezi"
   },
   "roles": {
     "title": "Roller ve izinler",

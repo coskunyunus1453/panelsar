@@ -1,0 +1,44 @@
+name: Build Profile Artifacts
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Prepare script permissions
+        run: chmod +x deploy/scripts/build-profile-artifact.sh
+
+      - name: Build customer artifact
+        run: bash deploy/scripts/build-profile-artifact.sh customer
+
+      - name: Build vendor artifact
+        run: bash deploy/scripts/build-profile-artifact.sh vendor
+
+      - name: Upload workflow artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: panelsar-profile-artifacts
+          path: dist-artifacts/*.tar.gz
+          if-no-files-found: error
+
+      - name: Publish GitHub Release assets (tag only)
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist-artifacts/*.tar.gz
+          generate_release_notes: true

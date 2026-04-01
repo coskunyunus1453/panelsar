@@ -1,16 +1,20 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useAuthStore } from '../store/authStore'
 import { authService } from '../services/authService'
 import { useBranding } from '../hooks/useBranding'
 import { Server, Eye, EyeOff } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { isVendorProfile } from '../config/profile'
 
 export default function LoginPage() {
   const { t } = useTranslation()
   const navigate = useNavigate()
+  const location = useLocation()
   const setAuth = useAuthStore((s) => s.setAuth)
+  const portal: 'customer' | 'vendor' =
+    isVendorProfile && location.pathname.startsWith('/vendor') ? 'vendor' : 'customer'
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -23,10 +27,10 @@ export default function LoginPage() {
     setLoading(true)
 
     try {
-      const data = await authService.login(email, password)
-      setAuth(data.user, data.token)
+      const data = await authService.login(email, password, portal)
+      setAuth(data.user, data.token, portal)
       toast.success(t('dashboard.welcome'))
-      navigate('/dashboard')
+      navigate(portal === 'vendor' ? '/admin/vendor-control' : '/dashboard')
     } catch (err: unknown) {
       const error = err as { response?: { data?: { message?: string } } }
       toast.error(error.response?.data?.message || t('common.error'))
@@ -56,6 +60,11 @@ export default function LoginPage() {
           <h2 className="text-xl font-semibold text-white mb-6">
             {t('auth.login_title')}
           </h2>
+          {portal === 'vendor' && (
+            <p className="mb-4 rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-3 py-2 text-xs text-cyan-100">
+              Vendor girisi: yalnizca yazilim sahibi hesaplari.
+            </p>
+          )}
 
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>

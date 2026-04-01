@@ -112,6 +112,16 @@ class User extends Authenticatable
         return $this->hasRole('admin');
     }
 
+    public function isVendorAdmin(): bool
+    {
+        return $this->hasRole('vendor_admin');
+    }
+
+    public function isVendorOperator(): bool
+    {
+        return $this->hasAnyRole(['admin', 'vendor_admin', 'vendor_support', 'vendor_finance', 'vendor_devops']);
+    }
+
     public function isReseller(): bool
     {
         return $this->hasRole('reseller');

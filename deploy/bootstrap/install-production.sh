@@ -52,6 +52,7 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 PANELSAR_HOME="${PANELSAR_HOME:-/var/www/panelsar}"
 SERVER_NAME="${SERVER_NAME:-_}"
 LETS_ENCRYPT_EMAIL="${LETS_ENCRYPT_EMAIL:-admin@localhost}"
+APP_PROFILE="${APP_PROFILE:-customer}"
 
 if [[ ! -d "$REPO_ROOT/panel" ]] || [[ ! -d "$REPO_ROOT/engine" ]]; then
   echo "Hata: panel/ veya engine/ bulunamadı. Bu betiği repo kökünden çalıştırın (PANELSAR_HOME=$PANELSAR_HOME)." >&2
@@ -335,6 +336,7 @@ update_env() {
 
 update_env "APP_ENV" "production"
 update_env "APP_DEBUG" "false"
+update_env "APP_PROFILE" "$APP_PROFILE"
 update_env "APP_URL" "http://$(hostname -I 2>/dev/null | awk '{print $1}' || echo localhost)"
 update_env "ENGINE_API_URL" "http://127.0.0.1:9090"
 update_env "ENGINE_INTERNAL_KEY" "$INTERNAL_KEY"
@@ -427,9 +429,9 @@ if [[ -f "$FRONTEND_ROOT/package.json" ]]; then
     exit 1
   fi
   if [[ -f "$FRONTEND_ROOT/package-lock.json" ]]; then
-    (cd "$FRONTEND_ROOT" && npm ci && npm run build)
+    (cd "$FRONTEND_ROOT" && npm ci && VITE_APP_PROFILE="$APP_PROFILE" npm run build)
   else
-    (cd "$FRONTEND_ROOT" && npm install && npm run build)
+    (cd "$FRONTEND_ROOT" && npm install && VITE_APP_PROFILE="$APP_PROFILE" npm run build)
   fi
   rsync -a --delete \
     --exclude index.php \

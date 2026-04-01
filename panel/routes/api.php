@@ -34,6 +34,15 @@ use App\Http\Controllers\Api\SslController;
 use App\Http\Controllers\Api\SystemController;
 use App\Http\Controllers\Api\TerminalController;
 use App\Http\Controllers\Api\UiLinksController;
+use App\Http\Controllers\Api\Vendor\FeatureController as VendorFeatureController;
+use App\Http\Controllers\Api\Vendor\BillingController as VendorBillingController;
+use App\Http\Controllers\Api\Vendor\LicenseController as VendorLicenseController;
+use App\Http\Controllers\Api\Vendor\NodeController as VendorNodeController;
+use App\Http\Controllers\Api\Vendor\OpsController as VendorOpsController;
+use App\Http\Controllers\Api\Vendor\PlanController as VendorPlanController;
+use App\Http\Controllers\Api\Vendor\SecurityController as VendorSecurityController;
+use App\Http\Controllers\Api\Vendor\SupportController as VendorSupportController;
+use App\Http\Controllers\Api\Vendor\TenantController as VendorTenantController;
 use App\Http\Controllers\Reseller\ResellerRoleController;
 use App\Services\EngineApiService;
 use Illuminate\Support\Facades\Route;
@@ -240,9 +249,9 @@ Route::middleware(['auth:sanctum', 'abilities:access:customer-panel'])->group(fu
     });
     Route::middleware('ability:billing:write')->post('billing/checkout', [BillingController::class, 'checkout']);
 
-    Route::middleware('role:admin')->post('terminal/session', [TerminalController::class, 'session']);
+    Route::middleware(['role:admin', 'require_admin_2fa'])->post('terminal/session', [TerminalController::class, 'session']);
 
-    Route::middleware('role:admin')->prefix('system')->group(function () {
+    Route::middleware(['role:admin', 'require_admin_2fa'])->prefix('system')->group(function () {
         Route::get('stats', [SystemController::class, 'stats']);
         Route::get('services', [SystemController::class, 'services']);
         Route::get('processes', [SystemController::class, 'processes']);
@@ -254,7 +263,7 @@ Route::middleware(['auth:sanctum', 'abilities:access:customer-panel'])->group(fu
         });
     });
 
-    Route::middleware('role:admin')->prefix('admin')->group(function () {
+    Route::middleware(['role:admin', 'require_admin_2fa'])->prefix('admin')->group(function () {
         Route::post('settings/branding', [BrandingController::class, 'update']);
         Route::get('settings/branding', [BrandingController::class, 'config']);
         Route::put('settings/branding', [BrandingController::class, 'updateConfig']);
@@ -282,26 +291,26 @@ Route::middleware(['auth:sanctum', 'abilities:access:customer-panel'])->group(fu
         Route::apiResource('packages', PackageController::class);
     });
 
-    Route::prefix('admin')->middleware(['role:admin', 'ability:webserver:read'])->group(function () {
+    Route::prefix('admin')->middleware(['role:admin', 'require_admin_2fa', 'ability:webserver:read'])->group(function () {
         Route::get('settings/webserver', [WebServerSettingsController::class, 'show']);
         Route::get('settings/webserver/services', [WebServerSettingsController::class, 'services']);
         Route::get('settings/webserver/apache-modules', [WebServerSettingsController::class, 'apacheModules']);
         Route::get('settings/webserver/nginx-config', [WebServerSettingsController::class, 'getNginxConfig']);
     });
 
-    Route::prefix('admin')->middleware(['role:admin', 'ability:webserver:write'])->group(function () {
+    Route::prefix('admin')->middleware(['role:admin', 'require_admin_2fa', 'ability:webserver:write'])->group(function () {
         Route::put('settings/webserver', [WebServerSettingsController::class, 'update']);
         Route::post('settings/webserver/apache-modules/{module}', [WebServerSettingsController::class, 'setApacheModule']);
         Route::put('settings/webserver/nginx-config', [WebServerSettingsController::class, 'updateNginxConfig']);
     });
 
-    Route::prefix('admin')->middleware(['role:admin', 'ability:php:read'])->group(function () {
+    Route::prefix('admin')->middleware(['role:admin', 'require_admin_2fa', 'ability:php:read'])->group(function () {
         Route::get('settings/php/versions', [PhpSettingsController::class, 'versions']);
         Route::get('settings/php/{version}/ini', [PhpSettingsController::class, 'ini']);
         Route::get('settings/php/{version}/modules', [PhpSettingsController::class, 'modules']);
     });
 
-    Route::prefix('admin')->middleware(['role:admin', 'ability:php:write'])->group(function () {
+    Route::prefix('admin')->middleware(['role:admin', 'require_admin_2fa', 'ability:php:write'])->group(function () {
         Route::put('settings/php/{version}/ini', [PhpSettingsController::class, 'updateIni']);
         Route::patch('settings/php/{version}/modules', [PhpSettingsController::class, 'updateModules']);
     });
@@ -320,12 +329,62 @@ Route::middleware(['auth:sanctum', 'abilities:access:customer-panel'])->group(fu
             Route::delete('roles/{role}', [ResellerRoleController::class, 'destroy']);
         });
     });
+
+    if ((bool) config('panelsar.vendor_enabled', false)) {
+        Route::prefix('vendor')
+            ->middleware(['vendor_host', 'role:vendor_admin|vendor_support|vendor_finance|vendor_devops', 'require_admin_2fa', 'throttle:vendor-api'])
+            ->group(function () {
+                Route::middleware('ability:vendor:read')->group(function () {
+                    Route::get('tenants', [VendorTenantController::class, 'index']);
+                    Route::get('plans', [VendorPlanController::class, 'index']);
+                    Route::get('features', [VendorFeatureController::class, 'index']);
+                    Route::get('licenses', [VendorLicenseController::class, 'index']);
+                    Route::get('nodes', [VendorNodeController::class, 'index']);
+                    Route::get('ops/customers/{tenant}', [VendorOpsController::class, 'customer360']);
+                    Route::get('ops/licenses/{license}/timeline', [VendorOpsController::class, 'licenseTimeline']);
+                });
+                Route::middleware('ability:vendor:write')->group(function () {
+                    Route::post('tenants', [VendorTenantController::class, 'store']);
+                    Route::post('plans', [VendorPlanController::class, 'store']);
+                    Route::post('plans/{plan}/features', [VendorPlanController::class, 'setFeature']);
+                    Route::post('features', [VendorFeatureController::class, 'store']);
+                    Route::post('licenses', [VendorLicenseController::class, 'store']);
+                    Route::post('licenses/{license}/status', [VendorLicenseController::class, 'setStatus']);
+                });
+                Route::middleware('ability:vendor:billing')->group(function () {
+                    Route::get('billing/subscriptions', [VendorBillingController::class, 'subscriptions']);
+                    Route::post('billing/subscriptions', [VendorBillingController::class, 'upsertSubscription']);
+                    Route::get('billing/invoices', [VendorBillingController::class, 'invoices']);
+                    Route::get('billing/payments', [VendorBillingController::class, 'payments']);
+                });
+                Route::middleware('ability:vendor:support')->group(function () {
+                    Route::get('support/tickets', [VendorSupportController::class, 'index']);
+                    Route::post('support/tickets', [VendorSupportController::class, 'store']);
+                    Route::get('support/tickets/{ticket}', [VendorSupportController::class, 'show']);
+                    Route::post('support/tickets/{ticket}/status', [VendorSupportController::class, 'setStatus']);
+                    Route::post('support/tickets/{ticket}/messages', [VendorSupportController::class, 'addMessage']);
+                });
+                Route::middleware('ability:vendor:audit')->group(function () {
+                    Route::get('security/audit', [VendorSecurityController::class, 'auditFeed']);
+                    Route::get('security/audit/export', [VendorSecurityController::class, 'auditExport']);
+                    Route::get('security/siem', [VendorSecurityController::class, 'siemConfig']);
+                    Route::post('security/siem', [VendorSecurityController::class, 'saveSiemConfig']);
+                    Route::post('security/siem/test', [VendorSecurityController::class, 'testSiem']);
+                });
+            });
+    }
 });
 
 Route::post('billing/webhook', [BillingController::class, 'webhook'])
     ->middleware('throttle:webhooks');
 Route::post('deployment/webhook/{domain}', [DeploymentController::class, 'webhook'])
     ->middleware(['throttle:webhooks', 'throttle:deploy-run']);
+if ((bool) config('panelsar.vendor_enabled', false)) {
+    Route::post('vendor/license/verify', [VendorLicenseController::class, 'verify'])->middleware('throttle:vendor-node');
+    Route::post('vendor/node/activate', [VendorNodeController::class, 'activate'])->middleware('throttle:vendor-node');
+    Route::post('vendor/node/heartbeat', [VendorNodeController::class, 'heartbeat'])->middleware('throttle:vendor-node');
+    Route::post('vendor/billing/webhook', [VendorBillingController::class, 'webhook'])->middleware('throttle:webhooks');
+}
 
 Route::get('health', fn () => response()->json([
     'status' => 'ok',

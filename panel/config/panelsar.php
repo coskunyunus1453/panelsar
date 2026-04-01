@@ -4,6 +4,9 @@ $panelRoot = dirname(__DIR__);
 
 return [
     'version' => '0.1.0',
+    'profile' => env('APP_PROFILE', 'customer'),
+    'customer_profile' => env('APP_PROFILE', 'customer') === 'customer',
+    'vendor_profile' => env('APP_PROFILE', 'customer') === 'vendor',
 
     /** Hosting dosya kökü (engine `paths.web_root` ile aynı olmalı; boşsa proje kökü/data/www) */
     'hosting_web_root' => env('PANELSAR_HOSTING_WEB_ROOT', dirname($panelRoot).DIRECTORY_SEPARATOR.'data'.DIRECTORY_SEPARATOR.'www'),
@@ -11,6 +14,20 @@ return [
     'engine_url' => env('ENGINE_API_URL', 'http://127.0.0.1:9090'),
     'engine_internal_key' => env('ENGINE_INTERNAL_KEY', ''),
     'engine_secret' => env('ENGINE_API_SECRET', ''),
+    'vendor_license_signing_key' => env('VENDOR_LICENSE_SIGNING_KEY', ''),
+    'vendor_billing_webhook_secret' => env('VENDOR_BILLING_WEBHOOK_SECRET', ''),
+    'vendor_request_replay_ttl_seconds' => (int) env('VENDOR_REQUEST_REPLAY_TTL_SECONDS', 300),
+    'vendor_license_grace_hours' => (int) env('VENDOR_LICENSE_GRACE_HOURS', 24),
+    'vendor_portal_hosts' => array_values(array_filter(array_map(
+        'trim',
+        explode(',', (string) env('VENDOR_PORTAL_HOSTS', ''))
+    ))),
+    'vendor_enabled' => filter_var(env('VENDOR_ENABLED', env('APP_PROFILE', 'customer') === 'vendor'), FILTER_VALIDATE_BOOLEAN),
+    'enforce_admin_2fa' => filter_var(env('ENFORCE_ADMIN_2FA', true), FILTER_VALIDATE_BOOLEAN),
+    'cors_allowed_origins' => array_values(array_filter(array_map(
+        'trim',
+        explode(',', (string) env('CORS_ALLOWED_ORIGINS', ''))
+    ))),
 
     /** Web terminal WebSocket URL’si (wss) — HTTP panelde kapalı; TLS/Cloudflare sonrası true yapın */
     'force_wss_terminal' => filter_var(env('FORCE_WSS_TERMINAL', false), FILTER_VALIDATE_BOOLEAN),

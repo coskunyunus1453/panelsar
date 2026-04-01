@@ -15,7 +15,7 @@
         "spatie/laravel-activitylog": "^4.12",
         "spatie/laravel-backup": "^9.3",
         "spatie/laravel-permission": "^6.25",
-        "spatie/laravel-translatable": "^6.13",
+        "spatie/laravel-translatable": "6.11.4",
         "stripe/stripe-php": "^20.0"
     },
     "require-dev": {
@@ -72,6 +72,9 @@
         "allow-plugins": {
             "pestphp/pest-plugin": true,
             "php-http/discovery": true
+        },
+        "platform": {
+            "php": "8.2.4"
         }
     },
     "minimum-stability": "stable",

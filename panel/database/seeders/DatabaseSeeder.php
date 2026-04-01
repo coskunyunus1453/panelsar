@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Models\HostingPackage;
+use App\Models\VendorPlan;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Database\Seeder;
@@ -12,7 +13,13 @@ class DatabaseSeeder extends Seeder
 {
     public function run(): void
     {
-        foreach (['admin', 'reseller', 'user'] as $roleName) {
+        $vendorEnabled = (bool) config('panelsar.vendor_enabled', false);
+        $roles = ['admin', 'reseller', 'user'];
+        if ($vendorEnabled) {
+            $roles = array_merge($roles, ['vendor_admin', 'vendor_support', 'vendor_finance', 'vendor_devops']);
+        }
+
+        foreach ($roles as $roleName) {
             Role::firstOrCreate(
                 ['name' => $roleName, 'guard_name' => 'web'],
                 ['is_system' => true]
@@ -20,6 +27,85 @@ class DatabaseSeeder extends Seeder
         }
 
         $this->call(PanelRolesAndPermissionsSeeder::class);
+
+        if ($vendorEnabled) {
+            // Vendor pricing model defaults (EUR, community free, both monthly/yearly).
+            VendorPlan::query()->updateOrCreate(
+                ['code' => 'community'],
+                [
+                    'name' => 'Community',
+                    'billing_cycle' => 'yearly',
+                    'price_minor' => 0,
+                    'currency' => 'EUR',
+                    'is_public' => true,
+                    'limits' => [
+                        'max_nodes' => 1,
+                        'max_domains' => 3,
+                        'support_tier' => 'community',
+                    ],
+                ]
+            );
+            VendorPlan::query()->updateOrCreate(
+                ['code' => 'pro-monthly'],
+                [
+                    'name' => 'Pro Monthly',
+                    'billing_cycle' => 'monthly',
+                    'price_minor' => 2900,
+                    'currency' => 'EUR',
+                    'is_public' => true,
+                    'limits' => [
+                        'max_nodes' => 10,
+                        'max_domains' => 200,
+                        'support_tier' => 'standard',
+                    ],
+                ]
+            );
+            VendorPlan::query()->updateOrCreate(
+                ['code' => 'pro-yearly'],
+                [
+                    'name' => 'Pro Yearly',
+                    'billing_cycle' => 'yearly',
+                    'price_minor' => 29900,
+                    'currency' => 'EUR',
+                    'is_public' => true,
+                    'limits' => [
+                        'max_nodes' => 10,
+                        'max_domains' => 200,
+                        'support_tier' => 'standard',
+                    ],
+                ]
+            );
+            VendorPlan::query()->updateOrCreate(
+                ['code' => 'reseller-monthly'],
+                [
+                    'name' => 'Reseller Monthly',
+                    'billing_cycle' => 'monthly',
+                    'price_minor' => 7900,
+                    'currency' => 'EUR',
+                    'is_public' => true,
+                    'limits' => [
+                        'max_nodes' => 50,
+                        'max_domains' => 2000,
+                        'support_tier' => 'priority',
+                    ],
+                ]
+            );
+            VendorPlan::query()->updateOrCreate(
+                ['code' => 'reseller-yearly'],
+                [
+                    'name' => 'Reseller Yearly',
+                    'billing_cycle' => 'yearly',
+                    'price_minor' => 79900,
+                    'currency' => 'EUR',
+                    'is_public' => true,
+                    'limits' => [
+                        'max_nodes' => 50,
+                        'max_domains' => 2000,
+                        'support_tier' => 'priority',
+                    ],
+                ]
+            );
+        }
 
         $starter = HostingPackage::firstOrCreate(
             ['slug' => 'starter'],
@@ -104,6 +190,22 @@ class DatabaseSeeder extends Seeder
             ]
         );
         $admin->syncRoles(['admin']);
+
+        $vendorAdminEmail = env('PANELSAR_VENDOR_ADMIN_EMAIL');
+        $vendorAdminPassword = env('PANELSAR_VENDOR_ADMIN_PASSWORD');
+        if ($vendorEnabled && $vendorAdminEmail && $vendorAdminPassword) {
+            $vendorAdmin = User::firstOrCreate(
+                ['email' => $vendorAdminEmail],
+                [
+                    'name' => 'Vendor Admin',
+                    'password' => Hash::make($vendorAdminPassword),
+                    'locale' => 'en',
+                    'status' => 'active',
+                    'email_verified_at' => now(),
+                ]
+            );
+            $vendorAdmin->syncRoles(['vendor_admin']);
+        }
 
         // Production default: only admin user.
         // Demo accounts are opt-in via PANELSAR_SEED_DEMO_USERS=1.

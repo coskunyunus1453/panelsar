@@ -74,6 +74,15 @@ class AppServiceProvider extends ServiceProvider
             return Limit::perMinute(15)->by($request->user()?->id ?: $request->ip());
         });
 
+        RateLimiter::for('vendor-api', function (Request $request) {
+            return Limit::perMinute(120)->by($request->user()?->id ?: $request->ip());
+        });
+
+        // Node aktivasyon/heartbeat daha sık cagrilabilir, yine de kontrollu limitlenir.
+        RateLimiter::for('vendor-node', function (Request $request) {
+            return Limit::perMinute(300)->by($request->ip());
+        });
+
         Gate::policy(Domain::class, DomainPolicy::class);
         Gate::policy(Database::class, DatabasePolicy::class);
 

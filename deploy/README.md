@@ -33,6 +33,57 @@ Müşteri **root** (veya `sudo`) ile Debian/Ubuntu sunucuda:
 URL="https://kodsar.com/panel/install.sh" && if command -v curl >/dev/null 2>&1; then curl -fsSL "$URL" | sudo bash; else wget -qO- "$URL" | sudo bash; fi
 ```
 
+### Profil bazlı kurulum (önerilen)
+
+- Customer panel (vendor modulleri kapali):
+
+```bash
+curl -fsSL https://kodsar.com/panel/install-customer.sh | sudo bash
+```
+
+- Vendor control plane (vendor modulleri acik):
+
+```bash
+curl -fsSL https://kodsar.com/panel/install-vendor.sh | sudo bash
+```
+
+## Profil artifact üretimi (güncelleme güvenli)
+
+Sürekli dosya değişimlerinde manuel ayıklama yapmamak için profile göre otomatik paket üretin:
+
+```bash
+cd /var/www/panelsar
+bash deploy/scripts/build-profile-artifact.sh customer
+bash deploy/scripts/build-profile-artifact.sh vendor
+```
+
+Üretilen paketler `dist-artifacts/` altında oluşur:
+
+- `panelsar-customer-*.tar.gz` (vendor backend dosyalari hariç)
+- `panelsar-vendor-*.tar.gz` (tam paket)
+
+Exclude listeleri:
+
+- `deploy/profiles/common.exclude`
+- `deploy/profiles/customer.exclude`
+- `deploy/profiles/vendor.exclude`
+
+Yeni dosya/klasör eklendikçe sadece bu listeleri güncellemeniz yeterli olur.
+
+### CI otomasyonu
+
+Repository icinde `.github/workflows/profile-artifacts.yml` eklidir.
+
+- `main` push: customer + vendor artifact build eder ve Actions artifact olarak saklar.
+- `v*` tag push: build eder, sonra `.tar.gz` dosyalarini otomatik GitHub Release'e ekler.
+
+Ornek release tetikleme:
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
+
 Önce dosyayı indirip çalıştırmak isterseniz (aaPanel’e daha çok benzer):
 
 ```bash

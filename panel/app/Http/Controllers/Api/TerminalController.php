@@ -98,11 +98,11 @@ class TerminalController extends Controller
     private function terminalJwtUseRoot(): bool
     {
         if (! Schema::hasTable('panel_settings')) {
-            return true;
+            return false;
         }
         $v = PanelSetting::query()->where('key', 'security.terminal_root')->value('value');
         if ($v === null) {
-            return true;
+            return false;
         }
 
         return filter_var($v, FILTER_VALIDATE_BOOLEAN);

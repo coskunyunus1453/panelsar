@@ -1,0 +1,8 @@
+docs/vendor-control-plane
+docs/vendor-control-plane/**
+panel/app/Http/Controllers/Api/Vendor
+panel/app/Http/Controllers/Api/Vendor/**
+panel/app/Models/Vendor*.php
+panel/app/Services/Vendor*.php
+panel/app/Http/Middleware/EnforceVendorHost.php
+panel/database/migrations/*vendor*.php

@@ -16,6 +16,7 @@ class AuthController extends Controller
         $request->validate([
             'email' => 'required|email',
             'password' => 'required|string',
+            'portal' => 'nullable|in:customer,vendor',
         ]);
 
         $user = User::where('email', $request->email)->first();
@@ -28,6 +29,40 @@ class AuthController extends Controller
 
         if ($user->status !== 'active') {
             return response()->json(['message' => __('auth.suspended')], 403);
+        }
+
+        $portal = (string) ($request->input('portal', 'customer'));
+        $vendorEnabled = (bool) config('panelsar.vendor_enabled', false);
+        if ($portal === 'vendor' && ! $vendorEnabled) {
+            return response()->json([
+                'message' => 'Vendor panel bu kurulum profilinde aktif degil.',
+                'code' => 'vendor_profile_disabled',
+            ], 403);
+        }
+        if ($portal === 'vendor') {
+            $allowedHosts = config('panelsar.vendor_portal_hosts', []);
+            if (is_array($allowedHosts) && count($allowedHosts) > 0) {
+                $host = strtolower((string) $request->getHost());
+                $normalized = array_map(static fn ($h) => strtolower((string) $h), $allowedHosts);
+                if (! in_array($host, $normalized, true)) {
+                    return response()->json([
+                        'message' => 'Vendor portal host policy violation.',
+                        'code' => 'vendor_host_forbidden',
+                    ], 403);
+                }
+            }
+        }
+        if ($portal === 'vendor' && ! $user->isVendorOperator()) {
+            return response()->json([
+                'message' => 'Bu hesap vendor paneline yetkili degil.',
+                'code' => 'vendor_access_denied',
+            ], 403);
+        }
+        if ($portal === 'customer' && $user->isVendorAdmin() && ! $user->isAdmin()) {
+            return response()->json([
+                'message' => 'Bu hesap sadece vendor panelinden giris yapabilir.',
+                'code' => 'use_vendor_login',
+            ], 403);
         }
 
         $expiresAt = now()->addHours(24);

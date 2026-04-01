@@ -5,8 +5,9 @@ import type { User } from '../types'
 interface AuthState {
   user: User | null
   token: string | null
+  portal: 'customer' | 'vendor'
   isAuthenticated: boolean
-  setAuth: (user: User, token: string) => void
+  setAuth: (user: User, token: string, portal: 'customer' | 'vendor') => void
   logout: () => void
   updateUser: (user: Partial<User>) => void
 }
@@ -16,9 +17,10 @@ export const useAuthStore = create<AuthState>()(
     (set) => ({
       user: null,
       token: null,
+      portal: 'customer',
       isAuthenticated: false,
-      setAuth: (user, token) => set({ user, token, isAuthenticated: true }),
-      logout: () => set({ user: null, token: null, isAuthenticated: false }),
+      setAuth: (user, token, portal) => set({ user, token, portal, isAuthenticated: true }),
+      logout: () => set({ user: null, token: null, portal: 'customer', isAuthenticated: false }),
       updateUser: (updates) =>
         set((state) => ({
           user: state.user ? { ...state.user, ...updates } : null,
@@ -30,6 +32,7 @@ export const useAuthStore = create<AuthState>()(
       partialize: (state) => ({
         token: state.token,
         user: state.user,
+        portal: state.portal,
         isAuthenticated: state.isAuthenticated,
       }),
     },

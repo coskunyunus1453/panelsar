@@ -6,6 +6,7 @@ import { useUiModeStore } from '../../store/uiModeStore'
 import { useAuthStore } from '../../store/authStore'
 import { tokenHasAbility } from '../../lib/abilities'
 import { useBranding } from '../../hooks/useBranding'
+import { isVendorProfile } from '../../config/profile'
 import {
   LayoutDashboard,
   Globe,
@@ -40,6 +41,7 @@ import {
   Rocket,
   Sparkles,
   Store,
+  Building2,
 } from 'lucide-react'
 
 type NavLeaf = {
@@ -68,6 +70,7 @@ export default function Sidebar() {
   const mode = useUiModeStore((s) => s.mode)
   const abilities = user?.abilities
   const isAdmin = user?.roles?.some((r) => r.name === 'admin')
+  const isVendorAdmin = user?.roles?.some((r) => ['vendor_admin', 'vendor_support', 'vendor_finance', 'vendor_devops'].includes(r.name))
   const canWebserverSettings =
     tokenHasAbility(abilities, 'webserver:read') || tokenHasAbility(abilities, 'webserver:write')
   const canPhpSettings =
@@ -158,6 +161,7 @@ export default function Sidebar() {
         { path: '/admin/roles', icon: Tags, label: 'nav.roles', allow: isAdmin },
         { path: '/admin/packages', icon: Package, label: 'nav.packages', allow: isAdmin },
         { path: '/admin/license', icon: KeyRound, label: 'nav.license', allow: isAdmin },
+        { path: '/admin/vendor-control', icon: Building2, label: 'nav.vendor_control', allow: isVendorProfile && (isVendorAdmin || isAdmin) },
       ],
     },
   ]
@@ -198,7 +202,7 @@ export default function Sidebar() {
         .map((m) => ({ ...m, items: m.items.filter((i) => i.allow) }))
         .map((m) => ({ ...m, items: mode === 'easy' ? [] : m.items }))
         .filter((m) => m.items.length > 0),
-    [isAdmin, canWebserverSettings, canPhpSettings, mode],
+    [isAdmin, isVendorAdmin, canWebserverSettings, canPhpSettings, mode],
   )
 
   useEffect(() => {
