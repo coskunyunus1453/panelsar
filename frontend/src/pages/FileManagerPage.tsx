@@ -60,9 +60,28 @@ function isExecutionRiskFilePath(p: string): boolean {
 
 function getMonacoLanguageFromPath(p: string): string {
   const name = p.split('/').pop()?.toLowerCase() || ''
+  const full = p.toLowerCase()
+  const baseNoExt = name.includes('.') ? name.slice(0, name.lastIndexOf('.')) : name
+
+  // Uzantısız / özel adlandırılmış dosyalar
+  if (name === 'dockerfile') return 'dockerfile'
+  if (name === 'makefile') return 'makefile'
+  if (name === 'jenkinsfile') return 'groovy'
+  if (name === '.env' || name.startsWith('.env.')) return 'shell'
+  if (name === '.htaccess' || name === '.gitignore' || name === '.gitattributes') return 'plaintext'
+  if (name === 'nginx.conf' || name.endsWith('.nginx.conf')) return 'nginx'
+  if (name === 'caddyfile') return 'plaintext'
+  if (baseNoExt === 'config' && (name.endsWith('.prod') || name.endsWith('.dev'))) return 'plaintext'
+
+  // Yol bazlı örüntüler
+  if (full.includes('/.github/workflows/') && (name.endsWith('.yml') || name.endsWith('.yaml'))) return 'yaml'
+
+  // Yaygın uzantılar
+  if (name.endsWith('.go')) return 'go'
   if (name.endsWith('.php')) return 'php'
   if (name.endsWith('.html') || name.endsWith('.htm')) return 'html'
   if (name.endsWith('.css')) return 'css'
+  if (name.endsWith('.scss') || name.endsWith('.sass') || name.endsWith('.less')) return 'css'
   if (
     name.endsWith('.js') ||
     name.endsWith('.mjs') ||
@@ -71,12 +90,28 @@ function getMonacoLanguageFromPath(p: string): string {
   ) {
     return 'javascript'
   }
+  if (name.endsWith('.ts') || name.endsWith('.tsx')) return 'typescript'
   if (name.endsWith('.json')) return 'json'
+  if (name.endsWith('.xml')) return 'xml'
+  if (name.endsWith('.yaml') || name.endsWith('.yml')) return 'yaml'
+  if (name.endsWith('.md')) return 'markdown'
+  if (name.endsWith('.sql')) return 'sql'
+  if (name.endsWith('.sh') || name.endsWith('.bash') || name.endsWith('.zsh')) return 'shell'
+  if (name.endsWith('.ini') || name.endsWith('.conf') || name.endsWith('.cfg') || name.endsWith('.cnf')) return 'ini'
   return 'plaintext'
 }
 
 // Heavy bundle: editor sadece dosya açılınca lazy yüklensin.
-const MonacoEditor = lazy(() => import('@monaco-editor/react'))
+const MonacoEditor = lazy(async () => {
+  const [mod, loaderMod, monacoMod] = await Promise.all([
+    import('@monaco-editor/react'),
+    import('@monaco-editor/loader'),
+    import('monaco-editor'),
+  ])
+  // CSP uyumu: CDN loader yerine local bundle.
+  loaderMod.default.config({ monaco: monacoMod })
+  return mod
+})
 
 function isEditableFile(name: string): boolean {
   if (EDIT_NAME.test(name)) return true
