@@ -6,10 +6,5 @@ export VENDOR_ENABLED=true
 export ENFORCE_ADMIN_2FA="${ENFORCE_ADMIN_2FA:-true}"
 export PANELSAR_INSTALL_SCRIPT_URL="${PANELSAR_INSTALL_SCRIPT_URL:-https://raw.githubusercontent.com/coskunyunus1453/panelsar/main/deploy/host/install.sh}"
 
-if [[ -n "${BASH_SOURCE[0]:-}" ]] && [[ -f "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/install.sh" ]]; then
-  SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-  exec bash "$SCRIPT_DIR/install.sh"
-fi
-
-# curl|bash ile çalıştırıldığında yerel dosya yolu yoktur; ana install.sh'i uzaktan çalıştır.
+# Wrapper her zaman ana install.sh'i uzaktan çalıştırır (curl|bash güvenli uyum).
 exec bash -c "$(curl -fsSL "$PANELSAR_INSTALL_SCRIPT_URL")"
