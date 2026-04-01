@@ -76,6 +76,35 @@ detect_php_fpm_sock() {
   echo "/run/php/php${pv}-fpm.sock"
 }
 
+yaml_value_from_block() {
+  local file="$1" block="$2" key="$3"
+  [[ -f "$file" ]] || return 1
+  awk -v block="$block" -v key="$key" '
+    function ltrim(s){ sub(/^[[:space:]]+/, "", s); return s }
+    function rtrim(s){ sub(/[[:space:]]+$/, "", s); return s }
+    function trim(s){ return rtrim(ltrim(s)) }
+    BEGIN { inblock=0 }
+    {
+      line=$0
+      if (match(line, "^[[:space:]]*" block ":[[:space:]]*$")) {
+        inblock=1
+        next
+      }
+      if (inblock && match(line, "^[[:space:]]*[A-Za-z0-9_]+:[[:space:]]*$")) {
+        inblock=0
+      }
+      if (!inblock) next
+      if (match(line, "^[[:space:]]*" key ":[[:space:]]*")) {
+        sub("^[[:space:]]*" key ":[[:space:]]*", "", line)
+        gsub(/^"|"$/, "", line)
+        gsub(/^'\''|'\''$/, "", line)
+        print trim(line)
+        exit
+      }
+    }
+  ' "$file"
+}
+
 panelsar_git_safe_directory() {
   local d="$1"
   [[ -d "$d/.git" ]] || return 0
@@ -194,14 +223,30 @@ mkdir -p "$PANELSAR_HOME/data"/{www,tmp,ssl,backups,logs,vhosts}
 mkdir -p /etc/panelsar
 chown -R www-data:www-data "$PANELSAR_HOME/data"
 
-INTERNAL_KEY="$(openssl rand -hex 32)"
-ENGINE_SECRET="$(openssl rand -hex 32)"
-ENGINE_JWT="$(openssl rand -hex 32)"
+# Kimlik anahtarları:
+# - İlk kurulumda güvenli rastgele üretilir.
+# - Sonraki kurulum/güncellemelerde mevcut /etc/panelsar/engine.yaml içinden okunup korunur.
+#   Böylece panel↔engine auth kopmaz.
+ENGINE_DST="/etc/panelsar/engine.yaml"
+FORCE_ROTATE_ENGINE_KEYS="${FORCE_ROTATE_ENGINE_KEYS:-0}"
+
+if [[ -f "$ENGINE_DST" ]] && [[ "$FORCE_ROTATE_ENGINE_KEYS" != "1" ]]; then
+  EXISTING_INTERNAL_KEY="$(yaml_value_from_block "$ENGINE_DST" "security" "internal_api_key" || true)"
+  EXISTING_ENGINE_JWT="$(yaml_value_from_block "$ENGINE_DST" "security" "jwt_secret" || true)"
+  EXISTING_ENGINE_SECRET="$(yaml_value_from_block "$ENGINE_DST" "server" "secret_key" || true)"
+else
+  EXISTING_INTERNAL_KEY=""
+  EXISTING_ENGINE_JWT=""
+  EXISTING_ENGINE_SECRET=""
+fi
+
+INTERNAL_KEY="${EXISTING_INTERNAL_KEY:-$(openssl rand -hex 32)}"
+ENGINE_SECRET="${EXISTING_ENGINE_SECRET:-$(openssl rand -hex 32)}"
+ENGINE_JWT="${EXISTING_ENGINE_JWT:-$(openssl rand -hex 32)}"
 ENGINE_DB_PASS="$(openssl rand -hex 24)"
 
 # Engine yaml
 ENGINE_TMPL="$REPO_ROOT/deploy/configs/engine.production.yaml"
-ENGINE_DST="/etc/panelsar/engine.yaml"
 sed \
   -e "s|__INTERNAL_KEY__|$INTERNAL_KEY|g" \
   -e "s|__ENGINE_SECRET_KEY__|$ENGINE_SECRET|g" \
