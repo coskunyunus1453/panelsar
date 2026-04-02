@@ -1,4 +1,9 @@
 #!/usr/bin/env bash
+#
+# ÖNEMLİ — Satır başına "* " (madde işareti) yazmayın; kabuk * ile dizindeki dosya
+# adlarını genişletir ve komutu bozar. Doğru: curl -fsSL "…/install-customer.sh" | bash
+# İsterseniz: cd /tmp && curl … | bash
+#
 set -euo pipefail
 
 export APP_PROFILE=customer

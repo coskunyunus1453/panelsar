@@ -1,4 +1,11 @@
 #!/usr/bin/env bash
+#
+# ÖNEMLİ — Markdown / dokümandan kopyalarken satır başına "* " EKLEMEYİN.
+# "* curl ... | bash" yazarsanız kabukta * tüm dosya adlarını genişletir; ~/ içinde
+# "go", "panelsar-admin-login.txt" vb. varsa komut "go panelsar-admin-login.txt …" gibi
+# bozulur (Go: unknown command). Doğru örnek — yalnızca bu satır, başında yıldız yok:
+#   cd /tmp && curl -fsSL "https://raw.githubusercontent.com/…/install-vendor.sh" | bash
+#
 set -euo pipefail
 
 export APP_PROFILE=vendor
