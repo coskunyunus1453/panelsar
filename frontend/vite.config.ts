@@ -11,6 +11,10 @@ export default defineConfig(({ mode }) => {
   return {
     base,
     plugins: [react()],
+    build: {
+      // Kurulum çıktısında Monaco vb. uyarıyı gürültü say (hata değil)
+      chunkSizeWarningLimit: 2500,
+    },
     resolve: {
       alias: {
         '@': path.resolve(__dirname, './src'),

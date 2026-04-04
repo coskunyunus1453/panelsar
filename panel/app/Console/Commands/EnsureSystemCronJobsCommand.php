@@ -15,6 +15,10 @@ class EnsureSystemCronJobsCommand extends Command
 
     public function handle(EngineApiService $engine): int
     {
+        $internalKey = (string) config('hostvim.engine_internal_key', '');
+        $jwtSecret = (string) config('hostvim.engine_secret', '');
+        $canSyncEngine = $internalKey !== '' || $jwtSecret !== '';
+
         $owner = User::query()
             ->whereHas('roles', static fn ($q) => $q->where('name', 'admin'))
             ->orderBy('id')
@@ -50,6 +54,15 @@ class EnsureSystemCronJobsCommand extends Command
                 'system_key' => $spec['key'],
             ]);
             $job->save();
+
+            if (! $canSyncEngine) {
+                $this->warn(
+                    'Engine cron API skipped (set ENGINE_INTERNAL_KEY or ENGINE_API_SECRET in .env). '.
+                    'Panel DB kaydı güncellendi; OS cron (`/etc/cron.d/hostvim-panel-scheduler`) schedule:run çalışmaya devam eder.'
+                );
+
+                continue;
+            }
 
             if ($job->engine_job_id) {
                 $resp = $engine->engineCronUpdate((string) $job->engine_job_id, [

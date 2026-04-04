@@ -276,6 +276,10 @@ fi
 INTERNAL_KEY="${EXISTING_INTERNAL_KEY:-$(openssl rand -hex 32)}"
 ENGINE_SECRET="${EXISTING_ENGINE_SECRET:-$(openssl rand -hex 32)}"
 ENGINE_JWT="${EXISTING_ENGINE_JWT:-$(openssl rand -hex 32)}"
+# Boş string atanmışsa :- genişlemesi yeni değer üretmez; engine panel auth kırılır.
+[[ -n "$INTERNAL_KEY" ]] || INTERNAL_KEY="$(openssl rand -hex 32)"
+[[ -n "$ENGINE_SECRET" ]] || ENGINE_SECRET="$(openssl rand -hex 32)"
+[[ -n "$ENGINE_JWT" ]] || ENGINE_JWT="$(openssl rand -hex 32)"
 ENGINE_DB_PASS="$(openssl rand -hex 24)"
 PANEL_ORIGINS="${PANEL_ORIGINS:-http://localhost,http://127.0.0.1}"
 if [[ "$SERVER_NAME" != "_" ]]; then
@@ -618,6 +622,10 @@ EOF
 systemctl daemon-reload
 systemctl enable --now hostvim-panel-queue.service
 
+# Nginx — eski Panelsar site dosyası default_server ile çakışmasın (duplicate default server hatası)
+rm -f /etc/nginx/sites-enabled/panelsar.conf /etc/nginx/sites-enabled/panelsar 2>/dev/null || true
+rm -f /etc/nginx/sites-enabled/default 2>/dev/null || true
+
 # Nginx
 NGX_DST="/etc/nginx/sites-available/hostvim.conf"
 sed \
@@ -632,7 +640,6 @@ if [[ "$SERVER_NAME" == "_" ]]; then
 fi
 
 ln -sf "$NGX_DST" /etc/nginx/sites-enabled/hostvim.conf
-rm -f /etc/nginx/sites-enabled/default 2>/dev/null || true
 nginx -t
 systemctl reload nginx
 systemctl enable nginx
