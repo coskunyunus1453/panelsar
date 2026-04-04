@@ -10,8 +10,8 @@ use App\Services\OutboundMailConfigurator;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
-use Illuminate\Validation\Rule;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Symfony\Component\Process\Process;
 
 class OutboundMailSettingsController extends Controller
@@ -362,10 +362,12 @@ class OutboundMailSettingsController extends Controller
 
             if (! in_array($type, ['A', 'MX', 'TXT'], true)) {
                 $skipped[] = ['record' => $row, 'reason' => 'unsupported_type'];
+
                 continue;
             }
             if ($value === '') {
                 $skipped[] = ['record' => $row, 'reason' => 'missing_value'];
+
                 continue;
             }
 
@@ -376,6 +378,7 @@ class OutboundMailSettingsController extends Controller
                 ->exists();
             if ($exists) {
                 $skipped[] = ['record' => $row, 'reason' => 'already_exists'];
+
                 continue;
             }
 
@@ -423,7 +426,7 @@ class OutboundMailSettingsController extends Controller
             ], 404);
         }
 
-        $proc = new Process(['sudo', '-n', '/usr/local/sbin/panelsar-security', 'mail-stack-setup', $domainName]);
+        $proc = new Process(['sudo', '-n', '/usr/local/sbin/hostvim-security', 'mail-stack-setup', $domainName]);
         $proc->setTimeout(300);
         $proc->run();
         $output = trim($proc->getOutput()."\n".$proc->getErrorOutput());
@@ -476,6 +479,7 @@ class OutboundMailSettingsController extends Controller
         $sock = @fsockopen($host, $port, $errno, $errstr, $timeout);
         if (is_resource($sock)) {
             fclose($sock);
+
             return ['ok' => true, 'error' => null];
         }
 

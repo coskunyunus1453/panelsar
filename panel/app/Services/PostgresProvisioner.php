@@ -9,7 +9,7 @@ class PostgresProvisioner
 {
     public function enabled(): bool
     {
-        return (bool) config('panelsar.postgres_provision.enabled', false);
+        return (bool) config('hostvim.postgres_provision.enabled', false);
     }
 
     public function provision(string $dbName, string $dbUser, string $dbPass): void
@@ -51,6 +51,24 @@ class PostgresProvisioner
         }
     }
 
+    /**
+     * Veritabanını siler ve aynı sahip ile yeniden oluşturur (içe aktarım öncesi).
+     */
+    public function recreateEmptyDatabase(string $dbName, string $ownerUser): void
+    {
+        $this->assertSafeIdent($dbName);
+        $this->assertSafeIdent($ownerUser);
+
+        $pdo = $this->adminPdoToMaintenanceDb();
+        $qDb = $this->quoteIdent($dbName);
+        $qOwner = $this->quoteIdent($ownerUser);
+
+        $this->terminateBackends($pdo, $dbName);
+        $pdo->exec("DROP DATABASE IF EXISTS {$qDb}");
+        $pdo->exec("CREATE DATABASE {$qDb} OWNER {$qOwner}");
+        $pdo->exec("GRANT ALL PRIVILEGES ON DATABASE {$qDb} TO {$qOwner}");
+    }
+
     public function rotatePassword(string $dbUser, string $newPassword): void
     {
         $this->assertSafeIdent($dbUser);
@@ -71,7 +89,7 @@ class PostgresProvisioner
 
     private function adminPdoToMaintenanceDb(): PDO
     {
-        $c = config('panelsar.postgres_provision');
+        $c = config('hostvim.postgres_provision');
         $host = (string) ($c['host'] ?? '127.0.0.1');
         $port = (int) ($c['port'] ?? 5432);
         $maint = (string) ($c['admin_database'] ?? 'postgres');

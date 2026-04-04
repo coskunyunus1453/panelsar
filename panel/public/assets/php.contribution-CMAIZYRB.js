@@ -1,1 +1,0 @@
-import{_ as p}from"./index-CEZ_shf3.js";import{r as e}from"./_.contribution-ooW9o1bc.js";e({id:"php",extensions:[".php",".php4",".php5",".phtml",".ctp"],aliases:["PHP","php"],mimetypes:["application/x-php"],loader:()=>p(()=>import("./php-BBUBE1dy.js"),[])});

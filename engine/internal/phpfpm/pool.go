@@ -98,15 +98,69 @@ chdir = %s
 php_admin_value[open_basedir] = %s:/tmp:/var/tmp
 `
 
-// WritePool pool dosyasını yazar ve kullanılacak socket yolunu döner.
-func WritePool(h HostingPoolSettings, domain, phpVersion, docRoot string) (socket string, err error) {
+// ReadPoolSnapshot mevcut pool dosyası varsa içeriğini döner (geri alma / sürüm değişimi yedeği).
+func ReadPoolSnapshot(h HostingPoolSettings, domain, phpVersion string) (data []byte, ok bool) {
 	domain = strings.TrimSpace(domain)
 	if domain == "" || strings.Contains(domain, "..") {
-		return "", fmt.Errorf("invalid domain")
+		return nil, false
+	}
+	p := poolConfPath(h, phpVersion, domain)
+	b, err := os.ReadFile(p)
+	if err != nil {
+		return nil, false
+	}
+	return b, true
+}
+
+func fpmTestBinary(phpVersion string) string {
+	v := NormalizeVersion(phpVersion)
+	name := "php-fpm" + v
+	if p, err := exec.LookPath(name); err == nil {
+		return p
+	}
+	alt := filepath.Join("/usr/sbin", name)
+	if st, err := os.Stat(alt); err == nil && !st.IsDir() {
+		return alt
+	}
+	return ""
+}
+
+// TestFPMConfig php-fpm sürüm ikilisini bulursa `php-fpmX.Y -t` çalıştırır. İkili yoksa hata dönmez (ör. geliştirme ortamı).
+func TestFPMConfig(phpVersion string) error {
+	bin := fpmTestBinary(phpVersion)
+	if bin == "" {
+		return nil
+	}
+	out, err := exec.Command(bin, "-t").CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("php-fpm -t: %w — %s", err, strings.TrimSpace(string(out)))
+	}
+	return nil
+}
+
+// RestorePoolConf başarısız reload veya vhost sonrası pool dosyasını önceki duruma getirir; hadPrevious false ise dosyayı siler.
+func RestorePoolConf(h HostingPoolSettings, domain, phpVersion string, previous []byte, hadPrevious bool) error {
+	domain = strings.TrimSpace(domain)
+	if domain == "" || strings.Contains(domain, "..") {
+		return fmt.Errorf("invalid domain")
+	}
+	p := poolConfPath(h, phpVersion, domain)
+	if hadPrevious {
+		return os.WriteFile(p, previous, 0o644)
+	}
+	return os.Remove(p)
+}
+
+// WritePool pool dosyasını yazar; önceki içerik varsa geri alma için döner.
+// Yazdıktan sonra mümkünse `php-fpm -t` ile doğrular; test başarısızsa dosyayı eski haline getirir.
+func WritePool(h HostingPoolSettings, domain, phpVersion, docRoot string) (socket string, previous []byte, hadPrevious bool, err error) {
+	domain = strings.TrimSpace(domain)
+	if domain == "" || strings.Contains(domain, "..") {
+		return "", nil, false, fmt.Errorf("invalid domain")
 	}
 	docRoot = filepath.Clean(docRoot)
 	if strings.Contains(docRoot, "..") {
-		return "", fmt.Errorf("invalid document root")
+		return "", nil, false, fmt.Errorf("invalid document root")
 	}
 
 	socket = SocketPath(h.listenDir(), domain)
@@ -114,10 +168,15 @@ func WritePool(h HostingPoolSettings, domain, phpVersion, docRoot string) (socke
 	dir := filepath.Dir(confPath)
 
 	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return "", fmt.Errorf("pool.d mkdir: %w", err)
+		return "", nil, false, fmt.Errorf("pool.d mkdir: %w", err)
 	}
 	if err := os.MkdirAll(filepath.Dir(socket), 0o755); err != nil {
-		return "", fmt.Errorf("run dir: %w", err)
+		return "", nil, false, fmt.Errorf("run dir: %w", err)
+	}
+
+	if b, rerr := os.ReadFile(confPath); rerr == nil {
+		previous = append([]byte(nil), b...)
+		hadPrevious = true
 	}
 
 	body := fmt.Sprintf(
@@ -135,10 +194,15 @@ func WritePool(h HostingPoolSettings, domain, phpVersion, docRoot string) (socke
 	)
 
 	if err := os.WriteFile(confPath, []byte(body), 0o644); err != nil {
-		return "", fmt.Errorf("write pool: %w", err)
+		return "", previous, hadPrevious, fmt.Errorf("write pool: %w", err)
 	}
 
-	return socket, nil
+	if terr := TestFPMConfig(phpVersion); terr != nil {
+		_ = RestorePoolConf(h, domain, phpVersion, previous, hadPrevious)
+		return "", nil, false, terr
+	}
+
+	return socket, previous, hadPrevious, nil
 }
 
 // RemovePool belirtilen PHP sürüm dizinindeki pool dosyasını siler.
@@ -183,12 +247,18 @@ func Reload(phpVersion string) error {
 	v := NormalizeVersion(phpVersion)
 	svc := "php" + v + "-fpm"
 	if _, err := exec.LookPath("systemctl"); err == nil {
-		cmd := exec.Command("systemctl", "reload", svc)
-		return cmd.Run()
+		out, err := exec.Command("systemctl", "reload", svc).CombinedOutput()
+		if err != nil {
+			return fmt.Errorf("systemctl reload %s: %w — %s", svc, err, strings.TrimSpace(string(out)))
+		}
+		return nil
 	}
 	if _, err := exec.LookPath("service"); err == nil {
-		cmd := exec.Command("service", svc, "reload")
-		return cmd.Run()
+		out, err := exec.Command("service", svc, "reload").CombinedOutput()
+		if err != nil {
+			return fmt.Errorf("service %s reload: %w — %s", svc, err, strings.TrimSpace(string(out)))
+		}
+		return nil
 	}
 	return nil
 }

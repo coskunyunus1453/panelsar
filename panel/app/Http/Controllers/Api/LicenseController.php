@@ -15,10 +15,10 @@ class LicenseController extends Controller
 
     public function status(Request $request): JsonResponse
     {
-        $key = config('panelsar.license_key') ?: $request->query('key', '');
+        $key = config('hostvim.license_key') ?: $request->query('key', '');
 
         return response()->json([
-            'local_key_set' => (bool) config('panelsar.license_key'),
+            'local_key_set' => (bool) config('hostvim.license_key'),
             'engine' => $key ? $this->engine->validateLicense((string) $key) : null,
         ]);
     }

@@ -10,8 +10,8 @@ class PanelRolesAndPermissionsSeeder extends Seeder
 {
     public function run(): void
     {
-        $vendorEnabled = (bool) config('panelsar.vendor_enabled', false);
-        $registry = config('panelsar_abilities', []);
+        $vendorEnabled = (bool) config('hostvim.vendor_enabled', false);
+        $registry = config('hostvim_abilities', []);
         if (! is_array($registry)) {
             return;
         }

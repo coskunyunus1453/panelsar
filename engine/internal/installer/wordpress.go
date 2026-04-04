@@ -11,8 +11,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/panelsar/engine/internal/config"
-	"github.com/panelsar/engine/internal/sites"
+	"hostvim/engine/internal/config"
+	"hostvim/engine/internal/sites"
 )
 
 var tablePrefixRe = regexp.MustCompile(`^[a-zA-Z0-9_]{1,16}$`)
@@ -87,7 +87,7 @@ func downloadFile(url, dest string, timeout time.Duration) error {
 	if err != nil {
 		return err
 	}
-	req.Header.Set("User-Agent", "PanelsarEngine/1.0")
+	req.Header.Set("User-Agent", "HostvimEngine/1.0")
 	resp, err := client.Do(req)
 	if err != nil {
 		return fmt.Errorf("indirme: %w", err)
@@ -174,7 +174,7 @@ func fetchWordPressSalts(timeout time.Duration) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	req.Header.Set("User-Agent", "PanelsarEngine/1.0")
+	req.Header.Set("User-Agent", "HostvimEngine/1.0")
 	resp, err := client.Do(req)
 	if err != nil {
 		return "", err

@@ -1,13 +1,28 @@
 // Package stack — panelden tetiklenen beyaz listeli sunucu paketleri (apt).
+// Tam apt/dpkg geri alması bu katmanda yok; betik hata verirse çıktı API’ye döner.
+// Betik yolu engine.yaml → hosting.stack_install_script ile değiştirilebilir.
 package stack
 
 import (
 	"errors"
 	"os/exec"
 	"strings"
+
+	"hostvim/engine/internal/config"
 )
 
-const installScript = "/usr/local/sbin/panelsar-stack-install"
+const defaultInstallScript = "/usr/local/sbin/hostvim-stack-install"
+
+func stackInstallScriptPath(cfg *config.Config) string {
+	if cfg == nil {
+		return defaultInstallScript
+	}
+	s := strings.TrimSpace(cfg.Hosting.StackInstallScript)
+	if s != "" {
+		return s
+	}
+	return defaultInstallScript
+}
 
 // Module — admin arayüzünde listelenen demet.
 type Module struct {
@@ -85,13 +100,14 @@ func ValidBundle(id string) bool {
 // ErrUnknownBundle — ID beyaz listede değil.
 var ErrUnknownBundle = errors.New("bilinmeyen paket demeti")
 
-// InstallBundle sudo ile panelsar-stack-install çalıştırır (engine www-data).
-func InstallBundle(id string) (string, error) {
+// InstallBundle sudo ile yapılandırılmış stack betiğini çalıştırır (engine www-data).
+func InstallBundle(cfg *config.Config, id string) (string, error) {
 	id = strings.TrimSpace(id)
 	if !ValidBundle(id) {
 		return "", ErrUnknownBundle
 	}
-	cmd := exec.Command("sudo", installScript, id)
+	script := stackInstallScriptPath(cfg)
+	cmd := exec.Command("sudo", script, id)
 	out, err := cmd.CombinedOutput()
 	return strings.TrimSpace(string(out)), err
 }

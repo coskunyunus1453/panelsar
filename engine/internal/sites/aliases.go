@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/panelsar/engine/internal/nginx"
+	"hostvim/engine/internal/nginx"
 )
 
 // AppendAlias ana site meta’sına alias ekler (FQDN, küçük harf).

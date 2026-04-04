@@ -9,7 +9,7 @@ import (
 	"strings"
 )
 
-const helperPath = "/usr/local/sbin/panelsar-security"
+const helperPath = "/usr/local/sbin/hostvim-security"
 
 type Overview struct {
 	Fail2banEnabled bool   `json:"fail2ban_enabled"`
@@ -137,7 +137,7 @@ func NginxConfigSet(scope, content string, reload bool) error {
 	if scope == "" {
 		scope = "main"
 	}
-	tmp, err := os.CreateTemp("", "panelsar-nginx-*.conf")
+	tmp, err := os.CreateTemp("", "hostvim-nginx-*.conf")
 	if err != nil {
 		return err
 	}

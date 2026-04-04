@@ -1,6 +1,6 @@
 {
   "app": {
-    "name": "Panelsar",
+    "name": "Hostvim",
     "tagline": "Panel de control de hosting moderno"
   },
   "nav": {
@@ -28,7 +28,7 @@
   "terminal": {
     "title": "Terminal SSH",
     "subtitle": "Root login shell (via sudo). Admin only; Nginx /engine-ws/ and ENGINE_API_SECRET required.",
-    "warning": "Full root access. Set PANELSAR_TERMINAL_NO_ROOT=1 on the engine service for the old engine-user shell.",
+    "warning": "Full root access. Set HOSTVIM_TERMINAL_NO_ROOT=1 on the engine service for the old engine-user shell (legacy: PANELSAR_TERMINAL_NO_ROOT=1).",
     "status_online": "Connected",
     "status_connecting": "Connecting…",
     "status_offline": "Offline",
@@ -47,8 +47,35 @@
     "password": "Contraseña",
     "remember": "Recordarme",
     "forgot": "¿Olvidaste tu contraseña?",
-    "login_title": "Inicia sesión en Panelsar",
+    "login_title": "Inicia sesión en Hostvim",
     "login_subtitle": "Administra tu entorno de hosting"
+  },
+  "files": {
+    "op_new_folder": "Nueva carpeta",
+    "op_new_file": "Nuevo archivo",
+    "invalid_filename": "Nombre de archivo inválido.",
+    "folder_created": "Carpeta creada",
+    "mkdir_err": "No se pudo crear la carpeta",
+    "file_created": "Archivo creado",
+    "create_file_err": "No se pudo crear el archivo",
+    "invalid_mode": "Modo inválido. Ejemplo: 644, 755, 0644",
+    "bulk_chmod_btn": "Chmod masivo ({{count}})",
+    "bulk_chmod_prompt": "Modo chmod masivo (644 / 755)",
+    "bulk_chmod_ok": "Permisos actualizados para {{total}} elemento(s)",
+    "bulk_chmod_fail": "Falló en {{failed}}/{{total}} elemento(s)",
+    "zip_pick_source": "Selecciona un archivo/carpeta para comprimir.",
+    "ctx_new_folder": "Nueva carpeta",
+    "ctx_new_file": "Nuevo archivo",
+    "ctx_edit": "Editar",
+    "ctx_download": "Descargar",
+    "ctx_rename": "Renombrar",
+    "ctx_copy": "Copiar",
+    "ctx_copy_ok": "Copiado",
+    "ctx_cut": "Cortar",
+    "ctx_cut_ok": "Cortado",
+    "ctx_paste": "Pegar",
+    "ctx_chmod": "Cambiar permisos",
+    "ctx_delete_to_trash": "Eliminar (mover a papelera)"
   },
   "common": {
     "create": "Crear",
@@ -68,6 +95,24 @@
     "pending": "Pendiente",
     "confirm_delete": "¿Estás seguro de que quieres eliminar esto?",
     "yes": "Sí",
-    "no": "No"
+    "no": "No",
+    "close": "Cerrar",
+    "ok": "Entendido"
+  },
+  "ui_mode": {
+    "easy": "Modo fácil",
+    "advanced": "Modo avanzado",
+    "switch_to_easy": "Cambiar a modo fácil",
+    "switch_to_advanced": "Cambiar a modo avanzado",
+    "simple_active": "Vista simple activa",
+    "advanced_tips_title": "Consejos del modo avanzado",
+    "tip_1": "Las herramientas Security, Monitoring, Cron y Deploy serán visibles.",
+    "tip_2": "Los cambios en ajustes técnicos/admin pueden afectar el sistema en producción.",
+    "tip_3": "Puedes volver al modo fácil en cualquier momento para tareas básicas.",
+    "onboarding_title": "Modo de inicio rápido",
+    "onboarding_desc": "El modo fácil muestra funciones básicas. El modo avanzado muestra todas las herramientas técnicas.",
+    "use_easy": "Usar modo fácil",
+    "advanced_required_title": "Se requiere modo avanzado",
+    "advanced_required_desc": "Esta página contiene configuraciones técnicas/avanzadas. Está oculta en modo fácil."
   }
 }

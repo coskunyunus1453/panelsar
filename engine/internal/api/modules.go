@@ -15,17 +15,18 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/panelsar/engine/internal/config"
-	"github.com/panelsar/engine/internal/daemon"
-	"github.com/panelsar/engine/internal/files"
-	"github.com/panelsar/engine/internal/installer"
-	"github.com/panelsar/engine/internal/monitoring"
-	"github.com/panelsar/engine/internal/panelmirror"
-	"github.com/panelsar/engine/internal/phpfpm"
-	"github.com/panelsar/engine/internal/phpini"
-	"github.com/panelsar/engine/internal/security"
-	"github.com/panelsar/engine/internal/stack"
-	"github.com/panelsar/engine/internal/tools"
+	"hostvim/engine/internal/config"
+	"hostvim/engine/internal/daemon"
+	"hostvim/engine/internal/middleware"
+	"hostvim/engine/internal/files"
+	"hostvim/engine/internal/installer"
+	"hostvim/engine/internal/monitoring"
+	"hostvim/engine/internal/panelmirror"
+	"hostvim/engine/internal/phpfpm"
+	"hostvim/engine/internal/phpini"
+	"hostvim/engine/internal/security"
+	"hostvim/engine/internal/stack"
+	"hostvim/engine/internal/tools"
 	"github.com/sirupsen/logrus"
 )
 
@@ -263,7 +264,7 @@ func registerModuleRoutes(cfg *config.Config, d *daemon.Daemon, api *gin.RouterG
 		c.JSON(http.StatusOK, gin.H{
 			"fail2ban": gin.H{
 				"enabled": fail2banOn,
-				"jails":   []string{"sshd", "panelsar-auth"},
+				"jails":   []string{"sshd", "hostvim-auth", "panelsar-auth"},
 				"settings": func() gin.H {
 					b, f, m, e := security.Fail2banJailGet()
 					return gin.H{
@@ -521,22 +522,72 @@ func registerModuleRoutes(cfg *config.Config, d *daemon.Daemon, api *gin.RouterG
 	})
 
 	api.GET("/webserver/services", func(c *gin.Context) {
-		check := func(name string) gin.H {
-			installed := false
-			active := false
-			unit := name + ".service"
-			if out, _ := exec.Command("systemctl", "list-unit-files", "--type=service", unit).CombinedOutput(); strings.Contains(string(out), unit) {
-				installed = true
+		// Linux: systemctl tabanlı kontrol.
+		// macOS/XAMPP: systemctl yok, o yüzden binary+process fallback.
+		if _, err := exec.LookPath("systemctl"); err == nil {
+			check := func(name string) gin.H {
+				installed := false
+				active := false
+				unit := name + ".service"
+				if out, _ := exec.Command("systemctl", "list-unit-files", "--type=service", unit).CombinedOutput(); strings.Contains(string(out), unit) {
+					installed = true
+				}
+				if err := exec.Command("systemctl", "is-active", "--quiet", name).Run(); err == nil {
+					active = true
+				}
+				return gin.H{"installed": installed, "active": active}
 			}
-			if err := exec.Command("systemctl", "is-active", "--quiet", name).Run(); err == nil {
-				active = true
-			}
-			return gin.H{"installed": installed, "active": active}
+
+			c.JSON(http.StatusOK, gin.H{
+				"services": gin.H{
+					"nginx":  check("nginx"),
+					"apache": check("apache2"),
+				},
+			})
+			return
 		}
+
+		pgrepHasProc := func(name string) bool {
+			if _, err := exec.LookPath("pgrep"); err != nil {
+				return false
+			}
+			return exec.Command("pgrep", "-x", name).Run() == nil
+		}
+
+		fileExists := func(path string) bool {
+			if strings.TrimSpace(path) == "" {
+				return false
+			}
+			_, err := os.Stat(path)
+			return err == nil
+		}
+
+		// Nginx.
+		nginxBin := strings.TrimSpace(os.Getenv("HOSTVIM_NGINX_BIN"))
+		if nginxBin == "" {
+			nginxBin = strings.TrimSpace(os.Getenv("PANELSAR_NGINX_BIN"))
+		}
+		if nginxBin == "" && fileExists("/Applications/XAMPP/xamppfiles/bin/nginx") {
+			nginxBin = "/Applications/XAMPP/xamppfiles/bin/nginx"
+		}
+		nginxInstalled := fileExists(nginxBin) || (func() bool { _, err := exec.LookPath("nginx"); return err == nil })()
+		nginxActive := pgrepHasProc("nginx")
+
+		// Apache.
+		httpdBin := strings.TrimSpace(os.Getenv("HOSTVIM_HTTPD_BIN"))
+		if httpdBin == "" {
+			httpdBin = strings.TrimSpace(os.Getenv("PANELSAR_HTTPD_BIN"))
+		}
+		if httpdBin == "" && fileExists("/Applications/XAMPP/xamppfiles/bin/httpd") {
+			httpdBin = "/Applications/XAMPP/xamppfiles/bin/httpd"
+		}
+		apacheInstalled := fileExists(httpdBin) || (func() bool { _, err := exec.LookPath("httpd"); return err == nil })()
+		apacheActive := pgrepHasProc("httpd") || pgrepHasProc("apache2")
+
 		c.JSON(http.StatusOK, gin.H{
 			"services": gin.H{
-				"nginx":  check("nginx"),
-				"apache": check("apache2"),
+				"nginx":  gin.H{"installed": nginxInstalled, "active": nginxActive},
+				"apache": gin.H{"installed": apacheInstalled, "active": apacheActive},
 			},
 		})
 	})
@@ -727,27 +778,95 @@ func registerModuleRoutes(cfg *config.Config, d *daemon.Daemon, api *gin.RouterG
 
 	api.GET("/php/versions", func(c *gin.Context) {
 		entries, err := os.ReadDir("/etc/php")
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		if err == nil {
+			var versions []string
+			for _, e := range entries {
+				if !e.IsDir() {
+					continue
+				}
+				name := e.Name()
+				if phpVerRe.MatchString(name) {
+					versions = append(versions, name)
+				}
+			}
+			sort.Strings(versions)
+			c.JSON(http.StatusOK, gin.H{"versions": versions})
 			return
 		}
 
-		var versions []string
-		for _, e := range entries {
-			if !e.IsDir() {
-				continue
-			}
-			name := e.Name()
-			if phpVerRe.MatchString(name) {
-				versions = append(versions, name)
+		// Fallback: /etc/php yok (macOS/XAMPP). php CLI'den ana+minör sürümü çek.
+		phpBin := strings.TrimSpace(os.Getenv("HOSTVIM_PHP_BIN"))
+		if phpBin == "" {
+			phpBin = strings.TrimSpace(os.Getenv("PANELSAR_PHP_BIN"))
+		}
+		if phpBin == "" {
+			if _, err := os.Stat("/Applications/XAMPP/xamppfiles/bin/php"); err == nil {
+				phpBin = "/Applications/XAMPP/xamppfiles/bin/php"
 			}
 		}
-		sort.Strings(versions)
-		c.JSON(http.StatusOK, gin.H{"versions": versions})
+		if phpBin == "" {
+			phpBin = "php"
+		}
+
+		verOut, verErr := exec.Command(phpBin, "-r", `echo PHP_MAJOR_VERSION.".".PHP_MINOR_VERSION;`).CombinedOutput()
+		if verErr != nil {
+			c.JSON(http.StatusOK, gin.H{"versions": []string{}})
+			return
+		}
+
+		ver := strings.TrimSpace(string(verOut))
+		if !phpVerRe.MatchString(ver) {
+			c.JSON(http.StatusOK, gin.H{"versions": []string{}})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{"versions": []string{ver}})
 	})
 
-	phpIniPath := func(version string) string {
-		return filepath.Join("/etc/php", version, "fpm", "php.ini")
+	phpIniPath := func(version string) (string, error) {
+		// Linux standart yollar (fpm + cli).
+		candidates := []string{
+			filepath.Join("/etc/php", version, "fpm", "php.ini"),
+			filepath.Join("/etc/php", version, "php.ini"),
+			filepath.Join("/etc/php", version, "cli", "php.ini"),
+		}
+		for _, p := range candidates {
+			if _, err := os.Stat(p); err == nil {
+				return p, nil
+			}
+		}
+
+		// macOS/XAMPP fallback: php --ini içinden Loaded Configuration File parse et.
+		phpBin := strings.TrimSpace(os.Getenv("HOSTVIM_PHP_BIN"))
+		if phpBin == "" {
+			phpBin = strings.TrimSpace(os.Getenv("PANELSAR_PHP_BIN"))
+		}
+		if phpBin == "" {
+			if _, err := os.Stat("/Applications/XAMPP/xamppfiles/bin/php"); err == nil {
+				phpBin = "/Applications/XAMPP/xamppfiles/bin/php"
+			}
+		}
+		if phpBin == "" {
+			phpBin = "php"
+		}
+
+		out, err := exec.Command(phpBin, "--ini").CombinedOutput()
+		if err != nil {
+			return "", errors.New("php.ini yolu bulunamadı")
+		}
+
+		// Örn: "Loaded Configuration File: /Applications/XAMPP/xamppfiles/etc/php.ini"
+		re := regexp.MustCompile(`Loaded Configuration File:\s*(.+)`)
+		m := re.FindStringSubmatch(string(out))
+		if len(m) < 2 {
+			return "", errors.New("Loaded Configuration File bulunamadı")
+		}
+
+		p := strings.TrimSpace(m[1])
+		if p == "" {
+			return "", errors.New("php.ini boş")
+		}
+		return p, nil
 	}
 
 	moduleLineRe := regexp.MustCompile(`^(\s*)(;?)(\s*)(extension|zend_extension)\s*=\s*([^\s#;]+)`)
@@ -759,7 +878,12 @@ func registerModuleRoutes(cfg *config.Config, d *daemon.Daemon, api *gin.RouterG
 			return
 		}
 
-		path := phpIniPath(version)
+		path, err := phpIniPath(version)
+		if err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": err.Error(), "path": ""})
+			return
+		}
+
 		b, err := phpini.Read(path)
 		if err != nil {
 			c.JSON(http.StatusNotFound, gin.H{"error": err.Error(), "path": path})
@@ -793,7 +917,11 @@ func registerModuleRoutes(cfg *config.Config, d *daemon.Daemon, api *gin.RouterG
 			reload = *req.Reload
 		}
 
-		path := phpIniPath(version)
+		path, err := phpIniPath(version)
+		if err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": err.Error(), "path": ""})
+			return
+		}
 		if err := phpini.Write(path, []byte(req.Ini), 0o644); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "path": path})
 			return
@@ -816,7 +944,12 @@ func registerModuleRoutes(cfg *config.Config, d *daemon.Daemon, api *gin.RouterG
 			return
 		}
 
-		path := phpIniPath(version)
+		path, err := phpIniPath(version)
+		if err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": err.Error(), "path": ""})
+			return
+		}
+
 		b, err := phpini.Read(path)
 		if err != nil {
 			c.JSON(http.StatusNotFound, gin.H{"error": err.Error(), "path": path})
@@ -902,7 +1035,12 @@ func registerModuleRoutes(cfg *config.Config, d *daemon.Daemon, api *gin.RouterG
 			reload = *req.Reload
 		}
 
-		path := phpIniPath(version)
+		path, err := phpIniPath(version)
+		if err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": err.Error(), "path": ""})
+			return
+		}
+
 		b, err := phpini.Read(path)
 		if err != nil {
 			c.JSON(http.StatusNotFound, gin.H{"error": err.Error(), "path": path})
@@ -969,65 +1107,71 @@ func registerModuleRoutes(cfg *config.Config, d *daemon.Daemon, api *gin.RouterG
 		}
 		c.JSON(http.StatusOK, gin.H{"processes": procs})
 	})
-	api.POST("/system/processes/kill", func(c *gin.Context) {
-		var req struct {
-			PID int `json:"pid" binding:"required"`
-		}
-		if err := c.ShouldBindJSON(&req); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-			return
-		}
-		if req.PID <= 1 {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid pid"})
-			return
-		}
-		out, err := exec.Command("kill", "-TERM", strconv.Itoa(req.PID)).CombinedOutput()
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{
-				"error":  err.Error(),
-				"output": strings.TrimSpace(string(out)),
-			})
-			return
-		}
-		c.JSON(http.StatusOK, gin.H{"message": "process kill signal sent", "pid": req.PID})
-	})
 
-	api.POST("/system/reboot", func(c *gin.Context) {
-		// Basit ve açık: sistem bazlı reboot. Çoğu dağıtımda systemctl reboot veya shutdown -r now çalışır.
-		go func() {
-			if _, err := exec.LookPath("systemctl"); err == nil {
-				_ = exec.Command("systemctl", "reboot").Run()
-				return
+	engineInternal := api.Group("")
+	engineInternal.Use(middleware.RequireInternalRole())
+	{
+		engineInternal.POST("/system/processes/kill", func(c *gin.Context) {
+			var req struct {
+				PID int `json:"pid" binding:"required"`
 			}
-			_ = exec.Command("shutdown", "-r", "now").Run()
-		}()
-		c.JSON(http.StatusAccepted, gin.H{"message": "reboot requested"})
-	})
-
-	api.GET("/stack/modules", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{"modules": stack.ModulesWithStatus()})
-	})
-	api.POST("/stack/install", func(c *gin.Context) {
-		var req struct {
-			BundleID string `json:"bundle_id" binding:"required"`
-		}
-		if err := c.ShouldBindJSON(&req); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-			return
-		}
-		out, err := stack.InstallBundle(req.BundleID)
-		if err != nil {
-			if errors.Is(err, stack.ErrUnknownBundle) {
+			if err := c.ShouldBindJSON(&req); err != nil {
 				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 				return
 			}
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"error":  err.Error(),
-				"output": out,
-			})
-			return
-		}
-		c.JSON(http.StatusOK, gin.H{"message": "ok", "output": out, "modules": stack.ModulesWithStatus()})
+			if req.PID <= 1 {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "invalid pid"})
+				return
+			}
+			out, err := exec.Command("kill", "-TERM", strconv.Itoa(req.PID)).CombinedOutput()
+			if err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{
+					"error":  err.Error(),
+					"output": strings.TrimSpace(string(out)),
+				})
+				return
+			}
+			c.JSON(http.StatusOK, gin.H{"message": "process kill signal sent", "pid": req.PID})
+		})
+
+		engineInternal.POST("/system/reboot", func(c *gin.Context) {
+			// Basit ve açık: sistem bazlı reboot. Çoğu dağıtımda systemctl reboot veya shutdown -r now çalışır.
+			go func() {
+				if _, err := exec.LookPath("systemctl"); err == nil {
+					_ = exec.Command("systemctl", "reboot").Run()
+					return
+				}
+				_ = exec.Command("shutdown", "-r", "now").Run()
+			}()
+			c.JSON(http.StatusAccepted, gin.H{"message": "reboot requested"})
+		})
+
+		engineInternal.POST("/stack/install", func(c *gin.Context) {
+			var req struct {
+				BundleID string `json:"bundle_id" binding:"required"`
+			}
+			if err := c.ShouldBindJSON(&req); err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+				return
+			}
+			out, err := stack.InstallBundle(cfg, req.BundleID)
+			if err != nil {
+				if errors.Is(err, stack.ErrUnknownBundle) {
+					c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+					return
+				}
+				c.JSON(http.StatusInternalServerError, gin.H{
+					"error":  err.Error(),
+					"output": out,
+				})
+				return
+			}
+			c.JSON(http.StatusOK, gin.H{"message": "ok", "output": out, "modules": stack.ModulesWithStatus()})
+		})
+	}
+
+	api.GET("/stack/modules", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"modules": stack.ModulesWithStatus()})
 	})
 
 	_ = d

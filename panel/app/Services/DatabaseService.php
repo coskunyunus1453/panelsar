@@ -6,6 +6,7 @@ use App\Models\Database;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Symfony\Component\Process\Process;
 
 class DatabaseService
 {
@@ -39,7 +40,7 @@ class DatabaseService
         if ($type === 'mysql') {
             $resolvedGrant = $grantHost !== null && trim($grantHost) !== ''
                 ? trim($grantHost)
-                : (string) config('panelsar.mysql_provision.grant_host', 'localhost');
+                : (string) config('hostvim.mysql_provision.grant_host', 'localhost');
             if ($this->mysqlProvisioner->enabled()) {
                 $this->mysqlProvisioner->provision($dbName, $dbUser, $dbPass, $resolvedGrant);
             }
@@ -49,10 +50,10 @@ class DatabaseService
             $this->postgresProvisioner->provision($dbName, $dbUser, $dbPass);
         }
 
-        $mysqlHost = (string) config('panelsar.mysql_provision.host', '127.0.0.1');
-        $mysqlPort = (int) config('panelsar.mysql_provision.port', 3306);
-        $pgHost = (string) config('panelsar.postgres_provision.host', '127.0.0.1');
-        $pgPort = (int) config('panelsar.postgres_provision.port', 5432);
+        $mysqlHost = (string) config('hostvim.mysql_provision.host', '127.0.0.1');
+        $mysqlPort = (int) config('hostvim.mysql_provision.port', 3306);
+        $pgHost = (string) config('hostvim.postgres_provision.host', '127.0.0.1');
+        $pgPort = (int) config('hostvim.postgres_provision.port', 5432);
 
         return DB::transaction(function () use ($user, $domainId, $type, $dbName, $dbUser, $dbPass, $resolvedGrant, $mysqlHost, $mysqlPort, $pgHost, $pgPort) {
             $database = Database::create([
@@ -162,5 +163,156 @@ class DatabaseService
         }
 
         $database->delete();
+    }
+
+    /**
+     * @param  callable(string): void  $writeChunk
+     */
+    public function streamMysqlDump(Database $database, callable $writeChunk): void
+    {
+        if ($database->type !== 'mysql') {
+            throw new \InvalidArgumentException(__('databases.export_not_mysql'));
+        }
+        if (! $this->mysqlProvisioner->enabled()) {
+            throw new \InvalidArgumentException(__('databases.provision_disabled_export'));
+        }
+
+        $bin = (string) config('hostvim.database_tools.mysqldump_path', 'mysqldump');
+        $args = [
+            $bin,
+            '-h', $database->host,
+            '-P', (string) $database->port,
+            '-u', $database->username,
+            '--single-transaction',
+            '--quick',
+            '--skip-lock-tables',
+            '--set-charset',
+            '--default-character-set=utf8mb4',
+            $database->name,
+        ];
+
+        $plain = $database->password;
+        $process = new Process($args, null, ['MYSQL_PWD' => $plain], null, 3600.0);
+        $process->run(function (string $type, string $buffer) use ($writeChunk): void {
+            if ($type === Process::OUT) {
+                $writeChunk($buffer);
+            }
+        });
+
+        if (! $process->isSuccessful()) {
+            throw new \RuntimeException(trim($process->getErrorOutput() ?: $process->getOutput()) ?: 'mysqldump failed');
+        }
+    }
+
+    /**
+     * @param  callable(string): void  $writeChunk
+     */
+    public function streamPostgresDump(Database $database, callable $writeChunk): void
+    {
+        if ($database->type !== 'postgresql') {
+            throw new \InvalidArgumentException(__('databases.export_not_postgresql'));
+        }
+        if (! $this->postgresProvisioner->enabled()) {
+            throw new \InvalidArgumentException(__('databases.provision_disabled_export'));
+        }
+
+        $bin = (string) config('hostvim.database_tools.pg_dump_path', 'pg_dump');
+        $args = [
+            $bin,
+            '-h', $database->host,
+            '-p', (string) $database->port,
+            '-U', $database->username,
+            '--no-owner',
+            '--no-acl',
+            $database->name,
+        ];
+
+        $plain = $database->password;
+        $process = new Process($args, null, ['PGPASSWORD' => $plain], null, 3600.0);
+        $process->run(function (string $type, string $buffer) use ($writeChunk): void {
+            if ($type === Process::OUT) {
+                $writeChunk($buffer);
+            }
+        });
+
+        if (! $process->isSuccessful()) {
+            throw new \RuntimeException(trim($process->getErrorOutput() ?: $process->getOutput()) ?: 'pg_dump failed');
+        }
+    }
+
+    public function importMysqlFromSqlFile(Database $database, string $absolutePath): void
+    {
+        if ($database->type !== 'mysql') {
+            throw new \InvalidArgumentException(__('databases.import_not_mysql'));
+        }
+        if (! $this->mysqlProvisioner->enabled()) {
+            throw new \InvalidArgumentException(__('databases.provision_disabled_import'));
+        }
+        if (! is_readable($absolutePath)) {
+            throw new \InvalidArgumentException(__('databases.import_file_unreadable'));
+        }
+
+        $plain = $database->password;
+        $this->mysqlProvisioner->recreateEmptyDatabase(
+            $database->name,
+            $database->username,
+            $database->mysqlGrantHost(),
+            $plain,
+        );
+
+        $bin = (string) config('hostvim.database_tools.mysql_path', 'mysql');
+        $sql = file_get_contents($absolutePath);
+        if ($sql === false) {
+            throw new \RuntimeException(__('databases.import_file_unreadable'));
+        }
+
+        $process = new Process(
+            [
+                $bin,
+                '-h', $database->host,
+                '-P', (string) $database->port,
+                '-u', $database->username,
+                $database->name,
+            ],
+            null,
+            ['MYSQL_PWD' => $plain],
+            $sql,
+            3600.0,
+        );
+        $process->mustRun();
+    }
+
+    public function importPostgresFromSqlFile(Database $database, string $absolutePath): void
+    {
+        if ($database->type !== 'postgresql') {
+            throw new \InvalidArgumentException(__('databases.import_not_postgresql'));
+        }
+        if (! $this->postgresProvisioner->enabled()) {
+            throw new \InvalidArgumentException(__('databases.provision_disabled_import'));
+        }
+        if (! is_readable($absolutePath)) {
+            throw new \InvalidArgumentException(__('databases.import_file_unreadable'));
+        }
+
+        $this->postgresProvisioner->recreateEmptyDatabase($database->name, $database->username);
+
+        $bin = (string) config('hostvim.database_tools.psql_path', 'psql');
+        $plain = $database->password;
+        $process = new Process(
+            [
+                $bin,
+                '-h', $database->host,
+                '-p', (string) $database->port,
+                '-U', $database->username,
+                '-d', $database->name,
+                '-v', 'ON_ERROR_STOP=1',
+                '-f', $absolutePath,
+            ],
+            null,
+            ['PGPASSWORD' => $plain],
+            null,
+            3600.0,
+        );
+        $process->mustRun();
     }
 }

@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'email_required' => 'Let’s Encrypt needs an email address. Set LETS_ENCRYPT_EMAIL / panelsar config or enter one in the SSL form.',
+    'email_required' => 'Let’s Encrypt needs an email address. Set LETS_ENCRYPT_EMAIL / hostvim config or enter one in the SSL form.',
     'issued' => 'SSL certificate issued',
     'renewed' => 'SSL certificate renewed',
     'revoked' => 'SSL certificate revoked',

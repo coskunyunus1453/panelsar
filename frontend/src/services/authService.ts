@@ -7,9 +7,23 @@ interface LoginResponse {
   expires_at: string
 }
 
+interface LoginOptions {
+  otp?: string
+  backupCode?: string
+}
+
 export const authService = {
-  login: async (email: string, password: string, portal: 'customer' | 'vendor' = 'customer'): Promise<LoginResponse> => {
-    const { data } = await api.post('/auth/login', { email, password, portal })
+  login: async (
+    email: string,
+    password: string,
+    portal: 'customer' | 'vendor' = 'customer',
+    options?: LoginOptions,
+  ): Promise<LoginResponse> => {
+    const payload: any = { email, password, portal }
+    if (options?.otp) payload.otp = options.otp
+    if (options?.backupCode) payload.backup_code = options.backupCode
+
+    const { data } = await api.post('/auth/login', payload)
     return data
   },
 

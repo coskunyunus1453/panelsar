@@ -1,6 +1,6 @@
 {
   "app": {
-    "name": "Panelsar",
+    "name": "Hostvim",
     "tagline": "Modernes Hosting-Kontrollpanel"
   },
   "nav": {
@@ -28,7 +28,7 @@
   "terminal": {
     "title": "SSH-Terminal",
     "subtitle": "Root login shell (via sudo). Admin only; Nginx /engine-ws/ and ENGINE_API_SECRET required.",
-    "warning": "Full root access. Set PANELSAR_TERMINAL_NO_ROOT=1 on the engine service for the old engine-user shell.",
+    "warning": "Full root access. Set HOSTVIM_TERMINAL_NO_ROOT=1 on the engine service for the old engine-user shell (legacy: PANELSAR_TERMINAL_NO_ROOT=1).",
     "status_online": "Connected",
     "status_connecting": "Connecting…",
     "status_offline": "Offline",
@@ -47,7 +47,7 @@
     "password": "Passwort",
     "remember": "Angemeldet bleiben",
     "forgot": "Passwort vergessen?",
-    "login_title": "Bei Panelsar anmelden",
+    "login_title": "Bei Hostvim anmelden",
     "login_subtitle": "Verwalten Sie Ihre Hosting-Umgebung"
   },
   "dashboard": {
@@ -67,6 +67,33 @@
     "create_email": "E-Mail erstellen",
     "system_status": "Systemstatus"
   },
+  "files": {
+    "op_new_folder": "Neuer Ordner",
+    "op_new_file": "Neue Datei",
+    "invalid_filename": "Ungültiger Dateiname.",
+    "folder_created": "Ordner erstellt",
+    "mkdir_err": "Ordner konnte nicht erstellt werden",
+    "file_created": "Datei erstellt",
+    "create_file_err": "Datei konnte nicht erstellt werden",
+    "invalid_mode": "Ungültiger Modus. Beispiel: 644, 755, 0644",
+    "bulk_chmod_btn": "Massen-chmod ({{count}})",
+    "bulk_chmod_prompt": "Massen-chmod Modus (644 / 755)",
+    "bulk_chmod_ok": "Berechtigungen für {{total}} Einträge aktualisiert",
+    "bulk_chmod_fail": "Berechtigungen für {{failed}}/{{total}} Einträge fehlgeschlagen",
+    "zip_pick_source": "Wählen Sie eine Datei/einen Ordner zum Zippen.",
+    "ctx_new_folder": "Neuer Ordner",
+    "ctx_new_file": "Neue Datei",
+    "ctx_edit": "Bearbeiten",
+    "ctx_download": "Herunterladen",
+    "ctx_rename": "Umbenennen",
+    "ctx_copy": "Kopieren",
+    "ctx_copy_ok": "Kopiert",
+    "ctx_cut": "Ausschneiden",
+    "ctx_cut_ok": "Ausgeschnitten",
+    "ctx_paste": "Einfügen",
+    "ctx_chmod": "Berechtigung ändern",
+    "ctx_delete_to_trash": "Löschen (in Papierkorb)"
+  },
   "common": {
     "create": "Erstellen",
     "edit": "Bearbeiten",
@@ -85,6 +112,24 @@
     "pending": "Ausstehend",
     "confirm_delete": "Möchten Sie dies wirklich löschen?",
     "yes": "Ja",
-    "no": "Nein"
+    "no": "Nein",
+    "close": "Schließen",
+    "ok": "Verstanden"
+  },
+  "ui_mode": {
+    "easy": "Einfacher Modus",
+    "advanced": "Erweiterter Modus",
+    "switch_to_easy": "Zum einfachen Modus wechseln",
+    "switch_to_advanced": "Zum erweiterten Modus wechseln",
+    "simple_active": "Einfache Ansicht aktiv",
+    "advanced_tips_title": "Tipps für erweiterten Modus",
+    "tip_1": "Security-, Monitoring-, Cron- und Deploy-Tools werden sichtbar.",
+    "tip_2": "Änderungen an Admin/Technik-Einstellungen können das Livesystem beeinflussen.",
+    "tip_3": "Für Basisaufgaben können Sie jederzeit zum einfachen Modus zurückkehren.",
+    "onboarding_title": "Schnellstartmodus",
+    "onboarding_desc": "Der einfache Modus zeigt Grundfunktionen. Der erweiterte Modus zeigt alle technischen Werkzeuge.",
+    "use_easy": "Einfachen Modus verwenden",
+    "advanced_required_title": "Erweiterter Modus erforderlich",
+    "advanced_required_desc": "Diese Seite enthält technische/erweiterte Einstellungen. Im einfachen Modus ist sie ausgeblendet."
   }
 }

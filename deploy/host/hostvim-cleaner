@@ -1,0 +1,138 @@
+#!/bin/bash
+# Hostvim — yarım kalan unzip/copy işlemlerinden kalan .tmp_* dizinlerini temizler.
+# /tmp ve hosting web_root altında; varsayılan yaş eşiği 2 saat (mtime).
+#
+# Kullanım:
+#   hostvim-cleaner
+#   hostvim-cleaner --web-root /var/www/hostvim/data/www
+#   HOSTVIM_HOSTING_WEB_ROOT=/path/to/www hostvim-cleaner
+#   hostvim-cleaner --dry-run --verbose
+#
+# Ortam:
+#   HOSTVIM_HOSTING_WEB_ROOT  — tarama yapılacak web kökü (birden fazla: : ile ayırın)
+#   HOSTVIM_CLEANER_AGE_MINUTES — eşik (varsayılan 120)
+#   HOSTVIM_CLEANER_SKIP_TMP   — 1 ise /tmp taranmaz
+set -euo pipefail
+
+AGE_MINUTES="${HOSTVIM_CLEANER_AGE_MINUTES:-120}"
+DRY_RUN=0
+VERBOSE=0
+WEB_ROOTS_ARG=""
+SKIP_TMP="${HOSTVIM_CLEANER_SKIP_TMP:-0}"
+
+usage() {
+  sed -n '1,20p' "$0" | tail -n +2
+  echo "Seçenekler: --web-root PATH | --age-minutes N | --dry-run | --verbose | -h"
+  exit 0
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --web-root)
+      WEB_ROOTS_ARG="${WEB_ROOTS_ARG:+$WEB_ROOTS_ARG:}${2:-}"
+      shift 2
+      ;;
+    --age-minutes)
+      AGE_MINUTES="${2:-120}"
+      shift 2
+      ;;
+    --dry-run) DRY_RUN=1; shift ;;
+    --verbose) VERBOSE=1; shift ;;
+    -h|--help) usage ;;
+    *)
+      echo "Bilinmeyen seçenek: $1" >&2
+      exit 2
+      ;;
+  esac
+done
+
+if ! [[ "$AGE_MINUTES" =~ ^[0-9]+$ ]] || [[ "$AGE_MINUTES" -lt 1 ]]; then
+  echo "Geçersiz yaş (dakika): $AGE_MINUTES" >&2
+  exit 2
+fi
+
+log_v() {
+  if [[ "$VERBOSE" == "1" ]]; then
+    echo "[hostvim-cleaner] $*" >&2
+  fi
+}
+
+# Mutlak yolu doğrula; yoksa atla (cron’da yanlış env zararsız).
+check_root_dir() {
+  local d="$1"
+  [[ -n "$d" ]] || return 1
+  [[ "${d:0:1}" == / ]] || return 1
+  [[ -d "$d" ]] || return 1
+  return 0
+}
+
+collect_web_roots() {
+  local out="" item
+  if [[ -n "$WEB_ROOTS_ARG" ]]; then
+    IFS=':' read -ra _parts <<< "$WEB_ROOTS_ARG"
+    for item in "${_parts[@]}"; do
+      item="$(echo "$item" | sed 's/[[:space:]]//g')"
+      [[ -n "$item" ]] || continue
+      out="${out:+$out }$item"
+    done
+  fi
+  if [[ -n "${HOSTVIM_HOSTING_WEB_ROOT:-}" ]]; then
+    IFS=':' read -ra _envparts <<< "$HOSTVIM_HOSTING_WEB_ROOT"
+    for item in "${_envparts[@]}"; do
+      item="$(echo "$item" | sed 's/[[:space:]]//g')"
+      [[ -n "$item" ]] || continue
+      out="${out:+$out }$item"
+    done
+  fi
+  # Tekilleştir (basit)
+  echo "$out" | tr ' ' '\n' | awk 'NF && !seen[$0]++' | tr '\n' ' '
+}
+
+REMOVED=0
+
+clean_under() {
+  local base="$1"
+  local label="$2"
+  check_root_dir "$base" || {
+    log_v "Atlanıyor (yok veya göreli): $label=$base"
+    return 0
+  }
+
+  local realbase
+  realbase="$(cd "$base" && pwd -P 2>/dev/null)" || return 0
+
+  log_v "Taranıyor: $label -> $realbase"
+
+  # -depth: iç içe .tmp_* için önce alt dizinler
+  while IFS= read -r -d '' d; do
+    [[ -d "$d" ]] || continue
+    if [[ "$DRY_RUN" == "1" ]]; then
+      echo "[dry-run] silinecek: $d" >&2
+      REMOVED=$((REMOVED + 1))
+      continue
+    fi
+    log_v "Siliniyor: $d"
+    rm -rf -- "$d"
+    REMOVED=$((REMOVED + 1))
+  done < <(find "$realbase" -xdev -depth -type d -name '.tmp_*' -mmin +"$AGE_MINUTES" -print0 2>/dev/null || true)
+}
+
+if [[ "$SKIP_TMP" != "1" ]]; then
+  clean_under "/tmp" "tmp"
+fi
+
+WR="$(collect_web_roots)"
+for w in $WR; do
+  clean_under "$w" "web_root"
+done
+
+if [[ -z "$WR" ]] && [[ "$SKIP_TMP" == "1" ]]; then
+  echo "hostvim-cleaner: ne /tmp ne de web_root tanımlı; çıkılıyor." >&2
+  exit 1
+fi
+
+if [[ "$VERBOSE" == "1" ]] || [[ "$DRY_RUN" == "1" ]]; then
+  echo "[hostvim-cleaner] eşik=${AGE_MINUTES}dk, kaldırılan/geçerli kayıt=${REMOVED}" >&2
+fi
+
+exit 0

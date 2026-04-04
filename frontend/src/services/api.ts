@@ -2,9 +2,28 @@ import axios from 'axios'
 import { useAuthStore } from '../store/authStore'
 import { useNotificationsStore } from '../store/notificationsStore'
 import { effectiveLoginPath, isVendorProfile } from '../config/profile'
+import { inferPublicPathPrefix } from '../lib/publicPath'
+import i18n from '../i18n'
 
-const baseUrl = (import.meta as any).env?.BASE_URL || '/'
-const apiBaseUrl = `${baseUrl.replace(/\/+$/, '')}/api`
+function resolvePanelApiBase(): string {
+  // Alt klasör kurulumda mutlak `/index.php/api` yanlış host köküne gider; gerçek sayfa URL’sine göre çöz.
+  if (typeof window !== 'undefined') {
+    try {
+      return new URL('index.php/api', window.location.href).href.replace(/\/+$/, '')
+    } catch {
+      /* fallthrough */
+    }
+  }
+  const base = String((import.meta as any).env?.BASE_URL || '/').replace(/\/+$/, '')
+  if (!base || base === '/' || base === '.' || base === './') {
+    return '/index.php/api'
+  }
+  return `${base}/index.php/api`
+}
+
+// XAMPP: `index.php/api` front controller; `.htaccess` rewrite yoksa bile çalışır.
+/** Dışa aktarma (fetch) için tam API kökü. */
+export const apiBaseUrl = resolvePanelApiBase()
 
 const api = axios.create({
   baseURL: apiBaseUrl,
@@ -19,6 +38,9 @@ api.interceptors.request.use((config) => {
   if (token) {
     config.headers.Authorization = `Bearer ${token}`
   }
+  // Backend Laravel `app()->setLocale()` için her API çağrısına dili taşır.
+  const currentLocale = (i18n.language || 'en').split('-')[0]
+  ;(config.headers as any)['X-Locale'] = currentLocale
   // FormData: Content-Type'ı kaldır; tarayıcı multipart boundary ile ayarlar (aksi halde Laravel 422)
   if (config.data instanceof FormData) {
     config.headers.delete('Content-Type')
@@ -33,8 +55,15 @@ api.interceptors.response.use(
       const portal = useAuthStore.getState().portal || 'customer'
       useAuthStore.getState().logout()
       const loginPath = portal === 'vendor' && isVendorProfile ? '/vendor/login' : effectiveLoginPath
-      window.location.href = `${baseUrl.replace(/\/+$/, '')}${loginPath}`
+      const prefix = inferPublicPathPrefix().replace(/\/+$/, '')
+      window.location.href = `${window.location.origin}${prefix}${loginPath}`
     } else {
+      const code = error.response?.data?.code as string | undefined
+      // 2FA challenge durumlarında UI zaten yönlendiriyor; interceptor otomatik error üretmesin.
+      if (error.response?.status === 423 && code === 'twofa_required') {
+        return Promise.reject(error)
+      }
+
       const msg = error.response?.data?.message || error.message || 'API error'
       useNotificationsStore.getState().add({
         level: 'error',

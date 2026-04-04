@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import axios from 'axios'
+import publicApi from '../services/publicApi'
 
 export interface BrandingPayload {
   logo_customer_url: string | null
@@ -10,9 +10,9 @@ export function useBranding() {
   return useQuery({
     queryKey: ['branding'],
     queryFn: async () => {
-      const { data } = await axios.get<BrandingPayload>('/api/branding', {
-        headers: { Accept: 'application/json' },
-      })
+      // Panel alt dizinde (ör. `/proje/panel/public/*`) çalışabilir; mutlak `/api/*`
+      // çağrıları yanlış mount’a düşebiliyor. Bu yüzden göreli path kullanıyoruz.
+      const { data } = await publicApi.get<BrandingPayload>('/branding')
       return data
     },
     staleTime: 5 * 60 * 1000,

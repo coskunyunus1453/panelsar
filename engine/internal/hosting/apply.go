@@ -5,12 +5,12 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/panelsar/engine/internal/apache"
-	"github.com/panelsar/engine/internal/config"
-	"github.com/panelsar/engine/internal/nginx"
-	"github.com/panelsar/engine/internal/phpfpm"
-	"github.com/panelsar/engine/internal/sites"
-	"github.com/panelsar/engine/internal/ssl"
+	"hostvim/engine/internal/apache"
+	"hostvim/engine/internal/config"
+	"hostvim/engine/internal/nginx"
+	"hostvim/engine/internal/phpfpm"
+	"hostvim/engine/internal/sites"
+	"hostvim/engine/internal/ssl"
 )
 
 func poolSettings(cfg *config.Config) phpfpm.HostingPoolSettings {

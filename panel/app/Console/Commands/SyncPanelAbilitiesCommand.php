@@ -7,15 +7,15 @@ use Spatie\Permission\Models\Permission;
 
 class SyncPanelAbilitiesCommand extends Command
 {
-    protected $signature = 'panelsar:sync-abilities';
+    protected $signature = 'hostvim:sync-abilities';
 
-    protected $description = 'config/panelsar_abilities.php içindeki yetenekleri Spatie permissions tablosuna ekler/günceller';
+    protected $description = 'config/hostvim_abilities.php içindeki yetenekleri Spatie permissions tablosuna ekler/günceller';
 
     public function handle(): int
     {
-        $registry = config('panelsar_abilities', []);
+        $registry = config('hostvim_abilities', []);
         if (! is_array($registry)) {
-            $this->error('panelsar_abilities config eksik veya geçersiz.');
+            $this->error('hostvim_abilities config eksik veya geçersiz.');
 
             return self::FAILURE;
         }

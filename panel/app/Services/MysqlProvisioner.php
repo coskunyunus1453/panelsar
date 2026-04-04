@@ -9,7 +9,7 @@ class MysqlProvisioner
 {
     public function enabled(): bool
     {
-        return (bool) config('panelsar.mysql_provision.enabled', false);
+        return (bool) config('hostvim.mysql_provision.enabled', false);
     }
 
     /** Panel doğrulaması: izin listesi veya geçerli IP. */
@@ -64,6 +64,33 @@ class MysqlProvisioner
         $pdo->exec('FLUSH PRIVILEGES');
     }
 
+    /**
+     * Veritabanını boşaltır (DROP+CREATE); uygulama kullanıcısı kalır, yetkiler yenilenir.
+     * İçe aktarımdan önce çağrılır.
+     */
+    public function recreateEmptyDatabase(string $dbName, string $dbUser, string $grantHost, string $plainPassword): void
+    {
+        $this->assertSafeIdentifier($dbName);
+        $this->assertSafeIdentifier($dbUser);
+        $this->assertAllowedGrantHost($grantHost);
+
+        $pdo = $this->adminPdo();
+        $grantHost = trim($grantHost);
+        $dbQuoted = '`'.$dbName.'`';
+        $u = $pdo->quote($dbUser);
+        $h = $pdo->quote($grantHost);
+
+        $pdo->exec("DROP DATABASE IF EXISTS {$dbQuoted}");
+        $pdo->exec("CREATE DATABASE {$dbQuoted} CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
+        try {
+            $pdo->exec("GRANT ALL PRIVILEGES ON {$dbQuoted}.* TO {$u}@{$h}");
+        } catch (PDOException) {
+            $pdo->exec("CREATE USER {$u}@{$h} IDENTIFIED BY ".$pdo->quote($plainPassword));
+            $pdo->exec("GRANT ALL PRIVILEGES ON {$dbQuoted}.* TO {$u}@{$h}");
+        }
+        $pdo->exec('FLUSH PRIVILEGES');
+    }
+
     public function rotatePassword(string $dbUser, string $grantHost, string $newPassword): void
     {
         $this->assertSafeIdentifier($dbUser);
@@ -109,7 +136,7 @@ class MysqlProvisioner
 
     private function adminPdo(): PDO
     {
-        $c = config('panelsar.mysql_provision');
+        $c = config('hostvim.mysql_provision');
         $host = (string) ($c['host'] ?? '127.0.0.1');
         $port = (int) ($c['port'] ?? 3306);
         $dsn = sprintf('mysql:host=%s;port=%d;charset=utf8mb4', $host, $port);
@@ -138,7 +165,7 @@ class MysqlProvisioner
             throw new \InvalidArgumentException('GRANT host boş olamaz.');
         }
 
-        $allowed = config('panelsar.mysql_provision.allowed_grant_hosts', []);
+        $allowed = config('hostvim.mysql_provision.allowed_grant_hosts', []);
         if (is_array($allowed) && in_array($host, $allowed, true)) {
             return;
         }

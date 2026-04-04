@@ -79,19 +79,11 @@ export default function Header() {
   }, [mode, advancedTipsSeen])
 
   return (
-    <header className="flex h-16 shrink-0 items-center justify-between border-b border-gray-200 bg-white px-4 dark:border-gray-800 dark:bg-gray-900 sm:px-6">
-      <div className="flex min-w-0 flex-1 items-center gap-3">
-        <button
-          type="button"
-          onClick={openMobileSidebar}
-          className="shrink-0 rounded-lg p-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 dark:text-gray-400 md:hidden"
-          aria-label={t('nav.open_menu')}
-        >
-          <Menu className="h-5 w-5" />
-        </button>
-      </div>
+    <header className="relative z-20 flex h-16 shrink-0 items-center justify-between gap-2 border-b border-gray-200 bg-white px-3 dark:border-gray-800 dark:bg-gray-900 sm:gap-3 sm:px-6">
+      {/* Mobilde flex-1 + min-w-0 sol blok menüyü sıfır genişliğe sıkıştırabiliyordu; alan ayırıcı olarak bırakıldı */}
+      <div className="hidden min-w-0 flex-1 md:block" aria-hidden />
 
-      <div className="flex items-center gap-3">
+      <div className="relative z-10 flex min-w-0 flex-1 flex-nowrap items-center justify-end gap-1 overflow-x-auto py-0 [scrollbar-width:none] md:flex-initial md:gap-3 md:overflow-visible [&::-webkit-scrollbar]:hidden">
         <button
           onClick={() => {
             const next = mode === 'easy' ? 'advanced' : 'easy'
@@ -100,25 +92,25 @@ export default function Header() {
               setShowAdvancedTips(false)
             }
           }}
-          className="px-3 py-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-300 text-xs font-semibold inline-flex items-center gap-1.5 border border-gray-200 dark:border-gray-700"
-          title={mode === 'easy' ? 'Gelişmiş Moda Geç' : 'Kolay Moda Geç'}
+          className="relative z-0 shrink-0 px-2 py-1.5 sm:px-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-300 text-xs font-semibold inline-flex items-center gap-1.5 border border-gray-200 dark:border-gray-700"
+          title={mode === 'easy' ? t('ui_mode.switch_to_advanced') : t('ui_mode.switch_to_easy')}
         >
-          <SlidersHorizontal className="h-3.5 w-3.5" />
-          {mode === 'easy' ? 'Kolay Mod' : 'Gelişmiş Mod'}
+          <SlidersHorizontal className="h-3.5 w-3.5 shrink-0" />
+          <span className="max-[380px]:hidden">{mode === 'easy' ? t('ui_mode.easy') : t('ui_mode.advanced')}</span>
         </button>
         {mode === 'easy' && (
-          <span className="px-2 py-1 rounded-full text-[10px] font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300">
-            Basit görünüm aktif
+          <span className="hidden shrink-0 px-2 py-1 rounded-full text-[10px] font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300 sm:inline-flex">
+            {t('ui_mode.simple_active')}
           </span>
         )}
         {showAdvancedTips && (
           <>
             <div className="hidden md:block absolute right-4 top-16 z-50 w-80 rounded-xl border border-primary-200 dark:border-primary-900/40 bg-white dark:bg-gray-900 shadow-lg p-3">
-              <p className="text-sm font-semibold text-gray-900 dark:text-white">Gelişmiş Mod İpuçları</p>
+              <p className="text-sm font-semibold text-gray-900 dark:text-white">{t('ui_mode.advanced_tips_title')}</p>
               <ul className="mt-2 text-xs text-gray-600 dark:text-gray-300 list-disc pl-4 space-y-1">
-                <li>Security, Monitoring, Cron ve Deploy araçları görünür.</li>
-                <li>Admin/teknik ayarlarda değişiklikler canlı sistemi etkileyebilir.</li>
-                <li>Temel işlemler için istediğin zaman Kolay Moda dönebilirsin.</li>
+                <li>{t('ui_mode.tip_1')}</li>
+                <li>{t('ui_mode.tip_2')}</li>
+                <li>{t('ui_mode.tip_3')}</li>
               </ul>
               <div className="mt-3 flex justify-end">
                 <button
@@ -129,7 +121,7 @@ export default function Header() {
                     setShowAdvancedTips(false)
                   }}
                 >
-                  Anladım
+                  {t('common.ok')}
                 </button>
               </div>
             </div>
@@ -140,11 +132,11 @@ export default function Header() {
                 onClick={(e) => e.stopPropagation()}
               >
                 <div className="mx-auto mb-3 h-1.5 w-12 rounded-full bg-gray-300 dark:bg-gray-700" />
-                <p className="text-sm font-semibold text-gray-900 dark:text-white">Gelişmiş Mod İpuçları</p>
+                <p className="text-sm font-semibold text-gray-900 dark:text-white">{t('ui_mode.advanced_tips_title')}</p>
                 <ul className="mt-2 text-xs text-gray-600 dark:text-gray-300 list-disc pl-4 space-y-1">
-                  <li>Security, Monitoring, Cron ve Deploy araçları görünür.</li>
-                  <li>Admin/teknik ayarlarda değişiklikler canlı sistemi etkileyebilir.</li>
-                  <li>Temel işlemler için istediğin zaman Kolay Moda dönebilirsin.</li>
+                  <li>{t('ui_mode.tip_1')}</li>
+                  <li>{t('ui_mode.tip_2')}</li>
+                  <li>{t('ui_mode.tip_3')}</li>
                 </ul>
                 <button
                   type="button"
@@ -154,7 +146,7 @@ export default function Header() {
                     setShowAdvancedTips(false)
                   }}
                 >
-                  Anladım
+                  {t('common.ok')}
                 </button>
               </div>
             </div>
@@ -163,13 +155,13 @@ export default function Header() {
 
         <button
           onClick={toggleTheme}
-          className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400"
+          className="shrink-0 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400"
           title={isDark ? t('settings.light_mode') : t('settings.dark_mode')}
         >
           {isDark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
         </button>
 
-        <div className="relative">
+        <div className="relative shrink-0">
           <button
             onClick={() => setShowLangMenu(!showLangMenu)}
             className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400"
@@ -198,7 +190,7 @@ export default function Header() {
           )}
         </div>
 
-        <div className="relative">
+        <div className="relative shrink-0">
           <button
             onClick={() => {
               const next = !showNotifMenu
@@ -271,7 +263,7 @@ export default function Header() {
           )}
         </div>
 
-        <div className="flex items-center gap-2 ml-2 pl-4 border-l border-gray-200 dark:border-gray-700">
+        <div className="flex shrink-0 items-center gap-2 border-l border-gray-200 pl-2 dark:border-gray-700 sm:ml-2 sm:pl-4">
           <div className="w-8 h-8 rounded-full bg-primary-100 dark:bg-primary-900 flex items-center justify-center">
             <User className="h-4 w-4 text-primary-600 dark:text-primary-400" />
           </div>
@@ -282,10 +274,19 @@ export default function Header() {
 
         <button
           onClick={handleLogout}
-          className="p-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 text-gray-500 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-400"
+          className="shrink-0 p-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 text-gray-500 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-400"
           title={t('auth.logout')}
         >
           <LogOut className="h-5 w-5" />
+        </button>
+
+        <button
+          type="button"
+          onClick={openMobileSidebar}
+          className="relative z-[60] -mr-0.5 shrink-0 rounded-lg p-2 text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-800 md:hidden"
+          aria-label={t('nav.open_menu')}
+        >
+          <Menu className="h-5 w-5" />
         </button>
       </div>
     </header>

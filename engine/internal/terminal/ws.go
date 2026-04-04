@@ -16,14 +16,14 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/gorilla/websocket"
-	"github.com/panelsar/engine/internal/config"
+	"hostvim/engine/internal/config"
 	"github.com/sirupsen/logrus"
 )
 
 const jwtTypTerminal = "terminal_ws"
 
-// Kurulumda /usr/local/sbin/panelsar-terminal-root + sudoers ile root login kabuğu (www-data → sudo NOPASSWD).
-const terminalRootLauncher = "/usr/local/sbin/panelsar-terminal-root"
+// Kurulumda /usr/local/sbin/hostvim-terminal-root + sudoers ile root login kabuğu (www-data → sudo NOPASSWD).
+const terminalRootLauncher = "/usr/local/sbin/hostvim-terminal-root"
 
 var upgrader = websocket.Upgrader{
 	ReadBufferSize:  4096,
@@ -37,7 +37,36 @@ var upgrader = websocket.Upgrader{
 		if err != nil || u.Host == "" {
 			return false
 		}
-		return strings.EqualFold(u.Host, r.Host)
+
+		normalizeHost := func(h string) string {
+			h = strings.TrimSpace(h)
+			// r.Host / u.Host genelde port içerebilir (örn: "127.0.0.1:9090")
+			if i := strings.IndexByte(h, ':'); i >= 0 {
+				h = h[:i]
+			}
+			return strings.ToLower(h)
+		}
+
+		originHost := normalizeHost(u.Host)
+		reqHost := normalizeHost(r.Host)
+
+		if originHost == reqHost {
+			return true
+		}
+
+		// XAMPP/macOS’te panel http://localhost ile engine http://127.0.0.1 arasında
+		// bağlanınca origin host eşleşmesi bozuluyor. Loopback’lerde izin verip canlıyı
+		// bozmayacak şekilde genel güvenlik kontrolünü gevşetmiyoruz.
+		loopback := map[string]bool{
+			"localhost": true,
+			"127.0.0.1": true,
+			"::1":       true,
+		}
+		if loopback[originHost] && loopback[reqHost] {
+			return true
+		}
+
+		return false
 	},
 }
 
@@ -91,13 +120,20 @@ func HandleWS(cfg *config.Config, log *logrus.Logger) gin.HandlerFunc {
 			return
 		}
 
-		shell := os.Getenv("PANELSAR_TERMINAL_SHELL")
+		shell := os.Getenv("HOSTVIM_TERMINAL_SHELL")
+		if shell == "" {
+			shell = os.Getenv("PANELSAR_TERMINAL_SHELL")
+		}
 		if shell == "" {
 			shell = "/bin/bash"
 		}
 
 		var cmd *exec.Cmd
-		wantRoot := jwtUseRoot && os.Getenv("PANELSAR_TERMINAL_NO_ROOT") != "1"
+		noRoot := os.Getenv("HOSTVIM_TERMINAL_NO_ROOT")
+		if noRoot == "" {
+			noRoot = os.Getenv("PANELSAR_TERMINAL_NO_ROOT")
+		}
+		wantRoot := jwtUseRoot && noRoot != "1"
 		if !wantRoot {
 			cmd = exec.Command(shell, "-i")
 		} else if fi, err := os.Stat(terminalRootLauncher); err == nil && !fi.IsDir() && fi.Mode()&0o111 != 0 {
@@ -182,6 +218,9 @@ func terminalTokenFromRequest(r *http.Request) (string, string) {
 
 	for _, p := range websocket.Subprotocols(r) {
 		pp := strings.TrimSpace(p)
+		if strings.HasPrefix(pp, "hostvim.jwt.") && len(pp) > len("hostvim.jwt.") {
+			return strings.TrimPrefix(pp, "hostvim.jwt."), pp
+		}
 		if strings.HasPrefix(pp, "panelsar.jwt.") && len(pp) > len("panelsar.jwt.") {
 			return strings.TrimPrefix(pp, "panelsar.jwt."), pp
 		}

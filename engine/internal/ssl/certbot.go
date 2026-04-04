@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/panelsar/engine/internal/config"
+	"hostvim/engine/internal/config"
 )
 
 // LetsEncryptDirs certbot --config-dir / --work-dir / --logs-dir için yollar.

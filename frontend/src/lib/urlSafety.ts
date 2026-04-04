@@ -24,8 +24,20 @@ export function safeWebSocketUrl(raw: string): string | null {
     const u = new URL(v)
     if (u.protocol !== 'wss:' && u.protocol !== 'ws:') return null
     if (u.protocol === 'ws:' && window.location.protocol === 'https:') return null
-    if (u.host !== window.location.host) return null
-    return u.toString()
+    // Prod güvenliği: host aynı olmalı.
+    // Local (XAMPP): Panel genelde `localhost`, engine ise `127.0.0.1:9090` dönebildiği için
+    // loopback'ler arası host uyuşmazlığını allow ediyoruz.
+    if (u.host === window.location.host) return u.toString()
+
+    const allowedLoopback = new Set(['localhost', '127.0.0.1', '::1'])
+    const currentHost = String(window.location.hostname || '').toLowerCase()
+    const targetHost = String(u.hostname || '').toLowerCase()
+
+    if (allowedLoopback.has(currentHost) && allowedLoopback.has(targetHost)) {
+      return u.toString()
+    }
+
+    return null
   } catch {
     return null
   }

@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'welcome' => 'Welcome to Panelsar',
+    'welcome' => 'Welcome to Hostvim',
     'dashboard' => 'Dashboard',
     'domains' => 'Domains',
     'databases' => 'Databases',

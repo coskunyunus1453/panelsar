@@ -1,22 +1,23 @@
 <?php
 
-use App\Http\Controllers\Admin\PackageController;
+use App\Http\Controllers\Admin\CmsController;
 use App\Http\Controllers\Admin\OutboundMailSettingsController;
-use App\Http\Controllers\Admin\RoleController;
-use App\Http\Controllers\Admin\TerminalSettingsController;
-use App\Http\Controllers\Admin\StackController;
-use App\Http\Controllers\Admin\UserController;
+use App\Http\Controllers\Admin\PackageController;
 use App\Http\Controllers\Admin\PhpSettingsController;
+use App\Http\Controllers\Admin\RoleController;
+use App\Http\Controllers\Admin\StackController;
+use App\Http\Controllers\Admin\TerminalSettingsController;
+use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Admin\WebServerSettingsController;
-use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\AiAdvisorController;
+use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BackupController;
 use App\Http\Controllers\Api\BillingController;
 use App\Http\Controllers\Api\BrandingController;
 use App\Http\Controllers\Api\CronJobController;
 use App\Http\Controllers\Api\DatabaseController;
-use App\Http\Controllers\Api\DnsRecordController;
 use App\Http\Controllers\Api\DeploymentController;
+use App\Http\Controllers\Api\DnsRecordController;
 use App\Http\Controllers\Api\DomainController;
 use App\Http\Controllers\Api\EmailAccountController;
 use App\Http\Controllers\Api\FileManagerController;
@@ -25,17 +26,20 @@ use App\Http\Controllers\Api\InstallerController;
 use App\Http\Controllers\Api\LicenseController;
 use App\Http\Controllers\Api\MonitoringController;
 use App\Http\Controllers\Api\NotificationController;
-use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\PluginStoreController;
+use App\Http\Controllers\Api\ProfileController;
+use App\Http\Controllers\Api\PublicCmsController;
+use App\Http\Controllers\Api\PublicPricingController;
 use App\Http\Controllers\Api\SecurityController;
 use App\Http\Controllers\Api\SiteController;
 use App\Http\Controllers\Api\SiteToolsController;
 use App\Http\Controllers\Api\SslController;
 use App\Http\Controllers\Api\SystemController;
 use App\Http\Controllers\Api\TerminalController;
+use App\Http\Controllers\Api\TwoFactorController;
 use App\Http\Controllers\Api\UiLinksController;
-use App\Http\Controllers\Api\Vendor\FeatureController as VendorFeatureController;
 use App\Http\Controllers\Api\Vendor\BillingController as VendorBillingController;
+use App\Http\Controllers\Api\Vendor\FeatureController as VendorFeatureController;
 use App\Http\Controllers\Api\Vendor\LicenseController as VendorLicenseController;
 use App\Http\Controllers\Api\Vendor\NodeController as VendorNodeController;
 use App\Http\Controllers\Api\Vendor\OpsController as VendorOpsController;
@@ -51,10 +55,25 @@ Route::get('branding', [BrandingController::class, 'showPublic']);
 Route::get('branding/files/{filename}', [BrandingController::class, 'serveFile'])
     ->where('filename', '[A-Za-z0-9._-]+');
 
+Route::prefix('public')->group(function () {
+    Route::get('pricing', PublicPricingController::class);
+    Route::get('cms/landing', [PublicCmsController::class, 'landing']);
+    Route::get('cms/install', [PublicCmsController::class, 'install']);
+    Route::get('docs', [PublicCmsController::class, 'docsIndex']);
+    Route::get('docs/{slug}', [PublicCmsController::class, 'docsShow'])->where('slug', '[a-zA-Z0-9][a-zA-Z0-9\-_]*');
+    Route::get('blog', [PublicCmsController::class, 'blogIndex']);
+    Route::get('blog/{slug}', [PublicCmsController::class, 'blogShow'])->where('slug', '[a-zA-Z0-9][a-zA-Z0-9\-_]*');
+});
+
 Route::prefix('auth')->group(function () {
     Route::post('login', [AuthController::class, 'login'])->middleware('throttle:login');
 
     Route::middleware(['auth:sanctum', 'abilities:access:customer-panel'])->group(function () {
+        Route::get('2fa/status', [TwoFactorController::class, 'status']);
+        Route::post('2fa/setup', [TwoFactorController::class, 'setup']);
+        Route::post('2fa/verify', [TwoFactorController::class, 'verify']);
+        Route::post('2fa/backup-codes/regenerate', [TwoFactorController::class, 'regenerateBackupCodes']);
+
         Route::post('logout', [AuthController::class, 'logout']);
         Route::get('me', [AuthController::class, 'me']);
         Route::post('refresh', [AuthController::class, 'refresh']);
@@ -96,12 +115,16 @@ Route::middleware(['auth:sanctum', 'abilities:access:customer-panel'])->group(fu
         Route::post('domains/{domain}/server', [DomainController::class, 'switchServer']);
     });
 
-    Route::middleware('ability:databases:read')->get('databases', [DatabaseController::class, 'index']);
+    Route::middleware('ability:databases:read')->group(function () {
+        Route::get('databases', [DatabaseController::class, 'index']);
+        Route::get('databases/{database}/export', [DatabaseController::class, 'export'])->middleware('throttle:api');
+    });
     Route::middleware('ability:databases:write')->group(function () {
         Route::post('databases', [DatabaseController::class, 'store']);
         Route::patch('databases/{database}', [DatabaseController::class, 'update']);
         Route::delete('databases/{database}', [DatabaseController::class, 'destroy']);
         Route::post('databases/{database}/rotate-password', [DatabaseController::class, 'rotatePassword']);
+        Route::post('databases/{database}/import', [DatabaseController::class, 'import'])->middleware('throttle:databases-import');
     });
 
     Route::prefix('domains/{domain}/files')->group(function () {
@@ -111,6 +134,7 @@ Route::middleware(['auth:sanctum', 'abilities:access:customer-panel'])->group(fu
             Route::get('read', [FileManagerController::class, 'read'])->middleware('throttle:files-read');
             Route::post('read', [FileManagerController::class, 'read'])->middleware('throttle:files-read');
             Route::get('download', [FileManagerController::class, 'download'])->middleware('throttle:files-read');
+            Route::get('trash', [FileManagerController::class, 'trashIndex'])->middleware('throttle:files-read');
         });
         Route::middleware('ability:files:write')->group(function () {
             Route::post('mkdir', [FileManagerController::class, 'mkdir'])->middleware('throttle:files-write');
@@ -124,6 +148,10 @@ Route::middleware(['auth:sanctum', 'abilities:access:customer-panel'])->group(fu
             Route::post('chmod', [FileManagerController::class, 'chmod'])->middleware('throttle:files-write');
             Route::post('zip', [FileManagerController::class, 'zip'])->middleware('throttle:files-write');
             Route::post('unzip', [FileManagerController::class, 'unzip'])->middleware('throttle:files-write');
+            Route::post('trash/move', [FileManagerController::class, 'trashMove'])->middleware('throttle:files-write');
+            Route::post('trash/restore', [FileManagerController::class, 'trashRestore'])->middleware('throttle:files-write');
+            Route::delete('trash/item', [FileManagerController::class, 'trashDestroy'])->middleware('throttle:files-write');
+            Route::delete('trash/empty', [FileManagerController::class, 'trashEmpty'])->middleware('throttle:files-write');
         });
     });
 
@@ -289,6 +317,13 @@ Route::middleware(['auth:sanctum', 'abilities:access:customer-panel'])->group(fu
         Route::post('users/{user}/activate', [UserController::class, 'activate']);
         Route::post('users/{user}/reset-password', [UserController::class, 'resetPassword']);
         Route::apiResource('packages', PackageController::class);
+
+        Route::get('cms/{kind}', [CmsController::class, 'indexByKind'])
+            ->where('kind', 'landing|install|doc|blog');
+        Route::get('cms-items', [CmsController::class, 'index']);
+        Route::post('cms-items', [CmsController::class, 'store']);
+        Route::patch('cms-items/{cms_item}', [CmsController::class, 'update']);
+        Route::delete('cms-items/{cms_item}', [CmsController::class, 'destroy']);
     });
 
     Route::prefix('admin')->middleware(['role:admin', 'require_admin_2fa', 'ability:webserver:read'])->group(function () {
@@ -330,7 +365,7 @@ Route::middleware(['auth:sanctum', 'abilities:access:customer-panel'])->group(fu
         });
     });
 
-    if ((bool) config('panelsar.vendor_enabled', false)) {
+    if ((bool) config('hostvim.vendor_enabled', false)) {
         Route::prefix('vendor')
             ->middleware(['vendor_host', 'role:vendor_admin|vendor_support|vendor_finance|vendor_devops', 'require_admin_2fa', 'throttle:vendor-api'])
             ->group(function () {
@@ -379,7 +414,7 @@ Route::post('billing/webhook', [BillingController::class, 'webhook'])
     ->middleware('throttle:webhooks');
 Route::post('deployment/webhook/{domain}', [DeploymentController::class, 'webhook'])
     ->middleware(['throttle:webhooks', 'throttle:deploy-run']);
-if ((bool) config('panelsar.vendor_enabled', false)) {
+if ((bool) config('hostvim.vendor_enabled', false)) {
     Route::post('vendor/license/verify', [VendorLicenseController::class, 'verify'])->middleware('throttle:vendor-node');
     Route::post('vendor/node/activate', [VendorNodeController::class, 'activate'])->middleware('throttle:vendor-node');
     Route::post('vendor/node/heartbeat', [VendorNodeController::class, 'heartbeat'])->middleware('throttle:vendor-node');
@@ -388,6 +423,6 @@ if ((bool) config('panelsar.vendor_enabled', false)) {
 
 Route::get('health', fn () => response()->json([
     'status' => 'ok',
-    'panel' => 'panelsar',
-    'version' => config('panelsar.version', '0.1.0'),
+    'panel' => 'hostvim',
+    'version' => config('hostvim.version', '0.1.0'),
 ]));

@@ -61,7 +61,7 @@ export const useNotificationsStore = create<NotificationsState>()(
       clear: () => set({ items: [] }),
     }),
     {
-      name: 'panelsar-notifications',
+      name: 'hostvim-notifications',
       storage: createJSONStorage(() => localStorage),
     }
   )

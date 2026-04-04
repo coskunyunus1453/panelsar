@@ -23,7 +23,7 @@ export const useUiModeStore = create<UiModeState>()(
       markAdvancedTipsSeen: () => set({ advancedTipsSeen: true }),
     }),
     {
-      name: 'panelsar-ui-mode',
+      name: 'hostvim-ui-mode',
     },
   ),
 )

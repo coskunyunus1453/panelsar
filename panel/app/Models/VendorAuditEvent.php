@@ -5,6 +5,9 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/**
+ * Vendor denetim kayıtları: payload SafeAuditLogger ile temizlenir; ip_address alanı ham IP değil SHA-256 özetidir.
+ */
 class VendorAuditEvent extends Model
 {
     protected $fillable = [
@@ -37,4 +40,3 @@ class VendorAuditEvent extends Model
         return $this->belongsTo(User::class, 'actor_user_id');
     }
 }
-

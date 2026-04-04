@@ -74,6 +74,10 @@ class AppServiceProvider extends ServiceProvider
             return Limit::perMinute(15)->by($request->user()?->id ?: $request->ip());
         });
 
+        RateLimiter::for('databases-import', function (Request $request) {
+            return Limit::perHour(8)->by($request->user()?->id ?: $request->ip());
+        });
+
         RateLimiter::for('vendor-api', function (Request $request) {
             return Limit::perMinute(120)->by($request->user()?->id ?: $request->ip());
         });
@@ -90,10 +94,10 @@ class AppServiceProvider extends ServiceProvider
 
         if ($this->app->environment('production')) {
             if (config('app.debug')) {
-                Log::warning('Panelsar: APP_DEBUG is enabled in production.');
+                Log::warning('Hostvim: APP_DEBUG is enabled in production.');
             }
-            if ((string) config('panelsar.engine_internal_key', '') === '') {
-                Log::warning('Panelsar: ENGINE_INTERNAL_KEY is empty; engine integration will fail.');
+            if ((string) config('hostvim.engine_internal_key', '') === '') {
+                Log::warning('Hostvim: ENGINE_INTERNAL_KEY is empty; engine integration will fail.');
             }
         }
     }

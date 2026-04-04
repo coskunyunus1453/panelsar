@@ -5,11 +5,11 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Role;
 use App\Models\User;
+use App\Services\SafeAuditLogger;
 use App\Services\UserHostingPackageSync;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
 
@@ -159,12 +159,10 @@ class UserController extends Controller
             'password' => Hash::make((string) $validated['password']),
         ])->save();
 
-        Log::info('panelsar.user_password_reset', [
-            'actor_user_id' => $request->user()?->id,
+        SafeAuditLogger::info('hostvim.user_password_reset', [
             'target_user_id' => $user->id,
-            'target_email' => $user->email,
-            'ip' => $request->ip(),
-        ]);
+            'target_email_hash' => hash('sha256', strtolower(trim((string) $user->email))),
+        ], $request);
 
         return response()->json([
             'message' => 'Kullanıcı şifresi güvenli şekilde güncellendi.',

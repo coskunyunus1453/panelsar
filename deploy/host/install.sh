@@ -1,24 +1,33 @@
 #!/usr/bin/env bash
 #
-# Panelsar — müşteri sunucusunda çalışır (root).
+# Hostvim — müşteri sunucusunda çalışır (root).
 #
 # SİZ (Kodsar): Bu dosyayı HTTPS ile yayınlayın, aşağıdaki varsayılan repo URL’ini kendi Git adresinizle değiştirin.
 # Örnek konum: https://kodsar.com/panel/install.sh
 #
+# Markdown listesinden kopyalarken satır başındaki "* " veya "• " İŞARETİNİ SİLİN;
+# aksi halde kabuk * ile mevcut dizindeki dosya adlarını genişletir (ör. go, panelsar-admin-login.txt)
+# ve komut "go panelsar-admin-login.txt …" gibi patlar. Güvenli: cd /tmp && curl … | bash
+#
 # Müşteri komutu (Linux VPS — SSL doğrulaması AÇIK):
 #   • Root SSH ile (aaPanel gibi ekstra şifre yok): ssh root@SUNUCU_IP → curl -fsSL "URL" | bash
 #   • sudo kullanıcı: aynı komut; betik bir kez sudo parolası sorup kendini root ile yeniden çalıştırır.
-#   • İlk admin URL/e-posta/şifre: /root/panelsar-admin-login.txt (kurulum özeti çıktısında da yazılır)
+#   • İlk admin URL/e-posta/şifre: /root/hostvim-admin-login.txt (kurulum özeti çıktısında da yazılır; eski kurulumlar: panelsar-admin-login.txt)
 #   • İkinci seçenek (klasik): curl -fsSL "URL" | sudo bash
 #   macOS/Windows’ta çalıştırmayın; boş Debian/Ubuntu sunucuda çalışır.
 #
 # Ortam ile (ör. özel branch):
 #   sudo PANELSAR_BRANCH=release PANELSAR_REPO_URL=https://github.com/kodsar/panelsar.git bash -s <<< "$(curl -fsSL https://kodsar.com/panel/install.sh)"
 #
-# Varsayılan davranış (tek komut kurulum):
-#   RESET_PANEL_DB=1 ve PANELSAR_SEED_DEMO_USERS=0 ile çalışır.
-#   Yani panel veritabanı sıfır kurulur, demo kullanıcı seed edilmez,
-#   PANELSAR_ADMIN_PASSWORD verilmediyse admin şifresi rastgele üretilir.
+# Plesk / cPanel benzeri izolasyon (varsayılan):
+#   Aynı komutu tekrar çalıştırmak = kod güncelle + migrate; panel DB ve data/www korunur.
+# Tam sıfırlama (migrate:fresh + hosting temizliği) ancak bilinçli seçilirse:
+#   HOSTVIM_FRESH_INSTALL=1 curl -fsSL "URL" | bash
+#   veya RESET_PANEL_DB=1 curl -fsSL "URL" | bash
+#
+# Diğer varsayılanlar:
+#   PANELSAR_SEED_DEMO_USERS=0 — demo kullanıcı seed etme
+#   İlk kurulumda kullanıcı yoksa db:seed admin üretir; HOSTVIM_ADMIN_PASSWORD verilmezse rastgele şifre
 #
 # Zorunlu proxy/kırık sertifika (ÖNERİLMEZ): yalnızca geçici tanı veya iç ağda:
 #   PANELSAR_INSECURE_DOWNLOAD=1 curl -fsSL ...  → betik içinde curl -k kullanılır (sadece bu dosyayı indirirken anlamsız; pipe ile çalışmaz)
@@ -31,17 +40,17 @@ set -euo pipefail
 : "${PANELSAR_REPO_URL:=https://github.com/coskunyunus1453/panelsar.git}"
 : "${PANELSAR_BRANCH:=main}"
 : "${PANELSAR_HOME:=/var/www/panelsar}"
-# Tek komut kurulum varsayılanı:
-# - Panel veritabanını sıfırdan kur
-# - Demo kullanıcıları seed etme
-# - Admin şifresini script rastgele üretsin (PANELSAR_ADMIN_PASSWORD verilmezse)
-: "${RESET_PANEL_DB:=1}"
+# Varsayılan RESET_PANEL_DB=0: yeniden kurulum / güncellemede müşteri verisi silinmez.
+: "${RESET_PANEL_DB:=0}"
+if [[ "${HOSTVIM_FRESH_INSTALL:-0}" == "1" ]] || [[ "${HOSTVIM_FRESH_INSTALL:-0}" == "yes" ]]; then
+  RESET_PANEL_DB=1
+fi
 : "${PANELSAR_SEED_DEMO_USERS:=0}"
 export RESET_PANEL_DB
 export PANELSAR_SEED_DEMO_USERS
 
 if [[ "$(uname -s)" != "Linux" ]]; then
-  echo "Panelsar kurulumu yalnızca Linux (Debian/Ubuntu) sunucu içindir." >&2
+  echo "Hostvim kurulumu yalnızca Linux (Debian/Ubuntu) sunucu içindir." >&2
   echo "macOS veya yerel bilgisayarınızda değil; boş VPS'e SSH ile bağlanıp orada çalıştırın." >&2
   echo "Örnek: ssh root@SUNUCU_IP  ardından: curl -fsSL \"$PANELSAR_INSTALL_SCRIPT_URL\" | bash" >&2
   exit 1
@@ -103,8 +112,8 @@ if [[ ! -f deploy/bootstrap/install-production.sh ]]; then
 fi
 
 # Kritik helper dosyasını kurulumdan önce senkronla (install-production yine doğrulayacak).
-if [[ -f deploy/host/panelsar-security ]]; then
-  install -m 755 deploy/host/panelsar-security /usr/local/sbin/panelsar-security
+if [[ -f deploy/host/hostvim-security ]]; then
+  install -m 755 deploy/host/hostvim-security /usr/local/sbin/hostvim-security
 fi
 
 # Panel/engine özellik güncellemeleri için bu dosyayı değiştirmeniz gerekmez: aynı komut repo’yu çeker;

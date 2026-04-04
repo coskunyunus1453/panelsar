@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Hostvim">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#2563eb" />
+      <stop offset="100%" stop-color="#06b6d4" />
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="14" fill="#0f172a" />
+  <path d="M14 45V19h18c8 0 13 5 13 12s-5 14-13 14H14zm8-8h10c3 0 5-2 5-6 0-3-2-5-5-5H22v11z" fill="url(#g)" />
+  <circle cx="49" cy="17" r="4" fill="#22c55e" />
+</svg>

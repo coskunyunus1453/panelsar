@@ -58,6 +58,7 @@ type ServiceConfig struct {
 type SecurityConfig struct {
 	JWTSecret        string `mapstructure:"jwt_secret"`
 	InternalAPIKey   string `mapstructure:"internal_api_key"`
+	AllowedOrigins   string `mapstructure:"allowed_origins"`
 	TokenExpiry      int    `mapstructure:"token_expiry"`
 	MaxLoginAttempts int    `mapstructure:"max_login_attempts"`
 	Fail2banEnabled  bool   `mapstructure:"fail2ban_enabled"`
@@ -103,6 +104,11 @@ type HostingConfig struct {
 	NpmPath         string `mapstructure:"npm_path"`
 	ToolsMaxSeconds int    `mapstructure:"tools_max_seconds"`
 	WordPressZipURL string `mapstructure:"wordpress_zip_url"`
+
+	// NginxVhostHelper — sudo ile çağrılan betik (varsayılan: /usr/local/sbin/hostvim-nginx-vhost).
+	NginxVhostHelper string `mapstructure:"nginx_vhost_helper"`
+	// StackInstallScript — panel stack demetleri için sudo betiği (varsayılan: /usr/local/sbin/hostvim-stack-install).
+	StackInstallScript string `mapstructure:"stack_install_script"`
 }
 
 func Load() (*Config, error) {
@@ -183,6 +189,7 @@ func setDefaults() {
 	viper.SetDefault("security.token_expiry", 3600)
 	viper.SetDefault("security.max_login_attempts", 5)
 	viper.SetDefault("security.fail2ban_enabled", true)
+	viper.SetDefault("security.allowed_origins", "http://localhost,http://127.0.0.1")
 
 	viper.SetDefault("paths.web_root", "")
 	viper.SetDefault("paths.vhosts_dir", "/etc/nginx/sites-available")
@@ -220,4 +227,6 @@ func setDefaults() {
 	viper.SetDefault("hosting.npm_path", "npm")
 	viper.SetDefault("hosting.tools_max_seconds", 300)
 	viper.SetDefault("hosting.wordpress_zip_url", "https://wordpress.org/latest.zip")
+	viper.SetDefault("hosting.nginx_vhost_helper", "/usr/local/sbin/hostvim-nginx-vhost")
+	viper.SetDefault("hosting.stack_install_script", "/usr/local/sbin/hostvim-stack-install")
 }

@@ -15,7 +15,7 @@ class ResellerRoleController extends Controller
     public function abilityRegistry(Request $request): JsonResponse
     {
         $allowed = $request->user()->getAllPermissions()->pluck('name')->all();
-        $registry = config('panelsar_abilities', []);
+        $registry = config('hostvim_abilities', []);
         $filtered = array_values(array_filter(
             is_array($registry) ? $registry : [],
             static fn ($row) => is_array($row) && ! empty($row['name']) && in_array((string) $row['name'], $allowed, true)

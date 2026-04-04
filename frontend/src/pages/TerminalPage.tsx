@@ -80,7 +80,7 @@ export default function TerminalPage() {
           throw new Error('Güvensiz terminal websocket URL')
         }
         const wsToken = String(data.token || '').trim()
-        const protocols = wsToken ? [`panelsar.jwt.${wsToken}`] : undefined
+        const protocols = wsToken ? [`hostvim.jwt.${wsToken}`] : undefined
         const ws = protocols ? new WebSocket(wsUrl, protocols) : new WebSocket(wsUrl)
         ws.binaryType = 'arraybuffer'
         let ro: ResizeObserver | undefined

@@ -9,15 +9,15 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"github.com/panelsar/engine/internal/config"
-	"github.com/panelsar/engine/internal/daemon"
-	"github.com/panelsar/engine/internal/hosting"
-	"github.com/panelsar/engine/internal/middleware"
-	"github.com/panelsar/engine/internal/nginx"
-	"github.com/panelsar/engine/internal/phpfpm"
-	"github.com/panelsar/engine/internal/sites"
-	"github.com/panelsar/engine/internal/ssl"
-	"github.com/panelsar/engine/internal/terminal"
+	"hostvim/engine/internal/config"
+	"hostvim/engine/internal/daemon"
+	"hostvim/engine/internal/hosting"
+	"hostvim/engine/internal/middleware"
+	"hostvim/engine/internal/nginx"
+	"hostvim/engine/internal/phpfpm"
+	"hostvim/engine/internal/sites"
+	"hostvim/engine/internal/ssl"
+	"hostvim/engine/internal/terminal"
 	"github.com/sirupsen/logrus"
 )
 
@@ -29,12 +29,12 @@ func NewRouter(cfg *config.Config, d *daemon.Daemon, log *logrus.Logger) *gin.En
 	r := gin.New()
 	r.Use(gin.Recovery())
 	r.Use(middleware.Logger(log))
-	r.Use(middleware.CORS())
+	r.Use(middleware.CORS(cfg))
 
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
 			"status":  "healthy",
-			"engine":  "panelsar",
+			"engine":  "hostvim",
 			"version": "0.1.0",
 			"running": d.IsRunning(),
 		})
@@ -160,8 +160,16 @@ func handleCreateSite(cfg *config.Config, d *daemon.Daemon) gin.HandlerFunc {
 
 		ps := phpfpmSettings(cfg)
 		phpSocket := nginx.EffectivePHPSocket(phpV, cfg.Hosting.PHPFPMsocket)
+		var poolPrev []byte
+		var poolHadPrev bool
+		var oldPoolBak []byte
+		var oldPoolBakHad bool
 		if cfg.Hosting.PHPFPMmanagePools {
-			sock, perr := phpfpm.WritePool(ps, req.Domain, phpV, docRoot)
+			if oldMeta != nil && phpfpm.NormalizeVersion(oldMeta.PHPVersion) != phpfpm.NormalizeVersion(phpV) {
+				oldPoolBak, oldPoolBakHad = phpfpm.ReadPoolSnapshot(ps, req.Domain, oldMeta.PHPVersion)
+			}
+			sock, pprev, phad, perr := phpfpm.WritePool(ps, req.Domain, phpV, docRoot)
+			poolPrev, poolHadPrev = pprev, phad
 			if perr != nil {
 				_ = sites.Remove(cfg.Paths.WebRoot, req.Domain)
 				c.JSON(http.StatusInternalServerError, gin.H{"error": perr.Error()})
@@ -169,7 +177,13 @@ func handleCreateSite(cfg *config.Config, d *daemon.Daemon) gin.HandlerFunc {
 			}
 			phpSocket = sock
 			if cfg.Hosting.PHPFPMreloadAfterPool {
-				_ = phpfpm.Reload(phpV)
+				if rerr := phpfpm.Reload(phpV); rerr != nil {
+					_ = phpfpm.RestorePoolConf(ps, req.Domain, phpV, poolPrev, poolHadPrev)
+					_ = phpfpm.Reload(phpV)
+					_ = sites.Remove(cfg.Paths.WebRoot, req.Domain)
+					c.JSON(http.StatusInternalServerError, gin.H{"error": rerr.Error()})
+					return
+				}
 			}
 			if oldMeta != nil && phpfpm.NormalizeVersion(oldMeta.PHPVersion) != phpfpm.NormalizeVersion(phpV) {
 				_ = phpfpm.RemovePool(ps, req.Domain, oldMeta.PHPVersion)
@@ -182,7 +196,16 @@ func handleCreateSite(cfg *config.Config, d *daemon.Daemon) gin.HandlerFunc {
 		metaNow, _ := sites.ReadSiteMeta(cfg.Paths.WebRoot, req.Domain)
 		if err := hosting.ApplyWebServer(cfg, req.Domain, docRoot, metaNow, phpSocket); err != nil {
 			if cfg.Hosting.PHPFPMmanagePools {
-				_ = phpfpm.RemovePool(ps, req.Domain, phpV)
+				_ = phpfpm.RestorePoolConf(ps, req.Domain, phpV, poolPrev, poolHadPrev)
+				if cfg.Hosting.PHPFPMreloadAfterPool {
+					_ = phpfpm.Reload(phpV)
+				}
+				if oldPoolBakHad && oldMeta != nil {
+					_ = phpfpm.RestorePoolConf(ps, req.Domain, oldMeta.PHPVersion, oldPoolBak, true)
+					if cfg.Hosting.PHPFPMreloadAfterPool {
+						_ = phpfpm.Reload(oldMeta.PHPVersion)
+					}
+				}
 			}
 			_ = sites.Remove(cfg.Paths.WebRoot, req.Domain)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})

@@ -1,5 +1,10 @@
 <?php
 
+use App\Http\Middleware\EnforceVendorHost;
+use App\Http\Middleware\EnsureTokenAbility;
+use App\Http\Middleware\RequireTwoFactorForAdmin;
+use App\Http\Middleware\SecureHeaders;
+use App\Http\Middleware\SetApiLocale;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -10,10 +15,6 @@ use Laravel\Sanctum\Http\Middleware\CheckAbilities;
 use Spatie\Permission\Middleware\PermissionMiddleware;
 use Spatie\Permission\Middleware\RoleMiddleware;
 use Spatie\Permission\Middleware\RoleOrPermissionMiddleware;
-use App\Http\Middleware\EnsureTokenAbility;
-use App\Http\Middleware\EnforceVendorHost;
-use App\Http\Middleware\RequireTwoFactorForAdmin;
-use App\Http\Middleware\SecureHeaders;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -25,7 +26,7 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withSchedule(function (Schedule $schedule) {
         $schedule->command('sanctum:prune-expired --hours=24')->daily();
         $schedule->command('backups:run-due')->everyMinute();
-        $schedule->command('panelsar:self-heal')->everyMinute()->withoutOverlapping();
+        $schedule->command('hostvim:self-heal')->everyMinute()->withoutOverlapping();
     })
     ->withMiddleware(function (Middleware $middleware) {
         // Nginx / TLS sonlandırma arkasında doğru şema (wss, secure() vb.)
@@ -36,6 +37,8 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->trustProxies(at: $trustedProxies);
         $middleware->throttleApi();
         $middleware->append(SecureHeaders::class);
+        // API cevaplarında (validation/auth) seçili dile göre translateler çalışsın.
+        $middleware->append(SetApiLocale::class);
         $middleware->alias([
             'abilities' => CheckAbilities::class,
             'ability' => EnsureTokenAbility::class,
@@ -58,6 +61,7 @@ return Application::configure(basePath: dirname(__DIR__))
                     ),
                 ], 413);
             }
+
             return null;
         });
     })->create();

@@ -17,9 +17,9 @@ class EngineApiService
 
     public function __construct()
     {
-        $this->baseUrl = rtrim(config('panelsar.engine_url', 'http://127.0.0.1:9090'), '/');
-        $this->internalKey = (string) config('panelsar.engine_internal_key', '');
-        $this->jwtSecret = (string) config('panelsar.engine_secret', '');
+        $this->baseUrl = rtrim(config('hostvim.engine_url', 'http://127.0.0.1:9090'), '/');
+        $this->internalKey = (string) config('hostvim.engine_internal_key', '');
+        $this->jwtSecret = (string) config('hostvim.engine_secret', '');
     }
 
     private function client(): PendingRequest
@@ -27,7 +27,7 @@ class EngineApiService
         $req = Http::timeout(45)->acceptJson();
 
         if ($this->internalKey !== '') {
-            return $req->withHeaders(['X-Panelsar-Engine-Key' => $this->internalKey]);
+            return $req->withHeaders(['X-Hostvim-Engine-Key' => $this->internalKey]);
         }
 
         if ($this->jwtSecret !== '') {
@@ -42,7 +42,7 @@ class EngineApiService
         $req = Http::timeout($timeout)->acceptJson();
 
         if ($this->internalKey !== '') {
-            return $req->withHeaders(['X-Panelsar-Engine-Key' => $this->internalKey]);
+            return $req->withHeaders(['X-Hostvim-Engine-Key' => $this->internalKey]);
         }
 
         if ($this->jwtSecret !== '') {
@@ -199,7 +199,7 @@ class EngineApiService
     }
 
     /**
-     * @param array<string, mixed> $payload
+     * @param  array<string, mixed>  $payload
      * @return array{message?: string, settings?: array<string, mixed>, reload?: array<string, mixed>}
      */
     public function updateWebServerSettings(array $payload): array
@@ -306,8 +306,7 @@ class EngineApiService
         int $offset = 0,
         string $sort = 'name',
         string $order = 'asc',
-    ): array
-    {
+    ): array {
         try {
             $response = $this->client()->get($this->baseUrl.'/api/v1/files', [
                 'domain' => $domain,
@@ -412,6 +411,7 @@ class EngineApiService
 
                 return ['error' => $msg];
             }
+
             return $json;
         } catch (\Exception $e) {
             Log::error('Engine API GET /files/download failed: '.$e->getMessage());
@@ -492,7 +492,7 @@ class EngineApiService
         try {
             $req = Http::timeout(120)->acceptJson();
             if ($this->internalKey !== '') {
-                $req = $req->withHeaders(['X-Panelsar-Engine-Key' => $this->internalKey]);
+                $req = $req->withHeaders(['X-Hostvim-Engine-Key' => $this->internalKey]);
             } elseif ($this->jwtSecret !== '') {
                 $req = $req->withToken($this->generateLegacyToken());
             }
@@ -566,7 +566,7 @@ class EngineApiService
     {
         $path = '/api/v1/ftp/'.rawurlencode($domain).'/'.rawurlencode($username);
 
-        return $this->delete($path);
+        return $this->deleteChecked($path);
     }
 
     public function mailOverview(string $domain): array
@@ -588,7 +588,7 @@ class EngineApiService
 
     public function mailDeleteDomainState(string $domain): array
     {
-        return $this->delete('/api/v1/mail/'.rawurlencode($domain));
+        return $this->deleteChecked('/api/v1/mail/'.rawurlencode($domain));
     }
 
     /**
@@ -602,6 +602,7 @@ class EngineApiService
     public function mailDeleteForwarder(string $domain, string $source, string $destination): array
     {
         $q = http_build_query(['source' => $source, 'destination' => $destination]);
+
         return $this->delete('/api/v1/mail/'.rawurlencode($domain).'/forwarder?'.$q);
     }
 
@@ -664,6 +665,7 @@ class EngineApiService
         if (is_string($target) && trim($target) !== '') {
             $payload['target'] = trim($target);
         }
+
         return $this->postLongChecked('/api/v1/security/clamav/scan', $payload, 1800);
     }
 
@@ -673,6 +675,7 @@ class EngineApiService
         if ($confirm !== null && trim($confirm) !== '') {
             $payload['confirm'] = trim($confirm);
         }
+
         return $this->postLongChecked('/api/v1/security/mail/reconcile', $payload, 120);
     }
 
@@ -779,6 +782,7 @@ class EngineApiService
                 if ($canRetry) {
                     // Geçici engine restart/bağlantı reset durumlarında bir kez daha deneyelim.
                     usleep(350000);
+
                     continue;
                 }
 
@@ -921,7 +925,7 @@ class EngineApiService
     private function generateLegacyToken(): string
     {
         $payload = base64_encode(json_encode([
-            'iss' => 'panelsar-panel',
+            'iss' => 'hostvim-panel',
             'iat' => time(),
             'exp' => time() + 300,
         ]));

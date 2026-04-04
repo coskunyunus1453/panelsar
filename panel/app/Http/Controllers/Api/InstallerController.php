@@ -4,15 +4,15 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Concerns\AuthorizesUserDomain;
 use App\Http\Controllers\Controller;
+use App\Jobs\RunInstallerJob;
 use App\Models\Database;
 use App\Models\Domain;
 use App\Models\InstallerRun;
-use App\Jobs\RunInstallerJob;
 use App\Services\EngineApiService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
@@ -79,7 +79,7 @@ class InstallerController extends Controller
 
             $dbHost = trim((string) ($db->host));
             if ($dbHost === '') {
-                $dbHost = (string) config('panelsar.mysql_provision.host', config('database.connections.mysql.host', '127.0.0.1'));
+                $dbHost = (string) config('hostvim.mysql_provision.host', config('database.connections.mysql.host', '127.0.0.1'));
             }
 
             $dbPort = (int) ($db->port ?? 3306);
@@ -120,7 +120,7 @@ class InstallerController extends Controller
                     if (EngineApiService::isLikelyConnectionFailure($run->message)) {
                         return response()->json([
                             'message' => __('installer.engine_unreachable', [
-                                'url' => config('panelsar.engine_url'),
+                                'url' => config('hostvim.engine_url'),
                             ]),
                             'hint' => __('installer.engine_start_hint'),
                             'run_id' => $run->id,
@@ -144,6 +144,7 @@ class InstallerController extends Controller
             }
 
             Bus::dispatch(new RunInstallerJob($run->id, $domain->name, 'wordpress', $payload))->afterResponse();
+
             return response()->json([
                 'message' => __('installer.started_background'),
                 'run_id' => $run->id,
@@ -153,11 +154,11 @@ class InstallerController extends Controller
         } catch (ValidationException $e) {
             throw $e;
         } catch (Throwable $e) {
-            Log::error('installer: beklenmeyen hata', [
+            Log::error('installer: beklenmeyen hata', array_filter([
                 'domain_id' => $domain->id,
                 'exception' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-            ]);
+                'trace' => config('app.debug') ? $e->getTraceAsString() : null,
+            ]));
 
             $message = config('app.debug')
                 ? $e->getMessage()
@@ -194,7 +195,7 @@ class InstallerController extends Controller
             'ok' => $engineOk,
             'message' => $engineOk
                 ? 'Engine bağlantısı başarılı.'
-                : 'Engine erişimi sağlanamadı. panelsar-engine servis durumunu kontrol edin.',
+                : 'Engine erişimi sağlanamadı. hostvim-engine servis durumunu kontrol edin.',
         ];
 
         $runsTableOk = Schema::hasTable('installer_runs');
@@ -228,7 +229,7 @@ class InstallerController extends Controller
                     : "Belge kökü erişilemiyor/yazılamıyor: {$docroot}";
 
                 if ($docrootOk) {
-                    $tmp = rtrim($docroot, '/').'/.__panelsar_installer_diag';
+                    $tmp = rtrim($docroot, '/').'/.__hostvim_installer_diag';
                     try {
                         file_put_contents($tmp, 'ok');
                         @unlink($tmp);
@@ -312,7 +313,7 @@ class InstallerController extends Controller
             if (EngineApiService::isLikelyConnectionFailure($engine['error'])) {
                 return response()->json([
                     'message' => __('installer.engine_unreachable', [
-                        'url' => config('panelsar.engine_url'),
+                        'url' => config('hostvim.engine_url'),
                     ]),
                     'hint' => __('installer.engine_start_hint'),
                     'background' => false,
@@ -351,7 +352,7 @@ class InstallerController extends Controller
 
         $host = trim((string) $db->host);
         if ($host === '') {
-            $host = (string) config('panelsar.mysql_provision.host', config('database.connections.mysql.host', '127.0.0.1'));
+            $host = (string) config('hostvim.mysql_provision.host', config('database.connections.mysql.host', '127.0.0.1'));
         }
         $port = (int) ($db->port ?? 3306);
         if ($port < 1 || $port > 65535) {

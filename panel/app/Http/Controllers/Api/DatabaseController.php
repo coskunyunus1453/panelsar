@@ -10,6 +10,8 @@ use App\Services\HostingQuotaService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use PDOException;
+use Symfony\Component\HttpFoundation\StreamedResponse;
+use Throwable;
 
 class DatabaseController extends Controller
 {
@@ -56,13 +58,13 @@ class DatabaseController extends Controller
             );
         } catch (\InvalidArgumentException $e) {
             return response()->json(['message' => $e->getMessage()], 422);
-        } catch (\PDOException $e) {
+        } catch (PDOException $e) {
             report($e);
 
             return response()->json([
                 'message' => __('databases.provision_failed').': '.$e->getMessage(),
             ], 503);
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             report($e);
 
             return response()->json(['message' => $e->getMessage() ?: __('databases.provision_failed')], 500);
@@ -97,7 +99,7 @@ class DatabaseController extends Controller
             return response()->json([
                 'message' => __('databases.provision_failed').': '.$e->getMessage(),
             ], 503);
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             report($e);
 
             return response()->json([
@@ -129,7 +131,7 @@ class DatabaseController extends Controller
             return response()->json([
                 'message' => __('databases.provision_failed').': '.$e->getMessage(),
             ], 503);
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             report($e);
 
             return response()->json([
@@ -156,7 +158,7 @@ class DatabaseController extends Controller
             return response()->json([
                 'message' => __('databases.provision_failed').': '.$e->getMessage(),
             ], 503);
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             report($e);
 
             return response()->json([
@@ -165,5 +167,100 @@ class DatabaseController extends Controller
         }
 
         return response()->json(['message' => __('databases.deleted')]);
+    }
+
+    public function export(Request $request, Database $database): JsonResponse|StreamedResponse
+    {
+        $this->authorize('export', $database);
+
+        if (! in_array($database->type, ['mysql', 'postgresql'], true)) {
+            return response()->json(['message' => __('databases.export_unsupported_type')], 422);
+        }
+
+        $safeName = preg_replace('/[^a-zA-Z0-9._-]+/', '_', $database->name) ?: 'database';
+        $filename = $safeName.'_'.date('Y-m-d_His').'.sql';
+
+        try {
+            return response()->streamDownload(function () use ($database): void {
+                if ($database->type === 'mysql') {
+                    $this->databaseService->streamMysqlDump($database, function (string $chunk): void {
+                        echo $chunk;
+                        if (ob_get_level() > 0) {
+                            @ob_flush();
+                        }
+                        flush();
+                    });
+                } else {
+                    $this->databaseService->streamPostgresDump($database, function (string $chunk): void {
+                        echo $chunk;
+                        if (ob_get_level() > 0) {
+                            @ob_flush();
+                        }
+                        flush();
+                    });
+                }
+            }, $filename, [
+                'Content-Type' => 'application/sql; charset=UTF-8',
+            ]);
+        } catch (\InvalidArgumentException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        } catch (Throwable $e) {
+            report($e);
+
+            return response()->json([
+                'message' => $e->getMessage() ?: __('databases.export_failed'),
+            ], 500);
+        }
+    }
+
+    public function import(Request $request, Database $database): JsonResponse
+    {
+        $this->authorize('import', $database);
+
+        if (! in_array($database->type, ['mysql', 'postgresql'], true)) {
+            return response()->json(['message' => __('databases.import_unsupported_type')], 422);
+        }
+
+        $maxMb = max(1, (int) config('hostvim.limits.max_db_import_mb', 512));
+        $maxKb = $maxMb * 1024;
+
+        $validated = $request->validate([
+            'sql_file' => ['required', 'file', 'max:'.$maxKb],
+            'confirmation' => ['required', 'string', 'max:128'],
+        ]);
+
+        $expected = (string) __('databases.import_confirm_expected');
+        if (trim((string) $validated['confirmation']) !== $expected) {
+            return response()->json(['message' => __('databases.import_confirm_mismatch')], 422);
+        }
+
+        $upload = $request->file('sql_file');
+        $ext = strtolower((string) $upload->getClientOriginalExtension());
+        if ($ext !== 'sql') {
+            return response()->json(['message' => __('databases.import_sql_only')], 422);
+        }
+
+        $path = $upload->getRealPath();
+        if ($path === false || ! is_readable($path)) {
+            return response()->json(['message' => __('databases.import_file_unreadable')], 422);
+        }
+
+        try {
+            if ($database->type === 'mysql') {
+                $this->databaseService->importMysqlFromSqlFile($database, $path);
+            } else {
+                $this->databaseService->importPostgresFromSqlFile($database, $path);
+            }
+        } catch (\InvalidArgumentException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        } catch (Throwable $e) {
+            report($e);
+
+            return response()->json([
+                'message' => $e->getMessage() ?: __('databases.import_failed'),
+            ], 500);
+        }
+
+        return response()->json(['message' => __('databases.imported')]);
     }
 }

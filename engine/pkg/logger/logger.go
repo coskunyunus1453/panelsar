@@ -14,10 +14,13 @@ func New() *logrus.Logger {
 		TimestampFormat: "2006-01-02 15:04:05",
 	})
 
-	level := os.Getenv("PANELSAR_LOG_LEVEL")
+	level := os.Getenv("HOSTVIM_LOG_LEVEL")
+	if level == "" {
+		level = os.Getenv("PANELSAR_LOG_LEVEL")
+	}
 	switch level {
 	case "debug":
-		log.SetLevel(logrus.DebugLevel)
+		log.SetLevel(logrus.InfoLevel)
 	case "warn":
 		log.SetLevel(logrus.WarnLevel)
 	case "error":

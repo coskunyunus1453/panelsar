@@ -12,7 +12,7 @@ class RoleController extends Controller
 {
     public function registry(): JsonResponse
     {
-        return response()->json(['abilities' => config('panelsar_abilities')]);
+        return response()->json(['abilities' => config('hostvim_abilities')]);
     }
 
     public function index(): JsonResponse

@@ -1,8 +1,21 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import api from '../services/api'
-import { Database, Plus, Search, Trash2, ExternalLink, KeyRound, Pencil } from 'lucide-react'
+import api, { apiBaseUrl } from '../services/api'
+import { useAuthStore } from '../store/authStore'
+import { tokenHasAbility } from '../lib/abilities'
+import i18n from '../i18n'
+import {
+  Database,
+  Plus,
+  Search,
+  Trash2,
+  ExternalLink,
+  KeyRound,
+  Pencil,
+  Download,
+  Upload,
+} from 'lucide-react'
 import toast from 'react-hot-toast'
 import { safeExternalHttpUrl } from '../lib/urlSafety'
 
@@ -31,10 +44,13 @@ function grantHostSelectOptions(current?: string | null): string[] {
 export default function DatabasesPage() {
   const { t } = useTranslation()
   const qc = useQueryClient()
+  const abilities = useAuthStore((s) => s.user?.abilities)
+  const canImportDb = tokenHasAbility(abilities, 'databases:write')
   const [search, setSearch] = useState('')
   const [showAdd, setShowAdd] = useState(false)
   const [createType, setCreateType] = useState('mysql')
   const [editAccessDb, setEditAccessDb] = useState<DbRow | null>(null)
+  const [importDb, setImportDb] = useState<DbRow | null>(null)
 
   const databasesQ = useQuery({
     queryKey: ['databases', 'paginated'],
@@ -127,6 +143,65 @@ export default function DatabasesPage() {
     },
   })
 
+  const importSqlM = useMutation({
+    mutationFn: async ({ id, file, confirmation }: { id: number; file: File; confirmation: string }) => {
+      const fd = new FormData()
+      fd.append('sql_file', file)
+      fd.append('confirmation', confirmation)
+      const { data } = await api.post<{ message?: string }>(`/databases/${id}/import`, fd)
+      return data
+    },
+    onSuccess: (data) => {
+      toast.success(data?.message ?? t('databases.import_started'))
+      qc.invalidateQueries({ queryKey: ['databases'] })
+      setImportDb(null)
+    },
+    onError: (err: unknown) => {
+      const ax = err as { response?: { data?: { message?: string } } }
+      toast.error(ax.response?.data?.message ?? String(err))
+    },
+  })
+
+  const runExport = async (db: DbRow) => {
+    const token = useAuthStore.getState().token
+    const locale = (i18n.language || 'en').split('-')[0]
+    try {
+      const res = await fetch(`${apiBaseUrl}/databases/${db.id}/export`, {
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          Accept: '*/*',
+          'X-Locale': locale,
+        },
+      })
+      if (!res.ok) {
+        const ct = res.headers.get('content-type') || ''
+        let msg = t('databases.export_failed')
+        if (ct.includes('json')) {
+          const j = (await res.json().catch(() => ({}))) as { message?: string }
+          if (j.message) msg = String(j.message)
+        } else {
+          const txt = await res.text().catch(() => '')
+          if (txt) msg = txt.slice(0, 240)
+        }
+        toast.error(msg)
+        return
+      }
+      const blob = await res.blob()
+      const cd = res.headers.get('content-disposition')
+      let fn = `${db.name.replace(/[^\w.-]+/g, '_')}.sql`
+      const m = cd?.match(/filename\*?=(?:UTF-8'')?["']?([^"';]+)/i) ?? cd?.match(/filename="([^"]+)"/i)
+      if (m?.[1]) fn = decodeURIComponent(m[1].trim())
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = fn
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch {
+      toast.error(t('databases.export_failed'))
+    }
+  }
+
   const list: DbRow[] = databasesQ.data?.data ?? []
   const total = (databasesQ.data?.total as number | undefined) ?? list.length
   const domainOptions: { id: number; name: string }[] = domainsQ.data?.data ?? []
@@ -139,7 +214,7 @@ export default function DatabasesPage() {
       if (!php) {
         toast.error(
           t('databases.ui_url_missing') +
-            ' PHPMYADMIN_URL (.env → panelsar.ui.phpmyadmin_url)',
+            ' PHPMYADMIN_URL (.env → hostvim.ui.phpmyadmin_url)',
         )
         return
       }
@@ -255,6 +330,61 @@ export default function DatabasesPage() {
                 </button>
                 <button type="submit" className="btn-primary" disabled={createM.isPending}>
                   {t('common.create')}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {importDb && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="card max-w-lg w-full p-6 space-y-4 bg-white dark:bg-gray-900 max-h-[90vh] overflow-y-auto">
+            <h2 className="text-lg font-semibold text-red-700 dark:text-red-400">
+              {t('databases.import_warning_title')}
+            </h2>
+            <p className="text-sm text-gray-600 dark:text-gray-400">{t('databases.import_warning_body')}</p>
+            <p className="text-sm font-medium text-gray-800 dark:text-gray-200">
+              {t('databases.import_confirm_hint', { phrase: t('databases.import_confirm_expected') })}
+            </p>
+            <form
+              className="space-y-3"
+              onSubmit={(ev) => {
+                ev.preventDefault()
+                const fd = new FormData(ev.currentTarget)
+                const file = (fd.get('sql_file') as File | null) ?? null
+                const confirmation = String(fd.get('confirmation') || '').trim()
+                if (!file || file.size === 0) {
+                  toast.error(t('databases.import_choose_file'))
+                  return
+                }
+                const expected = t('databases.import_confirm_expected')
+                if (confirmation !== expected) {
+                  toast.error(t('databases.import_confirm_mismatch'))
+                  return
+                }
+                importSqlM.mutate({ id: importDb.id, file, confirmation })
+              }}
+            >
+              <div>
+                <label className="label">{t('databases.import_choose_file')}</label>
+                <input name="sql_file" type="file" accept=".sql,text/plain,application/sql" className="input w-full" required />
+              </div>
+              <div>
+                <label className="label">{t('databases.import_confirm_label')}</label>
+                <input name="confirmation" type="text" className="input w-full font-mono" autoComplete="off" required />
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={() => setImportDb(null)}
+                  disabled={importSqlM.isPending}
+                >
+                  {t('common.cancel')}
+                </button>
+                <button type="submit" className="btn-primary bg-red-600 hover:bg-red-700 border-red-600" disabled={importSqlM.isPending}>
+                  {t('databases.import_sql')}
                 </button>
               </div>
             </form>
@@ -401,6 +531,26 @@ export default function DatabasesPage() {
                             onClick={() => setEditAccessDb(db)}
                           >
                             <Pencil className="h-4 w-4" />
+                          </button>
+                        )}
+                        {(db.type === 'mysql' || db.type === 'postgresql') && (
+                          <button
+                            type="button"
+                            className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500"
+                            title={t('databases.export_sql')}
+                            onClick={() => runExport(db)}
+                          >
+                            <Download className="h-4 w-4" />
+                          </button>
+                        )}
+                        {canImportDb && (db.type === 'mysql' || db.type === 'postgresql') && (
+                          <button
+                            type="button"
+                            className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500"
+                            title={t('databases.import_sql')}
+                            onClick={() => setImportDb(db)}
+                          >
+                            <Upload className="h-4 w-4" />
                           </button>
                         )}
                         {(db.type === 'mysql' || db.type === 'postgresql') && (

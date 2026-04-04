@@ -1,5 +1,6 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { lazy, Suspense, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useAuthStore } from './store/authStore'
 import { useThemeStore } from './store/themeStore'
 import { useUiModeStore } from './store/uiModeStore'
@@ -32,9 +33,22 @@ import AdminMailSettingsPage from './pages/AdminMailSettingsPage'
 import AdminRolesPage from './pages/AdminRolesPage'
 import AdminWebServerSettingsPage from './pages/AdminWebServerSettingsPage'
 import AdminPhpSettingsPage from './pages/AdminPhpSettingsPage'
+import AdminCmsLayout from './pages/AdminCmsLayout'
+import AdminCmsLandingPage from './pages/AdminCmsLandingPage'
+import AdminCmsInstallPage from './pages/AdminCmsInstallPage'
+import AdminCmsDocsPage from './pages/AdminCmsDocsPage'
+import AdminCmsBlogPage from './pages/AdminCmsBlogPage'
 import ResellerPage from './pages/ResellerPage'
 import AiAdvisorPage from './pages/AiAdvisorPage'
 import PluginsStorePage from './pages/PluginsStorePage'
+import PublicMarketingGate from './pages/PublicMarketingGate'
+import PublicLandingPage from './pages/PublicLandingPage'
+import PricingPage from './pages/PricingPage'
+import InstallPage from './pages/InstallPage'
+import DocsPage from './pages/DocsPage'
+import DocsDetailPage from './pages/DocsDetailPage'
+import BlogPage from './pages/BlogPage'
+import BlogDetailPage from './pages/BlogDetailPage'
 import { isVendorProfile } from './config/profile'
 
 const AdminVendorControlPage = lazy(() => import('./pages/AdminVendorControlPage'))
@@ -46,16 +60,17 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 }
 
 function AdvancedRoute({ children }: { children: React.ReactNode }) {
+  const { t } = useTranslation()
   const { mode, setMode } = useUiModeStore()
   if (mode === 'advanced') return <>{children}</>
   return (
     <div className="max-w-2xl rounded-xl border border-amber-200 dark:border-amber-900/40 bg-amber-50/80 dark:bg-amber-950/20 p-5">
-      <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Gelişmiş mod gerekli</h2>
+      <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{t('ui_mode.advanced_required_title')}</h2>
       <p className="mt-1 text-sm text-gray-600 dark:text-gray-300">
-        Bu sayfa teknik/ileri ayarlar içerir. Kolay modda gizlenir.
+        {t('ui_mode.advanced_required_desc')}
       </p>
       <button className="btn-primary mt-3" onClick={() => setMode('advanced')}>
-        Gelişmiş Moda Geç
+        {t('ui_mode.switch_to_advanced')}
       </button>
     </div>
   )
@@ -76,6 +91,15 @@ export default function App() {
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       {isVendorProfile && <Route path="/vendor/login" element={<LoginPage />} />}
+      <Route path="/" element={<PublicMarketingGate />}>
+        <Route index element={<PublicLandingPage />} />
+        <Route path="pricing" element={<PricingPage />} />
+        <Route path="install" element={<InstallPage />} />
+        <Route path="docs" element={<DocsPage />} />
+        <Route path="docs/:slug" element={<DocsDetailPage />} />
+        <Route path="blog" element={<BlogPage />} />
+        <Route path="blog/:slug" element={<BlogDetailPage />} />
+      </Route>
       <Route
         path="/"
         element={
@@ -114,6 +138,13 @@ export default function App() {
         <Route path="admin/mail-settings" element={<AdvancedRoute><AdminMailSettingsPage /></AdvancedRoute>} />
         <Route path="admin/webserver" element={<AdvancedRoute><AdminWebServerSettingsPage /></AdvancedRoute>} />
         <Route path="admin/php-settings" element={<AdvancedRoute><AdminPhpSettingsPage /></AdvancedRoute>} />
+        <Route path="admin/cms" element={<AdvancedRoute><AdminCmsLayout /></AdvancedRoute>}>
+          <Route index element={<Navigate to="landing" replace />} />
+          <Route path="landing" element={<AdminCmsLandingPage />} />
+          <Route path="install" element={<AdminCmsInstallPage />} />
+          <Route path="docs" element={<AdminCmsDocsPage />} />
+          <Route path="blog" element={<AdminCmsBlogPage />} />
+        </Route>
         {isVendorProfile && (
           <Route
             path="admin/vendor-control"

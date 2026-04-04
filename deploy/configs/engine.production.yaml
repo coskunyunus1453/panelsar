@@ -1,5 +1,5 @@
-# Panelsar Engine — üretim şablonu (/etc/panelsar/engine.yaml olarak kopyalanır)
-# Kurulum: install-production.sh otomatik doldurur (__INTERNAL_KEY__, __PANELSAR_HOME__)
+# Hostvim Engine — üretim şablonu (/etc/panelsar/engine.yaml olarak kopyalanır)
+# Kurulum: install-production.sh otomatik doldurur (__INTERNAL_KEY__, __HOSTVIM_HOME__)
 
 server:
   port: 9090
@@ -48,17 +48,19 @@ services:
 security:
   jwt_secret: "__ENGINE_JWT_SECRET__"
   internal_api_key: "__INTERNAL_KEY__"
+  # Virgülle ayrılmış origin listesi; internal API için wildcard kullanmayın.
+  allowed_origins: "__PANEL_ORIGINS__"
   token_expiry: 3600
   max_login_attempts: 5
   fail2ban_enabled: false
 
 paths:
-  web_root: "__PANELSAR_HOME__/data/www"
-  vhosts_dir: "__PANELSAR_HOME__/data/vhosts"
-  ssl_dir: "__PANELSAR_HOME__/data/ssl"
-  backup_dir: "__PANELSAR_HOME__/data/backups"
-  log_dir: "__PANELSAR_HOME__/data/logs"
-  temp_dir: "__PANELSAR_HOME__/data/tmp"
+  web_root: "__HOSTVIM_HOME__/data/www"
+  vhosts_dir: "__HOSTVIM_HOME__/data/vhosts"
+  ssl_dir: "__HOSTVIM_HOME__/data/ssl"
+  backup_dir: "__HOSTVIM_HOME__/data/backups"
+  log_dir: "__HOSTVIM_HOME__/data/logs"
+  temp_dir: "__HOSTVIM_HOME__/data/tmp"
 
 hosting:
   nginx_manage_vhosts: true

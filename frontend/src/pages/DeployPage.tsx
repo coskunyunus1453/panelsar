@@ -54,11 +54,13 @@ export default function DeployPage() {
   const cfg = cfgQ.data?.config
   useEffect(() => {
     syncFromServer(cfg)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cfg?.id, cfg?.repo_url, cfg?.branch, cfg?.runtime, cfg?.auto_deploy])
   const webhookUrl = useMemo(() => {
     if (!domainId) return ''
-    return `${window.location.origin}/api/deployment/webhook/${domainId}`
+    const baseUrl = (import.meta as any).env?.BASE_URL || '/'
+    const cleanBase = baseUrl.replace(/\/+$/, '')
+    // XAMPP local’de `/api/*` rewrite bazen çalışmayabiliyor; bu yüzden front controller olan `index.php` üzerinden çağırıyoruz.
+    return `${window.location.origin}${cleanBase}/index.php/api/deployment/webhook/${domainId}`
   }, [domainId])
 
   const syncFromServer = (next?: DeployConfig) => {

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/panelsar/engine/internal/config"
+	"hostvim/engine/internal/config"
 )
 
 // DBConfig WordPress vb. kurulumlar için MySQL bağlantısı.

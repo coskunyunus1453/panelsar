@@ -6,6 +6,7 @@ import { Toaster } from 'react-hot-toast'
 import App from './App'
 import './i18n'
 import './index.css'
+import { inferPublicPathPrefix } from './lib/publicPath'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -17,12 +18,29 @@ const queryClient = new QueryClient({
   },
 })
 
-const routerBase = (import.meta as any).env?.BASE_URL || '/'
+function routerBasename(): string | undefined {
+  if ((import.meta as any).env?.DEV) {
+    const b = String((import.meta as any).env?.BASE_URL || '/').replace(/\/+$/, '')
+    if (!b || b === '/' || b === '.' || b === './') {
+      return undefined
+    }
+    return b.startsWith('/') ? b : `/${b}`
+  }
+  const inferred = inferPublicPathPrefix()
+  if (inferred && inferred !== '/') {
+    return inferred
+  }
+  const b = String((import.meta as any).env?.BASE_URL || '/').replace(/\/+$/, '')
+  if (!b || b === '/' || b === '.' || b === './') {
+    return undefined
+  }
+  return b.startsWith('/') ? b : `/${b}`
+}
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter basename={routerBase}>
+      <BrowserRouter basename={routerBasename()}>
         <App />
         <Toaster
           position="top-right"

@@ -9,8 +9,8 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/panelsar/engine/internal/config"
-	"github.com/panelsar/engine/internal/nginx"
+	"hostvim/engine/internal/config"
+	"hostvim/engine/internal/nginx"
 )
 
 const tplHTTP = `# Panelsar — {{.Domain}} (Apache HTTP)
@@ -197,16 +197,48 @@ func ApplyVhost(cfg *config.Config, domain, docRoot, phpSocket, sslFullchain, ss
 	avail := filepath.Join(availDir, base)
 	enabled := filepath.Join(enDir, base)
 
+	oldAvail, readAvailErr := os.ReadFile(avail)
+	hadAvail := readAvailErr == nil
+
+	var oldLinkTarget string
+	hadOldLink := false
+	if fi, err := os.Lstat(enabled); err == nil && fi.Mode()&os.ModeSymlink != 0 {
+		if tgt, err := os.Readlink(enabled); err == nil && tgt != "" {
+			oldLinkTarget = tgt
+			hadOldLink = true
+		}
+	}
+
+	rollback := func() {
+		_ = os.Remove(enabled)
+		if hadOldLink && oldLinkTarget != "" {
+			_ = os.Symlink(oldLinkTarget, enabled)
+		}
+		if hadAvail {
+			_ = os.WriteFile(avail, oldAvail, 0o644)
+		} else {
+			_ = os.Remove(avail)
+		}
+	}
+
 	if err := os.WriteFile(avail, buf.Bytes(), 0o644); err != nil {
 		return fmt.Errorf("write apache vhost: %w", err)
 	}
 	_ = os.Remove(enabled)
 	if err := os.Symlink(avail, enabled); err != nil {
+		rollback()
 		return fmt.Errorf("apache symlink: %w", err)
 	}
 
+	if err := apacheTestConfig(); err != nil {
+		rollback()
+		return err
+	}
+
 	if cfg.Hosting.ApacheReloadAfterVhost {
-		reloadApache()
+		if err := reloadApacheErr(); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -223,7 +255,7 @@ func RemoveVhost(cfg *config.Config, domain string) error {
 	_ = os.Remove(filepath.Join(sitesEnabled(cfg), base))
 	_ = os.Remove(filepath.Join(sitesAvailable(cfg), base))
 	if cfg.Hosting.ApacheReloadAfterVhost {
-		reloadApache()
+		_ = reloadApacheErr()
 	}
 	return nil
 }
@@ -237,14 +269,35 @@ func RemoveVhostBestEffort(cfg *config.Config, domain string) {
 	_ = os.Remove(filepath.Join(sitesEnabled(cfg), base))
 	_ = os.Remove(filepath.Join(sitesAvailable(cfg), base))
 	if cfg.Hosting.ApacheReloadAfterVhost {
-		reloadApache()
+		_ = reloadApacheErr()
 	}
 }
 
-func reloadApache() {
-	if _, err := exec.LookPath("apache2ctl"); err == nil {
-		_ = exec.Command("apache2ctl", "graceful").Run()
-		return
+func apacheTestConfig() error {
+	var out []byte
+	var err error
+	if _, e := exec.LookPath("apache2ctl"); e == nil {
+		out, err = exec.Command("apache2ctl", "configtest").CombinedOutput()
+	} else {
+		out, err = exec.Command("apachectl", "configtest").CombinedOutput()
 	}
-	_ = exec.Command("apachectl", "graceful").Run()
+	if err != nil {
+		return fmt.Errorf("apache configtest: %w — %s", err, strings.TrimSpace(string(out)))
+	}
+	return nil
+}
+
+func reloadApacheErr() error {
+	if _, err := exec.LookPath("apache2ctl"); err == nil {
+		out, err2 := exec.Command("apache2ctl", "graceful").CombinedOutput()
+		if err2 != nil {
+			return fmt.Errorf("apache2ctl graceful: %w — %s", err2, strings.TrimSpace(string(out)))
+		}
+		return nil
+	}
+	out, err := exec.Command("apachectl", "graceful").CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("apachectl graceful: %w — %s", err, strings.TrimSpace(string(out)))
+	}
+	return nil
 }

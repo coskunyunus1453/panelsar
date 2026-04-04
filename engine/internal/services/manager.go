@@ -6,7 +6,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/panelsar/engine/internal/config"
+	"hostvim/engine/internal/config"
 	"github.com/sirupsen/logrus"
 )
 

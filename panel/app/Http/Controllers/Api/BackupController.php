@@ -10,9 +10,9 @@ use App\Models\BackupSchedule;
 use App\Models\Domain;
 use App\Services\EngineApiService;
 use App\Services\HostingQuotaService;
+use App\Services\SafeAuditLogger;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 
@@ -98,6 +98,7 @@ class BackupController extends Controller
             ->where('user_id', $request->user()->id)
             ->latest('id')
             ->get();
+
         return response()->json(['destinations' => $rows]);
     }
 
@@ -122,6 +123,7 @@ class BackupController extends Controller
             'is_active' => (bool) ($validated['is_active'] ?? true),
         ]);
         $this->audit($request, 'backup_destination_create', true, null, ['destination_id' => $dest->id]);
+
         return response()->json(['message' => __('backups.destination_saved'), 'destination' => $dest], 201);
     }
 
@@ -143,6 +145,7 @@ class BackupController extends Controller
         $backupDestination->fill($validated);
         $backupDestination->save();
         $this->audit($request, 'backup_destination_update', true, null, ['destination_id' => $backupDestination->id]);
+
         return response()->json(['message' => __('backups.destination_saved'), 'destination' => $backupDestination->fresh()]);
     }
 
@@ -154,6 +157,7 @@ class BackupController extends Controller
         $id = $backupDestination->id;
         $backupDestination->delete();
         $this->audit($request, 'backup_destination_delete', true, null, ['destination_id' => $id]);
+
         return response()->json(['message' => __('backups.deleted')]);
     }
 
@@ -164,6 +168,7 @@ class BackupController extends Controller
             ->with(['domain:id,name', 'destination:id,name,driver'])
             ->latest('id')
             ->get();
+
         return response()->json(['schedules' => $rows]);
     }
 
@@ -198,6 +203,7 @@ class BackupController extends Controller
             'enabled' => (bool) ($validated['enabled'] ?? true),
         ]);
         $this->audit($request, 'backup_schedule_create', true, null, ['schedule_id' => $row->id, 'domain_id' => $domain->id]);
+
         return response()->json(['message' => __('backups.schedule_saved'), 'schedule' => $row->fresh(['domain:id,name', 'destination:id,name,driver'])], 201);
     }
 
@@ -224,6 +230,7 @@ class BackupController extends Controller
         $backupSchedule->fill($validated);
         $backupSchedule->save();
         $this->audit($request, 'backup_schedule_update', true, null, ['schedule_id' => $backupSchedule->id]);
+
         return response()->json(['message' => __('backups.schedule_saved'), 'schedule' => $backupSchedule->fresh(['domain:id,name', 'destination:id,name,driver'])]);
     }
 
@@ -235,6 +242,7 @@ class BackupController extends Controller
         $id = $backupSchedule->id;
         $backupSchedule->delete();
         $this->audit($request, 'backup_schedule_delete', true, null, ['schedule_id' => $id]);
+
         return response()->json(['message' => __('backups.deleted')]);
     }
 
@@ -261,6 +269,7 @@ class BackupController extends Controller
         if (! empty($engine['error'])) {
             $backup->update(['status' => 'failed']);
             $this->audit($request, 'backup_schedule_run', false, (string) $engine['error'], ['schedule_id' => $backupSchedule->id, 'backup_id' => $backup->id]);
+
             return response()->json(['message' => (string) $engine['error']], 502);
         }
         $backupSchedule->update(['last_run_at' => now()]);
@@ -276,6 +285,7 @@ class BackupController extends Controller
             }
         }
         $this->audit($request, 'backup_schedule_run', true, null, ['schedule_id' => $backupSchedule->id, 'backup_id' => $backup->id]);
+
         return response()->json(['message' => __('backups.queued'), 'backup' => $backup->fresh()]);
     }
 
@@ -323,6 +333,7 @@ class BackupController extends Controller
                 'destination_id' => $destId,
                 'backup_set' => $set,
             ]);
+
             return response()->json(['message' => __('backups.restore_started'), 'engine' => $result]);
         }
 
@@ -377,6 +388,7 @@ class BackupController extends Controller
                 return true;
             }
             $panelBackupId = trim((string) ($row['panel_backup_id'] ?? ''));
+
             return $panelBackupId !== '' && in_array($panelBackupId, $allowedPanelIds, true);
         }));
 
@@ -391,9 +403,11 @@ class BackupController extends Controller
         $result = $this->syncToDestination($backup);
         if (! $result['ok']) {
             $this->audit($request, 'backup_sync', false, $result['error'] ?? 'sync failed', ['backup_id' => $backup->id]);
+
             return response()->json(['message' => $result['error'] ?? 'sync failed'], 422);
         }
         $this->audit($request, 'backup_sync', true, null, ['backup_id' => $backup->id]);
+
         return response()->json(['message' => __('backups.synced'), 'remote_path' => $result['remote_path'] ?? null]);
     }
 
@@ -429,6 +443,7 @@ class BackupController extends Controller
             if (! $ok) {
                 return ['ok' => false, 'error' => 'remote write failed'];
             }
+
             return ['ok' => true, 'remote_path' => $remotePath];
         } catch (\Throwable $e) {
             return ['ok' => false, 'error' => $e->getMessage()];
@@ -458,6 +473,7 @@ class BackupController extends Controller
                 'throw' => true,
             ]);
         }
+
         return Storage::build([
             'driver' => 'local',
             'root' => (string) ($cfg['path'] ?? storage_path('app/backups')),
@@ -467,12 +483,10 @@ class BackupController extends Controller
 
     private function audit(Request $request, string $action, bool $success, ?string $error = null, array $extra = []): void
     {
-        Log::info('panelsar.backup_audit', array_merge([
+        SafeAuditLogger::info('hostvim.backup_audit', array_merge([
             'action' => $action,
-            'user_id' => $request->user()?->id,
             'success' => $success,
             'error' => $error,
-            'ip' => $request->ip(),
-        ], $extra));
+        ], $extra), $request);
     }
 }

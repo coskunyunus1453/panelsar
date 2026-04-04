@@ -21,4 +21,14 @@ class DatabasePolicy
     {
         return $user->id === $database->user_id || $user->isAdmin();
     }
+
+    public function export(User $user, Database $database): bool
+    {
+        return $user->id === $database->user_id || $user->isAdmin();
+    }
+
+    public function import(User $user, Database $database): bool
+    {
+        return $user->id === $database->user_id || $user->isAdmin();
+    }
 }

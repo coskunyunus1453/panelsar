@@ -9,7 +9,7 @@ use Illuminate\Console\Command;
 
 class EnsureSystemCronJobsCommand extends Command
 {
-    protected $signature = 'panelsar:ensure-system-cron';
+    protected $signature = 'hostvim:ensure-system-cron';
 
     protected $description = 'Ensure protected system cron jobs exist and are synced to engine';
 
@@ -25,6 +25,7 @@ class EnsureSystemCronJobsCommand extends Command
         }
         if (! $owner) {
             $this->warn('No users found; system cron creation skipped.');
+
             return self::SUCCESS;
         }
 
@@ -33,7 +34,7 @@ class EnsureSystemCronJobsCommand extends Command
                 'key' => 'panel.scheduler.run',
                 'schedule' => '* * * * *',
                 'command' => '/usr/bin/php '.base_path('artisan').' schedule:run >> /dev/null 2>&1',
-                'description' => 'Panelsar system scheduler (protected)',
+                'description' => 'Hostvim system scheduler (protected)',
             ],
         ];
 
@@ -59,6 +60,7 @@ class EnsureSystemCronJobsCommand extends Command
                 if (! empty($resp['error'])) {
                     $this->warn('Engine cron update failed for '.$spec['key'].': '.$resp['error']);
                 }
+
                 continue;
             }
 
@@ -77,7 +79,7 @@ class EnsureSystemCronJobsCommand extends Command
         }
 
         $this->info('System cron jobs ensured.');
+
         return self::SUCCESS;
     }
 }
-

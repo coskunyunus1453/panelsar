@@ -37,6 +37,7 @@ import {
   Tags,
   ServerCog,
   FileCode,
+  BookMarked,
   ChevronDown,
   Rocket,
   Sparkles,
@@ -160,6 +161,7 @@ export default function Sidebar() {
         { path: '/admin/users', icon: Users, label: 'nav.users', allow: isAdmin },
         { path: '/admin/roles', icon: Tags, label: 'nav.roles', allow: isAdmin },
         { path: '/admin/packages', icon: Package, label: 'nav.packages', allow: isAdmin },
+        { path: '/admin/cms', icon: BookMarked, label: 'nav.cms', allow: isAdmin },
         { path: '/admin/license', icon: KeyRound, label: 'nav.license', allow: isAdmin },
         { path: '/admin/vendor-control', icon: Building2, label: 'nav.vendor_control', allow: isVendorProfile && (isVendorAdmin || isAdmin) },
       ],
@@ -241,7 +243,7 @@ export default function Sidebar() {
           )}
           {!headerLogo && (
             <span className="truncate text-xl font-bold text-gray-900 dark:text-white">
-              Panelsar
+              Hostvim
             </span>
           )}
         </div>

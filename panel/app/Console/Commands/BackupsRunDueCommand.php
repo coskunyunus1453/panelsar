@@ -46,7 +46,7 @@ class BackupsRunDueCommand extends Command
             $res = $engine->queueBackup($domain->name, $backup->type, $backup->id);
             if (! empty($res['error'])) {
                 $backup->update(['status' => 'failed']);
-                Log::warning('panelsar.backup_schedule_due_failed', [
+                Log::warning('hostvim.backup_schedule_due_failed', [
                     'schedule_id' => $s->id,
                     'backup_id' => $backup->id,
                     'error' => $res['error'],

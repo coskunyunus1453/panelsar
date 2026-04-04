@@ -10,12 +10,14 @@ use Illuminate\Support\Facades\Schema;
 
 class RunSelfHealCommand extends Command
 {
-    protected $signature = 'panelsar:self-heal';
+    protected $signature = 'hostvim:self-heal';
 
     protected $description = 'Run guarded self-heal checks and alerts';
 
     private const WINDOW_SECONDS = 300; // 5 min
+
     private const MAX_SAME_ACTION = 3;
+
     private const COOLDOWN_SECONDS = 120; // 2 min
 
     public function handle(EngineApiService $engine): int
@@ -86,6 +88,7 @@ class RunSelfHealCommand extends Command
         $last = (int) (Cache::get($lastKey, 0));
         if ($last > 0 && ($nowTs - $last) < self::COOLDOWN_SECONDS) {
             $this->emitGuardrailAlert($service, 'cooldown', 'Auto-restart cooldown aktif, islem ertelendi.');
+
             return;
         }
 
@@ -96,6 +99,7 @@ class RunSelfHealCommand extends Command
         $history = array_values(array_filter($history, static fn ($ts) => is_numeric($ts) && ((int) $ts) >= ($nowTs - self::WINDOW_SECONDS)));
         if (count($history) >= self::MAX_SAME_ACTION) {
             $this->emitGuardrailAlert($service, 'limit', 'Auto-restart limitine ulasildi (3/5dk), loop engellendi.');
+
             return;
         }
 
@@ -110,7 +114,7 @@ class RunSelfHealCommand extends Command
             'level' => $ok ? 'info' : 'error',
             'title' => $ok ? "Auto-restart uygulandi: {$service}" : "Auto-restart basarisiz: {$service}",
             'message' => $ok
-                ? "Servis running degildi, guvenli politika ile restart denendi."
+                ? 'Servis running degildi, guvenli politika ile restart denendi.'
                 : ((string) ($resp['error'] ?? 'bilinmeyen hata')),
             'path' => '/system',
             'dedupe_key' => "restart-{$service}-".date('YmdHi'),
@@ -142,7 +146,7 @@ class RunSelfHealCommand extends Command
     }
 
     /**
-     * @param array<string, mixed> $payload
+     * @param  array<string, mixed>  $payload
      */
     private function createAlert(array $payload): void
     {
@@ -152,4 +156,3 @@ class RunSelfHealCommand extends Command
         SystemAlert::query()->create($payload);
     }
 }
-

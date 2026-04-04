@@ -16,7 +16,7 @@ class TerminalController extends Controller
      */
     public function session(Request $request): JsonResponse
     {
-        $secret = (string) config('panelsar.engine_secret', '');
+        $secret = (string) config('hostvim.engine_secret', '');
         if ($secret === '') {
             return response()->json([
                 'message' => 'ENGINE_API_SECRET tanımlı değil; panel .env ile engine jwt_secret eşleştirin.',
@@ -42,7 +42,28 @@ class TerminalController extends Controller
 
         $scheme = $this->websocketScheme($request);
         $host = $request->getHost();
+
+        // Local/XAMPP’de Nginx proxy olmadığı için `/engine-ws/*` path’i çalışmayabilir.
+        // Bu yüzden local ortamda WS URL’yi direkt engine’a çeviriyoruz.
+        // Canlıda (Nginx proxy) env `app.env` local olmadığı sürece eski davranış korunur.
         $url = $scheme.'://'.$host.'/engine-ws/terminal';
+        $appEnv = (string) config('app.env');
+        $isLocalHost = is_string($host) && (
+            str_starts_with($host, 'localhost')
+            || str_starts_with($host, '127.0.0.1')
+            || str_starts_with($host, '::1')
+        );
+
+        if (($appEnv === 'local' || $appEnv === 'development') && $isLocalHost) {
+            $engineUrl = (string) config('hostvim.engine_url', 'http://127.0.0.1:9090');
+            $p = parse_url($engineUrl);
+            if (is_array($p) && ! empty($p['host'])) {
+                $wsScheme = (! empty($p['scheme']) && strtolower((string) $p['scheme']) === 'https') ? 'wss' : 'ws';
+                $engineHost = (string) $p['host'];
+                $enginePort = ! empty($p['port']) ? ':'.$p['port'] : '';
+                $url = $wsScheme.'://'.$engineHost.$enginePort.'/ws/terminal';
+            }
+        }
 
         return response()->json([
             'url' => $url,
@@ -65,7 +86,7 @@ class TerminalController extends Controller
         if (is_string($appScheme) && strtolower($appScheme) === 'https') {
             return 'wss';
         }
-        if (config('panelsar.force_wss_terminal') === true) {
+        if (config('hostvim.force_wss_terminal') === true) {
             return 'wss';
         }
 

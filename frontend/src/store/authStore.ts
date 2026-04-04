@@ -27,7 +27,7 @@ export const useAuthStore = create<AuthState>()(
         })),
     }),
     {
-      name: 'panelsar-auth',
+      name: 'hostvim-auth',
       storage: createJSONStorage(() => sessionStorage),
       partialize: (state) => ({
         token: state.token,

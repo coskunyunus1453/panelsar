@@ -2,17 +2,17 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Jobs\RunPluginMigrationJob;
 use App\Http\Controllers\Controller;
+use App\Jobs\RunPluginMigrationJob;
 use App\Models\Domain;
-use App\Models\PluginModule;
 use App\Models\PluginMigrationRun;
+use App\Models\PluginModule;
 use App\Models\UserPluginModule;
+use App\Services\SafeAuditLogger;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Crypt;
-use Illuminate\Support\Facades\Log;
 use Symfony\Component\Process\Process;
 
 class PluginStoreController extends Controller
@@ -33,6 +33,7 @@ class PluginStoreController extends Controller
 
         $rows = $mods->map(function (PluginModule $m) use ($userMap) {
             $u = $userMap->get($m->id);
+
             return [
                 'id' => $m->id,
                 'slug' => $m->slug,
@@ -68,12 +69,7 @@ class PluginStoreController extends Controller
             $row->status = 'installed';
             $row->save();
         }
-        Log::info('panelsar.plugin_audit', [
-            'action' => 'install',
-            'user_id' => $user->id,
-            'plugin' => $pluginModule->slug,
-            'ip' => $request->ip(),
-        ]);
+
         return response()->json(['message' => 'module installed']);
     }
 
@@ -91,12 +87,12 @@ class PluginStoreController extends Controller
         $row->status = 'active';
         $row->activated_at = now();
         $row->save();
-        Log::info('panelsar.plugin_audit', [
+        SafeAuditLogger::info('hostvim.plugin_audit', [
             'action' => 'activate',
             'user_id' => $user->id,
             'plugin' => $pluginModule->slug,
-            'ip' => $request->ip(),
-        ]);
+        ], $request);
+
         return response()->json(['message' => 'module activated']);
     }
 
@@ -113,12 +109,12 @@ class PluginStoreController extends Controller
         $row->is_active = false;
         $row->status = 'installed';
         $row->save();
-        Log::info('panelsar.plugin_audit', [
+        SafeAuditLogger::info('hostvim.plugin_audit', [
             'action' => 'deactivate',
             'user_id' => $user->id,
             'plugin' => $pluginModule->slug,
-            'ip' => $request->ip(),
-        ]);
+        ], $request);
+
         return response()->json(['message' => 'module deactivated']);
     }
 
@@ -240,15 +236,14 @@ class PluginStoreController extends Controller
         ]);
         Bus::dispatch(new RunPluginMigrationJob($run->id))->afterResponse();
 
-        Log::info('panelsar.plugin_audit', [
+        SafeAuditLogger::info('hostvim.plugin_audit', [
             'action' => 'migration_start',
             'user_id' => $user->id,
             'plugin' => $pluginModule->slug,
             'run_id' => $run->id,
             'source_type' => $sourceType,
-            'source_host' => $run->source_host,
-            'ip' => $request->ip(),
-        ]);
+            'source_host_fp' => SafeAuditLogger::hostFingerprint($run->source_host),
+        ], $request);
 
         return response()->json([
             'message' => 'migration queued',
@@ -312,6 +307,7 @@ class PluginStoreController extends Controller
         }
 
         $ok = collect($checks)->every(fn ($c) => (bool) ($c['ok'] ?? false));
+
         return response()->json([
             'ok' => $ok,
             'checks' => $checks,
@@ -397,6 +393,7 @@ class PluginStoreController extends Controller
     {
         $p = new Process(['sh', '-lc', 'command -v '.escapeshellarg($bin)]);
         $p->run();
+
         return [
             'key' => 'bin_'.$bin,
             'ok' => $p->isSuccessful(),
@@ -421,6 +418,7 @@ class PluginStoreController extends Controller
                 $remoteCmd,
             ], null, null, null, 20);
             $p->run();
+
             return [
                 'key' => 'remote_path',
                 'ok' => $p->isSuccessful() && str_contains($p->getOutput(), 'OK'),
@@ -443,6 +441,7 @@ class PluginStoreController extends Controller
             $remoteCmd,
         ], null, null, null, 20);
         $p->run();
+
         return $p->isSuccessful() && str_contains($p->getOutput(), 'OK');
     }
 
@@ -461,6 +460,7 @@ class PluginStoreController extends Controller
         if (! $p->isSuccessful()) {
             return [];
         }
+
         return array_values(array_filter(array_map('trim', explode("\n", trim($p->getOutput())))));
     }
 
@@ -479,6 +479,7 @@ class PluginStoreController extends Controller
         if (! $p->isSuccessful()) {
             return [];
         }
+
         return array_values(array_filter(array_map('trim', explode("\n", trim($p->getOutput())))));
     }
 

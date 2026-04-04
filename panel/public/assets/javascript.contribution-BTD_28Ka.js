@@ -1,2 +1,0 @@
-const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/javascript-DFz4_BJ5.js","assets/_.contribution-ooW9o1bc.js","assets/_-CYycS1jb.css"])))=>i.map(i=>d[i]);
-import{_ as e}from"./index-CEZ_shf3.js";import{r as s}from"./_.contribution-ooW9o1bc.js";s({id:"javascript",extensions:[".js",".es6",".jsx",".mjs",".cjs"],firstLine:"^#!.*\\bnode",filenames:["jakefile"],aliases:["JavaScript","javascript","js"],mimetypes:["text/javascript"],loader:()=>e(()=>import("./javascript-DFz4_BJ5.js"),__vite__mapDeps([0,1,2]))});

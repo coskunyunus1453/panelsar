@@ -37,7 +37,7 @@ export const useThemeStore = create<ThemeState>()(
       closeMobileSidebar: () => set({ mobileSidebarOpen: false }),
     }),
     {
-      name: 'panelsar-theme',
+      name: 'hostvim-theme',
       partialize: (state) => ({
         isDark: state.isDark,
         sidebarCollapsed: state.sidebarCollapsed,

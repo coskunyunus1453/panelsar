@@ -10,7 +10,7 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/panelsar/engine/internal/config"
+	"hostvim/engine/internal/config"
 )
 
 var domainSafe = regexp.MustCompile(`^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?)*$`)
@@ -258,22 +258,56 @@ func ApplyVhost(cfg *config.Config, confName, docRoot, phpSocket, sslFullchain, 
 	base := confBaseName(confName)
 	avail := filepath.Join(cfg.Paths.VhostsDir, base)
 
+	var oldContent []byte
+	hadOld := false
+	if _, statErr := os.Stat(avail); statErr == nil {
+		b, rerr := os.ReadFile(avail)
+		if rerr != nil {
+			return fmt.Errorf("read existing vhost: %w", rerr)
+		}
+		oldContent = b
+		hadOld = true
+	}
+
 	if err := os.WriteFile(avail, buf.Bytes(), 0o644); err != nil {
 		return fmt.Errorf("write vhost: %w", err)
 	}
 
-	// www-data /etc/nginx/sites-enabled altına yazamaz; sudo + deploy/host/panelsar-nginx-vhost
-	if err := runNginxVhostHelper("enable", avail); err != nil {
+	// www-data /etc/nginx/sites-enabled altına yazamaz; sudo + deploy/host/hostvim-nginx-vhost
+	if err := runNginxVhostHelper(cfg, "enable", avail); err != nil {
+		_ = runNginxVhostHelper(cfg, "disable", base)
+		if hadOld {
+			if werr := os.WriteFile(avail, oldContent, 0o644); werr != nil {
+				return fmt.Errorf("%w; önceki vhost geri yazılamadı: %v", err, werr)
+			}
+			if e2 := runNginxVhostHelper(cfg, "enable", avail); e2 != nil {
+				return fmt.Errorf("%w; önceki vhost yeniden etkinleştirilemedi: %v", err, e2)
+			}
+		} else {
+			_ = os.Remove(avail)
+		}
 		return err
 	}
 
 	return nil
 }
 
-const nginxVhostHelper = "/usr/local/sbin/panelsar-nginx-vhost"
+const defaultNginxVhostHelper = "/usr/local/sbin/hostvim-nginx-vhost"
 
-func runNginxVhostHelper(action, arg string) error {
-	out, err := exec.Command("sudo", nginxVhostHelper, action, arg).CombinedOutput()
+func nginxVhostHelperPath(cfg *config.Config) string {
+	if cfg == nil {
+		return defaultNginxVhostHelper
+	}
+	s := strings.TrimSpace(cfg.Hosting.NginxVhostHelper)
+	if s != "" {
+		return s
+	}
+	return defaultNginxVhostHelper
+}
+
+func runNginxVhostHelper(cfg *config.Config, action, arg string) error {
+	helper := nginxVhostHelperPath(cfg)
+	out, err := exec.Command("sudo", helper, action, arg).CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("nginx vhost helper %s: %w: %s", action, err, strings.TrimSpace(string(out)))
 	}
@@ -291,7 +325,7 @@ func RemoveVhost(cfg *config.Config, domain string) error {
 	base := confBaseName(domain)
 	avail := filepath.Join(cfg.Paths.VhostsDir, base)
 
-	if err := runNginxVhostHelper("disable", base); err != nil {
+	if err := runNginxVhostHelper(cfg, "disable", base); err != nil {
 		return err
 	}
 	_ = os.Remove(avail)
@@ -305,6 +339,6 @@ func RemoveVhostBestEffort(cfg *config.Config, domain string) {
 	}
 	base := confBaseName(domain)
 	avail := filepath.Join(cfg.Paths.VhostsDir, base)
-	_ = runNginxVhostHelper("disable", base)
+	_ = runNginxVhostHelper(cfg, "disable", base)
 	_ = os.Remove(avail)
 }

@@ -33,7 +33,7 @@ class DomainService
                     abort(503, 'Engine yanıt vermedi; motor çalışıyor mu ve ENGINE_INTERNAL_KEY eşleşiyor mu kontrol edin.');
                 }
 
-                $fallbackRoot = rtrim((string) config('panelsar.hosting_web_root'), DIRECTORY_SEPARATOR);
+                $fallbackRoot = rtrim((string) config('hostvim.hosting_web_root'), DIRECTORY_SEPARATOR);
                 $documentRoot = (string) ($resp['document_root'] ?? $fallbackRoot.DIRECTORY_SEPARATOR.$name.DIRECTORY_SEPARATOR.'public_html');
 
                 $existing->update([
@@ -48,6 +48,21 @@ class DomainService
                 return $existing->fresh();
             }
 
+            $fallbackRoot = rtrim((string) config('hostvim.hosting_web_root'), DIRECTORY_SEPARATOR);
+            $provisionalRoot = $fallbackRoot !== ''
+                ? $fallbackRoot.DIRECTORY_SEPARATOR.$name.DIRECTORY_SEPARATOR.'public_html'
+                : $name.DIRECTORY_SEPARATOR.'public_html';
+
+            $domain = Domain::create([
+                'user_id' => $user->id,
+                'name' => $name,
+                'document_root' => $provisionalRoot,
+                'php_version' => $phpVersion,
+                'server_type' => $serverType,
+                'status' => 'active',
+                'is_primary' => ! $user->domains()->exists(),
+            ]);
+
             $resp = $this->engineApi->createSite($name, $user->id, $phpVersion, $serverType);
             if (! empty($resp['error'])) {
                 abort(503, (string) $resp['error']);
@@ -56,20 +71,12 @@ class DomainService
                 abort(503, 'Engine yanıt vermedi; motor çalışıyor mu ve ENGINE_INTERNAL_KEY eşleşiyor mu kontrol edin.');
             }
 
-            $fallbackRoot = rtrim((string) config('panelsar.hosting_web_root'), DIRECTORY_SEPARATOR);
-            $documentRoot = (string) ($resp['document_root'] ?? $fallbackRoot.DIRECTORY_SEPARATOR.$name.DIRECTORY_SEPARATOR.'public_html');
+            $documentRoot = (string) ($resp['document_root'] ?? $provisionalRoot);
+            if ($documentRoot !== $provisionalRoot) {
+                $domain->update(['document_root' => $documentRoot]);
+            }
 
-            $domain = Domain::create([
-                'user_id' => $user->id,
-                'name' => $name,
-                'document_root' => $documentRoot,
-                'php_version' => $phpVersion,
-                'server_type' => $serverType,
-                'status' => 'active',
-                'is_primary' => ! $user->domains()->exists(),
-            ]);
-
-            return $domain;
+            return $domain->fresh();
         });
     }
 
@@ -80,35 +87,27 @@ class DomainService
             $domain->update(['status' => 'deleting']);
 
             foreach ($domain->ftpAccounts as $ftp) {
-                try {
-                    $this->engineApi->ftpDeleteAccount($domain->name, $ftp->username);
-                } catch (\Throwable $e) {
-                    report($e);
+                $ftpDel = $this->engineApi->ftpDeleteAccount($domain->name, $ftp->username);
+                if (! empty($ftpDel['error']) && ! $this->isIgnorableDeleteError((string) $ftpDel['error'])) {
+                    abort(503, (string) $ftpDel['error']);
                 }
                 $ftp->delete();
             }
 
-            try {
-                $this->engineApi->mailDeleteDomainState($domain->name);
-            } catch (\Throwable $e) {
-                report($e);
+            $mailDel = $this->engineApi->mailDeleteDomainState($domain->name);
+            if (! empty($mailDel['error']) && ! $this->isIgnorableDeleteError((string) $mailDel['error'])) {
+                abort(503, (string) $mailDel['error']);
             }
 
             foreach ($domain->siteSubdomains as $sub) {
-                try {
-                    $rm = $this->engineApi->siteRemoveSubdomain($domain->name, $sub->path_segment);
-                    if (! empty($rm['error']) && ! $this->isIgnorableDeleteError((string) $rm['error'])) {
-                        $domain->update(['status' => 'failed']);
-                        abort(503, (string) $rm['error']);
-                    }
-                } catch (\Throwable $e) {
-                    report($e);
+                $rm = $this->engineApi->siteRemoveSubdomain($domain->name, $sub->path_segment);
+                if (! empty($rm['error']) && ! $this->isIgnorableDeleteError((string) $rm['error'])) {
+                    abort(503, (string) $rm['error']);
                 }
             }
 
             $del = $this->engineApi->deleteSite($domain->name);
             if (! empty($del['error']) && ! $this->isIgnorableDeleteError((string) $del['error'])) {
-                $domain->update(['status' => 'failed']);
                 abort(503, (string) $del['error']);
             }
 
@@ -126,51 +125,57 @@ class DomainService
 
     public function switchPhpVersion(Domain $domain, string $version): void
     {
-        $resp = $this->engineApi->createSite($domain->name, $domain->user_id, $version, $domain->server_type ?? 'nginx');
-        if (! empty($resp['error'])) {
-            abort(503, (string) $resp['error']);
-        }
-        $domain->update(['php_version' => $version]);
+        DB::transaction(function () use ($domain, $version): void {
+            $resp = $this->engineApi->createSite($domain->name, $domain->user_id, $version, $domain->server_type ?? 'nginx');
+            if (! empty($resp['error'])) {
+                abort(503, (string) $resp['error']);
+            }
+            $domain->update(['php_version' => $version]);
+        });
     }
 
     public function switchServerType(Domain $domain, string $serverType): void
     {
         $serverType = in_array($serverType, ['nginx', 'apache'], true) ? $serverType : 'nginx';
-        $resp = $this->engineApi->createSite(
-            $domain->name,
-            (int) $domain->user_id,
-            (string) ($domain->php_version ?? '8.2'),
-            $serverType
-        );
-        if (! empty($resp['error'])) {
-            abort(503, (string) $resp['error']);
-        }
-        $domain->update(['server_type' => $serverType]);
+        DB::transaction(function () use ($domain, $serverType): void {
+            $resp = $this->engineApi->createSite(
+                $domain->name,
+                (int) $domain->user_id,
+                (string) ($domain->php_version ?? '8.2'),
+                $serverType
+            );
+            if (! empty($resp['error'])) {
+                abort(503, (string) $resp['error']);
+            }
+            $domain->update(['server_type' => $serverType]);
+        });
     }
 
     public function setPanelStatus(Domain $domain, string $status): void
     {
         $status = $status === 'suspended' ? 'suspended' : 'active';
 
-        if ($status === 'suspended') {
-            if (! in_array($domain->status, ['suspended', 'deleting'], true)) {
-                $resp = $this->engineApi->suspendSite($domain->name);
+        DB::transaction(function () use ($domain, $status): void {
+            if ($status === 'suspended') {
+                if (! in_array($domain->status, ['suspended', 'deleting'], true)) {
+                    $resp = $this->engineApi->suspendSite($domain->name);
+                    if (! empty($resp['error'])) {
+                        abort(503, (string) $resp['error']);
+                    }
+                }
+                $domain->update(['status' => 'suspended']);
+
+                return;
+            }
+
+            if ($domain->status === 'suspended') {
+                $resp = $this->engineApi->activateSite($domain->name);
                 if (! empty($resp['error'])) {
                     abort(503, (string) $resp['error']);
                 }
             }
-            $domain->update(['status' => 'suspended']);
-
-            return;
-        }
-
-        if ($domain->status === 'suspended') {
-            $resp = $this->engineApi->activateSite($domain->name);
-            if (! empty($resp['error'])) {
-                abort(503, (string) $resp['error']);
-            }
-        }
-        $domain->update(['status' => 'active']);
+            $domain->update(['status' => 'active']);
+        });
     }
 
     private function isIgnorableDeleteError(string $error): bool

@@ -1,0 +1,48 @@
+#!/bin/bash
+# Hostvim engine (www-data) tarafından sudo ile çağrılır — nginx sites-enabled symlink + reload.
+set -euo pipefail
+
+ACTION="${1:?}"
+ARG="${2:?}"
+
+case "$ACTION" in
+  enable)
+    CONF="$ARG"
+    [[ -f "$CONF" ]] || { echo "hostvim-nginx-vhost: conf yok: $CONF" >&2; exit 1; }
+    [[ "$CONF" =~ ^/var/www/[^/]+/data/vhosts/(hostvim|panelsar)-[a-zA-Z0-9.-]+\.conf$ ]] || {
+      echo "hostvim-nginx-vhost: izin verilmeyen conf yolu" >&2
+      exit 1
+    }
+    BASE="$(basename "$CONF")"
+    TARGET="/etc/nginx/sites-enabled/${BASE}"
+    OLD_ABS=""
+    if [[ -L "$TARGET" ]]; then
+      OLD_ABS="$(readlink -f "$TARGET" 2>/dev/null || true)"
+    fi
+    ln -sf "$CONF" "$TARGET"
+    if ! nginx -t 2>/tmp/hostvim-nginx-test.log; then
+      rm -f "$TARGET"
+      if [[ -n "$OLD_ABS" && -f "$OLD_ABS" ]]; then
+        ln -sf "$OLD_ABS" "$TARGET" || true
+        nginx -t 2>/dev/null || true
+      fi
+      cat /tmp/hostvim-nginx-test.log >&2
+      exit 1
+    fi
+    nginx -s reload
+    ;;
+  disable)
+    BASE="$ARG"
+    [[ "$BASE" =~ ^(hostvim|panelsar)-[a-zA-Z0-9.-]+\.conf$ ]] || {
+      echo "hostvim-nginx-vhost: geçersiz dosya adı" >&2
+      exit 1
+    }
+    rm -f "/etc/nginx/sites-enabled/${BASE}"
+    nginx -t
+    nginx -s reload
+    ;;
+  *)
+    echo "hostvim-nginx-vhost: kullanım: enable <conf-yolu> | disable <basename.conf>" >&2
+    exit 1
+    ;;
+esac

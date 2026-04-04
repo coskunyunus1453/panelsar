@@ -1,4 +1,4 @@
-# Panelsar — üretim dağıtımı
+# Hostvim — üretim dağıtımı
 
 Yerel geliştirme doğrulamaları için bkz. [LOCAL_DEVELOPMENT.md](./LOCAL_DEVELOPMENT.md).
 
@@ -19,7 +19,7 @@ Repoda **`deploy/`** klasörü:
 ## Mimari
 
 1. **Panel API** — kullanıcılar, paketler, faturalama, RBAC; `ENGINE_API_URL` üzerinden engine’e gider.
-2. **Engine** — site oluşturma, SSL, dosya sistemi, nginx/apache vhost, PHP-FPM, izleme; `paths.web_root` ile `PANELSAR_HOSTING_WEB_ROOT` aynı olmalı.
+2. **Engine** — site oluşturma, SSL, dosya sistemi, nginx/apache vhost, PHP-FPM, izleme; `paths.web_root` ile panel `HOSTVIM_HOSTING_WEB_ROOT` (veya eski `PANELSAR_HOSTING_WEB_ROOT`) aynı olmalı.
 3. **Frontend** — statik derleme veya Vite; API’ye `APP_URL`/CORS ile bağlanır.
 
 ## Sunucu öncesi kontrol
@@ -28,12 +28,12 @@ Panel dizininde:
 
 ```bash
 php artisan migrate --force
-php artisan panelsar:install-check --ping
+php artisan hostvim:install-check --ping
 ```
 
 - Üretimde `APP_DEBUG=false`, `APP_ENV=production`.
 - `ENGINE_INTERNAL_KEY` panel `.env` ile engine yapılandırması aynı olmalı.
-- `php artisan panelsar:install-check --ping` engine `/health` için HTTP dener.
+- `php artisan hostvim:install-check --ping` engine `/health` için HTTP dener.
 
 ## Önemli ortam değişkenleri (panel)
 
@@ -41,8 +41,8 @@ php artisan panelsar:install-check --ping
 |----------|----------|
 | `ENGINE_API_URL` | Engine taban URL (örn. `http://127.0.0.1:9090`) |
 | `ENGINE_INTERNAL_KEY` | Engine internal API anahtarı |
-| `PANELSAR_HOSTING_WEB_ROOT` | `data/www` veya üretim web kökü (engine ile aynı) |
-| `PANELSAR_LETS_ENCRYPT_EMAIL` | ACME için varsayılan e-posta |
+| `HOSTVIM_HOSTING_WEB_ROOT` | `data/www` veya üretim web kökü (engine ile aynı; eski: `PANELSAR_HOSTING_WEB_ROOT`) |
+| `HOSTVIM_LETS_ENCRYPT_EMAIL` | ACME için varsayılan e-posta (eski: `PANELSAR_LETS_ENCRYPT_EMAIL`) |
 | `MYSQL_PROVISION_ENABLED` | MySQL gerçek provizyon |
 | `POSTGRES_PROVISION_ENABLED` | PostgreSQL provizyon |
 | `PHPMYADMIN_URL` / `ADMINER_URL` | Veritabanları sayfası harici araç linkleri |

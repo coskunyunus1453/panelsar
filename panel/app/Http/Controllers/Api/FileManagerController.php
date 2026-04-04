@@ -6,13 +6,20 @@ use App\Http\Controllers\Concerns\AuthorizesUserDomain;
 use App\Http\Controllers\Controller;
 use App\Models\Domain;
 use App\Services\EngineApiService;
+use App\Services\SafeAuditLogger;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 class FileManagerController extends Controller
 {
     use AuthorizesUserDomain;
+
+    private const TRASH_DIR = '.hostvim-trash';
+
+    private const TRASH_ITEMS_DIR = '.hostvim-trash/items';
+
+    private const TRASH_META_DIR = '.hostvim-trash/meta';
 
     public function __construct(
         private EngineApiService $engine,
@@ -24,7 +31,7 @@ class FileManagerController extends Controller
      */
     private function panelRelToEngineRel(Domain $domain, string $panelRel): string
     {
-        $hostingRoot = rtrim((string) config('panelsar.hosting_web_root'), "/\\");
+        $hostingRoot = rtrim((string) config('hostvim.hosting_web_root'), '/\\');
         $engineRoot = $hostingRoot.DIRECTORY_SEPARATOR.$domain->name;
 
         // Domain.document_root panelde tam path (örn. /var/www/example.com/public_html)
@@ -151,6 +158,7 @@ class FileManagerController extends Controller
             $result = $this->engine->deleteFile($domain->name, $engineFrom);
             if (! empty($result['error'])) {
                 $this->logFileAction($request, $domain, 'delete', $from, null, false, $result['error']);
+
                 return response()->json(['message' => $result['error']], 422);
             }
             $this->logFileAction($request, $domain, 'delete', $from, null, true, null);
@@ -160,6 +168,219 @@ class FileManagerController extends Controller
         }
 
         return response()->json($result);
+    }
+
+    public function trashIndex(Request $request, Domain $domain): JsonResponse
+    {
+        if (! $this->userOwnsDomain($request, $domain)) {
+            abort(403);
+        }
+
+        $limit = (int) $request->query('limit', 200);
+        $limit = max(1, min(200, $limit));
+
+        $metaList = $this->engine->listFilesResult($domain->name, self::TRASH_META_DIR, $limit, 0, 'mtime', 'desc');
+        if ($metaList['error'] !== null) {
+            // Trash hiç yoksa boş dön.
+            return response()->json(['items' => []]);
+        }
+
+        $items = [];
+        foreach (($metaList['entries'] ?? []) as $e) {
+            $name = (string) ($e['name'] ?? '');
+            $isDir = (bool) ($e['is_dir'] ?? false);
+            if ($name === '' || $isDir) {
+                continue;
+            }
+            if (! str_ends_with($name, '.json')) {
+                continue;
+            }
+
+            $id = substr($name, 0, -5);
+            if ($id === '') {
+                continue;
+            }
+
+            try {
+                $raw = $this->engine->readFile($domain->name, self::TRASH_META_DIR.'/'.$name);
+                $meta = json_decode($raw, true);
+                if (! is_array($meta)) {
+                    continue;
+                }
+                $items[] = [
+                    'id' => $id,
+                    'original_path' => (string) ($meta['original_path'] ?? ''),
+                    'deleted_at' => (string) ($meta['deleted_at'] ?? ''),
+                    'name' => (string) ($meta['name'] ?? ''),
+                    'is_dir' => (bool) ($meta['is_dir'] ?? false),
+                    'size' => (int) ($meta['size'] ?? 0),
+                ];
+            } catch (\Throwable $ignored) {
+                continue;
+            }
+        }
+
+        return response()->json(['items' => $items]);
+    }
+
+    public function trashMove(Request $request, Domain $domain): JsonResponse
+    {
+        if (! $this->userOwnsDomain($request, $domain)) {
+            abort(403);
+        }
+
+        $validated = $request->validate([
+            'path' => 'required|string|max:2048',
+        ]);
+
+        $from = trim((string) $validated['path']);
+        if ($from === '') {
+            return response()->json(['message' => 'The path field is required.'], 422);
+        }
+
+        $id = now()->format('YmdHis').'-'.Str::lower(Str::random(10));
+        $engineFrom = $this->panelRelToEngineRel($domain, $from);
+        $engineItem = self::TRASH_ITEMS_DIR.'/'.$id;
+        $engineMeta = self::TRASH_META_DIR.'/'.$id.'.json';
+
+        try {
+            // Trash klasörlerini garanti et.
+            $this->engine->mkdirFile($domain->name, self::TRASH_DIR);
+            $this->engine->mkdirFile($domain->name, self::TRASH_ITEMS_DIR);
+            $this->engine->mkdirFile($domain->name, self::TRASH_META_DIR);
+
+            $mv = $this->engine->moveFile($domain->name, $engineFrom, $engineItem);
+            if (! empty($mv['error'])) {
+                $this->logFileAction($request, $domain, 'trash_move', $from, null, false, $mv['error']);
+
+                return response()->json(['message' => $mv['error']], 422);
+            }
+
+            $metaPayload = [
+                'id' => $id,
+                'original_path' => $from,
+                'deleted_at' => now()->toIso8601String(),
+                'name' => basename($from),
+                // dosya/klasör ayrımı engine tarafında list ile net; burada best-effort
+            ];
+            $wr = $this->engine->writeFile($domain->name, $engineMeta, json_encode($metaPayload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
+            if (! empty($wr['error'])) {
+                // Meta yazılamadıysa bile dosya trash’e taşındı; kullanıcı restore edemeyebilir.
+                $this->logFileAction($request, $domain, 'trash_meta_write', $from, null, false, $wr['error']);
+            }
+
+            $this->logFileAction($request, $domain, 'trash_move', $from, null, true, null);
+
+            return response()->json(['id' => $id, 'message' => 'moved_to_trash']);
+        } catch (\Throwable $e) {
+            $this->logFileAction($request, $domain, 'trash_move', $from, null, false, $e->getMessage());
+            throw $e;
+        }
+    }
+
+    public function trashRestore(Request $request, Domain $domain): JsonResponse
+    {
+        if (! $this->userOwnsDomain($request, $domain)) {
+            abort(403);
+        }
+
+        $validated = $request->validate([
+            'id' => 'required|string|max:64',
+        ]);
+        $id = trim((string) $validated['id']);
+        if ($id === '') {
+            return response()->json(['message' => 'The id field is required.'], 422);
+        }
+
+        $engineMeta = self::TRASH_META_DIR.'/'.$id.'.json';
+        $engineItem = self::TRASH_ITEMS_DIR.'/'.$id;
+
+        try {
+            $raw = $this->engine->readFile($domain->name, $engineMeta);
+            $meta = json_decode($raw, true);
+            $origPanel = is_array($meta) ? (string) ($meta['original_path'] ?? '') : '';
+            if (trim($origPanel) === '') {
+                return response()->json(['message' => 'Restore bilgisi bulunamadı.'], 404);
+            }
+
+            $engineTo = $this->panelRelToEngineRel($domain, $origPanel);
+            $mv = $this->engine->moveFile($domain->name, $engineItem, $engineTo);
+            if (! empty($mv['error'])) {
+                // Çakışma varsa alternatif isme restore et.
+                $altPanel = $origPanel.'.restored-'.now()->format('YmdHis');
+                $altEngine = $this->panelRelToEngineRel($domain, $altPanel);
+                $mv2 = $this->engine->moveFile($domain->name, $engineItem, $altEngine);
+                if (! empty($mv2['error'])) {
+                    $this->logFileAction($request, $domain, 'trash_restore', $origPanel, null, false, $mv2['error']);
+
+                    return response()->json(['message' => $mv2['error']], 422);
+                }
+            }
+
+            // Meta'yı sil.
+            $this->engine->deleteFile($domain->name, $engineMeta);
+
+            $this->logFileAction($request, $domain, 'trash_restore', $origPanel, null, true, null);
+
+            return response()->json(['message' => 'restored']);
+        } catch (\Throwable $e) {
+            $this->logFileAction($request, $domain, 'trash_restore', $id, null, false, $e->getMessage());
+            throw $e;
+        }
+    }
+
+    public function trashDestroy(Request $request, Domain $domain): JsonResponse
+    {
+        if (! $this->userOwnsDomain($request, $domain)) {
+            abort(403);
+        }
+
+        $id = (string) $request->query('id', '');
+        $id = trim($id);
+        if ($id === '') {
+            return response()->json(['message' => 'The id field is required.'], 422);
+        }
+
+        $engineMeta = self::TRASH_META_DIR.'/'.$id.'.json';
+        $engineItem = self::TRASH_ITEMS_DIR.'/'.$id;
+
+        try {
+            $r1 = $this->engine->deleteFile($domain->name, $engineItem);
+            $this->engine->deleteFile($domain->name, $engineMeta);
+            if (! empty($r1['error'])) {
+                $this->logFileAction($request, $domain, 'trash_delete', $id, null, false, $r1['error']);
+
+                return response()->json(['message' => $r1['error']], 422);
+            }
+            $this->logFileAction($request, $domain, 'trash_delete', $id, null, true, null);
+
+            return response()->json(['message' => 'deleted']);
+        } catch (\Throwable $e) {
+            $this->logFileAction($request, $domain, 'trash_delete', $id, null, false, $e->getMessage());
+            throw $e;
+        }
+    }
+
+    public function trashEmpty(Request $request, Domain $domain): JsonResponse
+    {
+        if (! $this->userOwnsDomain($request, $domain)) {
+            abort(403);
+        }
+
+        try {
+            $r = $this->engine->deleteFile($domain->name, self::TRASH_DIR);
+            if (! empty($r['error'])) {
+                $this->logFileAction($request, $domain, 'trash_empty', null, null, false, $r['error']);
+
+                return response()->json(['message' => $r['error']], 422);
+            }
+            $this->logFileAction($request, $domain, 'trash_empty', null, null, true, null);
+
+            return response()->json(['message' => 'emptied']);
+        } catch (\Throwable $e) {
+            $this->logFileAction($request, $domain, 'trash_empty', null, null, false, $e->getMessage());
+            throw $e;
+        }
     }
 
     public function read(Request $request, Domain $domain): JsonResponse
@@ -194,6 +415,7 @@ class FileManagerController extends Controller
             $result = $this->engine->writeFile($domain->name, $engineFrom, $validated['content'] ?? '');
             if (! empty($result['error'])) {
                 $this->logFileAction($request, $domain, 'edit', $from, null, false, $result['error']);
+
                 return response()->json(['message' => $result['error']], 422);
             }
             $this->logFileAction($request, $domain, 'edit', $from, null, true, null);
@@ -222,6 +444,7 @@ class FileManagerController extends Controller
             $result = $this->engine->createFile($domain->name, $engineFrom, $validated['content'] ?? '');
             if (! empty($result['error'])) {
                 $this->logFileAction($request, $domain, 'create', $from, null, false, $result['error']);
+
                 return response()->json(['message' => $result['error']], 422);
             }
 
@@ -239,7 +462,7 @@ class FileManagerController extends Controller
         if (! $this->userOwnsDomain($request, $domain)) {
             abort(403);
         }
-        $maxKb = max(1, (int) config('panelsar.limits.max_file_manager_size_mb', 50)) * 1024;
+        $maxKb = max(1, (int) config('hostvim.limits.max_file_manager_size_mb', 50)) * 1024;
         $validated = $request->validate([
             'path' => 'nullable|string',
             'file' => 'required|file|max:'.$maxKb,
@@ -252,6 +475,7 @@ class FileManagerController extends Controller
             $this->logFileAction($request, $domain, 'upload', $relPath, null, $ok, $result['error'] ?? null);
 
             $status = $ok ? 200 : 502;
+
             return response()->json($result, $status);
         } catch (\Throwable $e) {
             $this->logFileAction($request, $domain, 'upload', $relPath, null, false, $e->getMessage());
@@ -278,6 +502,7 @@ class FileManagerController extends Controller
             $result = $this->engine->renameFile($domain->name, $engineFrom, $engineTo);
             if (! empty($result['error'])) {
                 $this->logFileAction($request, $domain, 'rename', $from, $to, false, $result['error']);
+
                 return response()->json(['message' => $result['error']], 422);
             }
             $this->logFileAction($request, $domain, 'rename', $from, $to, true, null);
@@ -308,6 +533,7 @@ class FileManagerController extends Controller
             $result = $this->engine->moveFile($domain->name, $engineFrom, $engineTo);
             if (! empty($result['error'])) {
                 $this->logFileAction($request, $domain, 'move', $from, $to, false, $result['error']);
+
                 return response()->json(['message' => $result['error']], 422);
             }
             $this->logFileAction($request, $domain, 'move', $from, $to, true, null);
@@ -335,9 +561,11 @@ class FileManagerController extends Controller
         $result = $this->engine->copyFile($domain->name, $engineFrom, $engineTo);
         if (! empty($result['error'])) {
             $this->logFileAction($request, $domain, 'copy', $from, $to, false, $result['error']);
+
             return response()->json(['message' => $result['error']], 422);
         }
         $this->logFileAction($request, $domain, 'copy', $from, $to, true, null);
+
         return response()->json($result);
     }
 
@@ -356,9 +584,11 @@ class FileManagerController extends Controller
         $result = $this->engine->chmodFile($domain->name, $enginePath, $mode);
         if (! empty($result['error'])) {
             $this->logFileAction($request, $domain, 'chmod', $path, null, false, $result['error']);
+
             return response()->json(['message' => $result['error']], 422);
         }
         $this->logFileAction($request, $domain, 'chmod', $path, null, true, null);
+
         return response()->json($result);
     }
 
@@ -379,10 +609,35 @@ class FileManagerController extends Controller
             $this->panelRelToEngineRel($domain, $target)
         );
         if (! empty($result['error'])) {
+            // Aynı isimde zip varsa otomatik olarak benzersiz isimle bir kez daha dene.
+            if (str_contains(strtolower((string) $result['error']), 'target already exists')) {
+                $dot = strrpos($target, '.');
+                $base = $dot !== false ? substr($target, 0, $dot) : $target;
+                $ext = $dot !== false ? substr($target, $dot) : '.zip';
+                $retryTarget = $base.'-'.now()->format('YmdHis').$ext;
+
+                $retry = $this->engine->zipPath(
+                    $domain->name,
+                    $this->panelRelToEngineRel($domain, $source),
+                    $this->panelRelToEngineRel($domain, $retryTarget)
+                );
+                if (empty($retry['error'])) {
+                    $this->logFileAction($request, $domain, 'zip', $source, $retryTarget, true, null);
+
+                    return response()->json([
+                        'message' => 'zip created',
+                        'target' => $retryTarget,
+                    ]);
+                }
+                $result = $retry;
+            }
+
             $this->logFileAction($request, $domain, 'zip', $source, $target, false, $result['error']);
+
             return response()->json(['message' => $result['error']], 422);
         }
         $this->logFileAction($request, $domain, 'zip', $source, $target, true, null);
+
         return response()->json($result);
     }
 
@@ -404,9 +659,11 @@ class FileManagerController extends Controller
         );
         if (! empty($result['error'])) {
             $this->logFileAction($request, $domain, 'unzip', $archive, $targetDir, false, $result['error']);
+
             return response()->json(['message' => $result['error']], 422);
         }
         $this->logFileAction($request, $domain, 'unzip', $archive, $targetDir, true, null);
+
         return response()->json($result);
     }
 
@@ -425,6 +682,7 @@ class FileManagerController extends Controller
         $result = $this->engine->downloadFile($domain->name, $enginePath);
         if (! empty($result['error'])) {
             $this->logFileAction($request, $domain, 'download', $path, null, false, $result['error']);
+
             return response()->json(['message' => $result['error']], 422);
         }
 
@@ -432,6 +690,7 @@ class FileManagerController extends Controller
         $bytes = base64_decode($b64, true);
         if ($bytes === false) {
             $this->logFileAction($request, $domain, 'download', $path, null, false, 'invalid base64');
+
             return response()->json(['message' => 'download failed'], 500);
         }
 
@@ -494,15 +753,15 @@ class FileManagerController extends Controller
         bool $success,
         ?string $error,
     ): void {
-        Log::info('panelsar.file_audit', [
-            'user_id' => $request->user()?->id,
+        SafeAuditLogger::info('hostvim.file_audit', [
             'domain' => $domain->name,
             'action' => $action,
-            'from' => $from,
-            'to' => $to,
+            'from_fp' => SafeAuditLogger::pathFingerprint($domain->name, $from),
+            'from_base' => SafeAuditLogger::pathBasename($from),
+            'to_fp' => SafeAuditLogger::pathFingerprint($domain->name, $to),
+            'to_base' => SafeAuditLogger::pathBasename($to),
             'success' => $success,
             'error' => $error,
-            'ip' => $request->ip(),
-        ]);
+        ], $request);
     }
 }

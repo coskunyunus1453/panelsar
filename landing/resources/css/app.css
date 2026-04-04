@@ -1,0 +1,1004 @@
+@import 'tailwindcss';
+
+/* Manuel gece modu: html.dark ile çalışır (varsayılan Tailwind v4 = sadece OS karanlık teması) */
+@custom-variant dark (&:where(.dark, .dark *));
+
+@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
+@source '../../storage/framework/views/*.php';
+@source '../**/*.blade.php';
+@source '../**/*.js';
+
+@theme {
+    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
+        'Segoe UI Symbol', 'Noto Color Emoji';
+}
+
+/* -------------------------------------------------------------------------
+   Tema 1 (turuncu) & Tema 2 (turkuaz) — RGB üçlüleri (boşlukla), rgb(var(--x)/a) ile kullanılır
+   Admin’den “ana renk” seçilirse html üzerinde inline style ile ezilir.
+   ------------------------------------------------------------------------- */
+html.hv-theme-orange {
+    --hv-brand-200: 254 215 170;
+    --hv-brand-300: 253 186 116;
+    --hv-brand-400: 251 146 60;
+    --hv-brand-500: 249 115 22;
+    --hv-brand-600: 234 88 12;
+    --hv-brand-700: 194 65 12;
+    --hv-brand-800: 154 52 18;
+    --hv-blob: 254 215 170;
+}
+
+html.hv-theme-turquoise {
+    --hv-brand-200: 153 246 228;
+    --hv-brand-300: 94 234 212;
+    --hv-brand-400: 45 212 191;
+    --hv-brand-500: 20 184 166;
+    --hv-brand-600: 13 148 136;
+    --hv-brand-700: 15 118 110;
+    --hv-brand-800: 17 94 89;
+    --hv-blob: 125 211 192;
+}
+
+html.hv-theme-turquoise:not(.dark) .hv-body {
+    background-color: rgb(240 253 250);
+}
+
+html.dark.hv-theme-turquoise .hv-body {
+    background-color: rgb(2 6 23);
+}
+
+/* -------------------------------------------------------------------------
+   Tema 3 — Neon / material (sade, gece modu, cam yüzeyler)
+   ------------------------------------------------------------------------- */
+html.hv-theme-neon {
+    --hv-brand-200: 207 250 254;
+    --hv-brand-300: 103 232 249;
+    --hv-brand-400: 34 211 238;
+    --hv-brand-500: 6 182 212;
+    --hv-brand-600: 8 145 178;
+    --hv-brand-700: 14 116 144;
+    --hv-brand-800: 21 94 117;
+    --hv-blob: 103 232 249;
+    --hv-neon-magenta: 217 70 239;
+}
+
+html.hv-theme-neon:not(.dark) .hv-body {
+    background-color: rgb(248 250 252);
+}
+
+html.dark.hv-theme-neon .hv-body {
+    background-color: rgb(3 7 18);
+}
+
+.hv-neon-backdrop-grid {
+    background-image:
+        linear-gradient(rgb(var(--hv-brand-500) / 0.06) 1px, transparent 1px),
+        linear-gradient(90deg, rgb(var(--hv-brand-500) / 0.06) 1px, transparent 1px);
+    background-size: 48px 48px;
+}
+
+.dark .hv-neon-backdrop-grid {
+    background-image:
+        linear-gradient(rgb(var(--hv-brand-400) / 0.08) 1px, transparent 1px),
+        linear-gradient(90deg, rgb(var(--hv-brand-400) / 0.08) 1px, transparent 1px);
+}
+
+.hv-neon-backdrop-orb-a {
+    background: radial-gradient(circle, rgb(var(--hv-brand-400) / 0.35) 0%, transparent 65%);
+}
+
+.hv-neon-backdrop-orb-b {
+    background: radial-gradient(circle, rgb(var(--hv-neon-magenta) / 0.2) 0%, transparent 60%);
+}
+
+.dark .hv-neon-backdrop-orb-a {
+    background: radial-gradient(circle, rgb(var(--hv-brand-500) / 0.25) 0%, transparent 65%);
+}
+
+.dark .hv-neon-backdrop-orb-b {
+    background: radial-gradient(circle, rgb(var(--hv-neon-magenta) / 0.18) 0%, transparent 60%);
+}
+
+.hv-neon-logo {
+    border: 1px solid rgb(var(--hv-brand-500) / 0.45);
+    background: linear-gradient(145deg, rgb(var(--hv-brand-500) / 0.15), rgb(var(--hv-neon-magenta) / 0.08));
+    color: rgb(var(--hv-brand-700) / 1);
+    box-shadow: 0 0 24px rgb(var(--hv-brand-400) / 0.25);
+}
+
+.dark .hv-neon-logo {
+    color: rgb(var(--hv-brand-200) / 1);
+    box-shadow: 0 0 28px rgb(var(--hv-brand-500) / 0.35);
+}
+
+.hv-neon-nav-link {
+    color: rgb(51 65 85 / 0.95);
+}
+
+.hv-neon-nav-link:hover {
+    color: rgb(var(--hv-brand-600) / 1);
+    background-color: rgb(var(--hv-brand-500) / 0.08);
+}
+
+.dark .hv-neon-nav-link {
+    color: rgb(226 232 240 / 0.9);
+}
+
+.dark .hv-neon-nav-link:hover {
+    color: rgb(var(--hv-brand-300) / 1);
+    background-color: rgb(var(--hv-brand-500) / 0.12);
+}
+
+.hv-neon-select {
+    border: 1px solid rgb(var(--hv-brand-500) / 0.25);
+    background-color: rgb(255 255 255 / 0.85);
+    color: rgb(30 41 59 / 1);
+}
+
+.dark .hv-neon-select {
+    border-color: rgb(var(--hv-brand-500) / 0.35);
+    background-color: rgb(15 23 42 / 0.85);
+    color: rgb(241 245 249 / 1);
+}
+
+.hv-neon-cta {
+    border: 1px solid rgb(var(--hv-brand-500) / 0.5);
+    background: linear-gradient(135deg, rgb(var(--hv-brand-500) / 0.2), rgb(var(--hv-neon-magenta) / 0.12));
+    color: rgb(var(--hv-brand-800) / 1);
+    box-shadow: 0 0 20px rgb(var(--hv-brand-400) / 0.2);
+}
+
+.dark .hv-neon-cta {
+    color: rgb(var(--hv-brand-100) / 1);
+    box-shadow: 0 0 24px rgb(var(--hv-brand-500) / 0.35);
+}
+
+.hv-neon-drawer-panel {
+    border-color: rgb(var(--hv-brand-500) / 0.25);
+    background-color: rgb(255 255 255 / 0.97);
+}
+
+.dark .hv-neon-drawer-panel {
+    border-color: rgb(var(--hv-brand-500) / 0.3);
+    background-color: rgb(15 23 42 / 0.98);
+}
+
+.hv-neon-drawer-link {
+    color: rgb(51 65 85 / 1);
+}
+
+.hv-neon-drawer-link:hover {
+    background-color: rgb(var(--hv-brand-500) / 0.1);
+    color: rgb(var(--hv-brand-700) / 1);
+}
+
+.dark .hv-neon-drawer-link {
+    color: rgb(226 232 240 / 1);
+}
+
+.dark .hv-neon-drawer-link:hover {
+    background-color: rgb(var(--hv-brand-500) / 0.15);
+    color: rgb(var(--hv-brand-200) / 1);
+}
+
+.hv-neon-footer-link {
+    color: rgb(71 85 105 / 1);
+}
+
+.hv-neon-footer-link:hover {
+    color: rgb(var(--hv-brand-600) / 1);
+}
+
+.dark .hv-neon-footer-link {
+    color: rgb(148 163 184 / 1);
+}
+
+.dark .hv-neon-footer-link:hover {
+    color: rgb(var(--hv-brand-300) / 1);
+}
+
+.hv-neon-badge {
+    border-color: rgb(var(--hv-brand-500) / 0.4);
+    background: rgb(var(--hv-brand-500) / 0.1);
+    color: rgb(var(--hv-brand-800) / 1);
+}
+
+.dark .hv-neon-badge {
+    color: rgb(var(--hv-brand-200) / 1);
+    box-shadow: 0 0 18px rgb(var(--hv-brand-500) / 0.2);
+}
+
+.hv-neon-dot {
+    background: rgb(var(--hv-brand-500) / 1);
+    box-shadow: 0 0 10px rgb(var(--hv-brand-400) / 0.9);
+}
+
+.hv-neon-btn-primary {
+    background: linear-gradient(135deg, rgb(var(--hv-brand-500) / 1), rgb(var(--hv-brand-600) / 1));
+    color: white;
+    box-shadow:
+        0 4px 20px rgb(var(--hv-brand-500) / 0.45),
+        0 0 0 1px rgb(var(--hv-brand-300) / 0.35);
+}
+
+.hv-neon-btn-primary:hover {
+    filter: brightness(1.06);
+}
+
+.hv-neon-btn-ghost {
+    border-color: rgb(var(--hv-brand-500) / 0.35);
+    background: rgb(255 255 255 / 0.6);
+    color: rgb(var(--hv-brand-800) / 1);
+}
+
+.dark .hv-neon-btn-ghost {
+    background: rgb(15 23 42 / 0.6);
+    color: rgb(var(--hv-brand-200) / 1);
+}
+
+.hv-neon-art {
+    border-color: rgb(var(--hv-brand-500) / 0.25);
+    background: linear-gradient(160deg, rgb(255 255 255 / 0.9), rgb(var(--hv-brand-500) / 0.06));
+    box-shadow:
+        0 20px 50px rgb(15 23 42 / 0.08),
+        0 0 0 1px rgb(var(--hv-brand-500) / 0.12);
+}
+
+.dark .hv-neon-art {
+    background: linear-gradient(160deg, rgb(15 23 42 / 0.95), rgb(var(--hv-brand-600) / 0.12));
+    box-shadow:
+        0 24px 60px rgb(0 0 0 / 0.45),
+        0 0 0 1px rgb(var(--hv-brand-500) / 0.25);
+}
+
+.hv-neon-hero-svg {
+    color: rgb(var(--hv-brand-600) / 1);
+}
+
+.dark .hv-neon-hero-svg {
+    color: rgb(var(--hv-brand-400) / 1);
+}
+
+.hv-neon-art-ring {
+    border-color: rgb(var(--hv-brand-500) / 0.22);
+}
+
+.dark .hv-neon-art-ring {
+    border-color: rgb(var(--hv-brand-400) / 0.35);
+}
+
+.hv-neon-stack-card,
+.hv-neon-grid-card {
+    border-color: rgb(var(--hv-brand-500) / 0.18);
+    background: rgb(255 255 255 / 0.75);
+    box-shadow: 0 4px 24px rgb(15 23 42 / 0.06);
+}
+
+.dark .hv-neon-stack-card,
+.dark .hv-neon-grid-card {
+    border-color: rgb(var(--hv-brand-500) / 0.22);
+    background: rgb(15 23 42 / 0.55);
+    box-shadow: 0 8px 32px rgb(0 0 0 / 0.35);
+}
+
+.hv-neon-icon-ring {
+    border: 1px solid rgb(var(--hv-brand-500) / 0.35);
+    background: rgb(var(--hv-brand-500) / 0.1);
+    color: rgb(var(--hv-brand-700) / 1);
+    box-shadow: 0 0 16px rgb(var(--hv-brand-400) / 0.2);
+}
+
+.dark .hv-neon-icon-ring {
+    color: rgb(var(--hv-brand-300) / 1);
+    box-shadow: 0 0 20px rgb(var(--hv-brand-500) / 0.25);
+}
+
+/* Ana sayfa alt bölümler (fiyatlandırma vb.) — tema 3 uyumu */
+html.hv-theme-neon .hv-neon-page-section .hv-section-eyebrow {
+    border-color: rgb(var(--hv-brand-500) / 0.35);
+    background-color: rgb(var(--hv-brand-500) / 0.1);
+    color: rgb(var(--hv-brand-800) / 1);
+}
+
+html.dark.hv-theme-neon .hv-neon-page-section .hv-section-eyebrow {
+    color: rgb(var(--hv-brand-200) / 1);
+}
+
+html.hv-theme-neon .hv-neon-page-section .hv-glass {
+    border-color: rgb(var(--hv-brand-500) / 0.15);
+    background: rgb(255 255 255 / 0.72);
+}
+
+html.dark.hv-theme-neon .hv-neon-page-section .hv-glass {
+    background: rgb(15 23 42 / 0.55);
+    border-color: rgb(var(--hv-brand-500) / 0.2);
+}
+
+html.hv-theme-neon .hv-neon-page-section .hv-blog-card {
+    border-color: rgb(var(--hv-brand-500) / 0.12);
+}
+
+html.dark.hv-theme-neon .hv-neon-page-section .hv-blog-card {
+    border-color: rgb(var(--hv-brand-500) / 0.2);
+}
+
+/* Ön yüz (site layout): Helvetica ailesi; admin paneli html/body varsayılan --font-sans ile kalır */
+.hv-body {
+    @apply bg-slate-50 text-slate-800 antialiased dark:bg-slate-950 dark:text-slate-100;
+    font-family:
+        Helvetica,
+        'Helvetica Neue',
+        Arial,
+        ui-sans-serif,
+        sans-serif,
+        'Apple Color Emoji',
+        'Segoe UI Emoji',
+        'Segoe UI Symbol',
+        'Noto Color Emoji';
+}
+
+.hv-bg-blob {
+    position: relative;
+    background-color: rgb(var(--hv-blob) / 0.55);
+}
+.dark .hv-bg-blob {
+    background-color: rgb(var(--hv-brand-500) / 0.12);
+}
+
+/* Arka plan grafikleri (tema ayarı) */
+.hv-motif-grid .hv-bg-blob {
+    mask-image: radial-gradient(circle at 30% 20%, black 0, transparent 55%);
+}
+
+.hv-motif-waves .hv-bg-blob::after {
+    content: '';
+    position: absolute;
+    inset: -20%;
+    background: repeating-linear-gradient(
+        -12deg,
+        rgb(var(--hv-brand-400) / 0.07) 0 2px,
+        transparent 2px 14px
+    );
+    pointer-events: none;
+}
+
+.hv-motif-dots .hv-bg-blob::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: radial-gradient(rgb(var(--hv-brand-500) / 0.12) 1px, transparent 1px);
+    background-size: 20px 20px;
+    pointer-events: none;
+}
+
+.hv-motif-radial .hv-bg-blob::after {
+    content: '';
+    position: absolute;
+    inset: -30%;
+    background: radial-gradient(circle at 50% 0%, rgb(var(--hv-brand-400) / 0.2), transparent 55%);
+    pointer-events: none;
+}
+
+.hv-container {
+    @apply mx-auto w-full max-w-6xl px-5 sm:px-8 lg:px-12 xl:px-14;
+}
+
+.hv-section-eyebrow {
+    margin-bottom: 0.75rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    border-radius: 9999px;
+    border-width: 1px;
+    border-color: rgb(var(--hv-brand-500) / 0.35);
+    background-color: rgb(var(--hv-brand-500) / 0.1);
+    padding: 0.25rem 0.75rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: rgb(var(--hv-brand-700) / 1);
+}
+.dark .hv-section-eyebrow {
+    border-color: rgb(var(--hv-brand-400) / 0.4);
+    background-color: rgb(var(--hv-brand-500) / 0.1);
+    color: rgb(var(--hv-brand-200) / 1);
+}
+
+.hv-section-title {
+    @apply text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl lg:text-[2rem] dark:text-slate-50;
+}
+
+.hv-section-lead {
+    @apply mt-2 max-w-3xl text-base leading-relaxed text-slate-600 sm:text-lg dark:text-slate-400;
+}
+
+.hv-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    border-radius: 9999px;
+    border-width: 1px;
+    border-color: rgb(var(--hv-brand-500) / 0.35);
+    background-color: rgb(var(--hv-brand-500) / 0.08);
+    padding: 0.375rem 0.75rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: rgb(var(--hv-brand-800) / 1);
+}
+.dark .hv-pill {
+    border-color: rgb(var(--hv-brand-400) / 0.45);
+    background-color: rgb(var(--hv-brand-500) / 0.1);
+    color: rgb(var(--hv-brand-200) / 1);
+}
+
+.hv-badge {
+    @apply inline-flex items-center gap-1 rounded-full border border-slate-300/90 bg-white px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-600 dark:border-slate-600 dark:bg-slate-900/80 dark:text-slate-300;
+}
+
+.hv-glass {
+    @apply border border-slate-200/90 bg-white/90 shadow-sm dark:border-slate-700/80 dark:bg-slate-900/70 dark:shadow-none;
+}
+
+.hv-shadow-soft {
+    box-shadow: 0 22px 50px rgba(15, 23, 42, 0.08);
+}
+.dark .hv-shadow-soft {
+    box-shadow: 0 22px 60px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(30, 41, 59, 0.5);
+}
+
+.hv-gradient-outline {
+    position: relative;
+}
+.hv-gradient-outline::before {
+    content: '';
+    position: absolute;
+    inset: -1px;
+    border-radius: 9999px;
+    background: conic-gradient(
+        from 180deg,
+        rgb(var(--hv-brand-500)),
+        rgb(var(--hv-brand-400)),
+        rgb(var(--hv-brand-300)),
+        rgb(var(--hv-brand-500))
+    );
+    opacity: 0.35;
+    filter: blur(12px);
+    z-index: -1;
+}
+
+.hv-grid-fade {
+    position: absolute;
+    inset: 0;
+    opacity: 0.2;
+    background-image:
+        linear-gradient(to right, rgba(148, 163, 184, 0.15) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(148, 163, 184, 0.15) 1px, transparent 1px);
+    background-size: 32px 32px;
+    mask-image: radial-gradient(circle at top, black 0, transparent 70%);
+}
+.dark .hv-grid-fade {
+    opacity: 0.35;
+}
+
+/* Marka renk yardımcıları (ön yüz) */
+.hv-text-brand {
+    color: rgb(var(--hv-brand-600) / 1);
+}
+.dark .hv-text-brand {
+    color: rgb(var(--hv-brand-400) / 1);
+}
+
+.hv-text-brand-strong {
+    color: rgb(var(--hv-brand-700) / 1);
+}
+.dark .hv-text-brand-strong {
+    color: rgb(var(--hv-brand-300) / 1);
+}
+
+.hv-bg-brand {
+    background-color: rgb(var(--hv-brand-500) / 1);
+}
+.hv-bg-brand:hover {
+    background-color: rgb(var(--hv-brand-600) / 1);
+}
+
+.hv-bg-brand-soft {
+    background-color: rgb(var(--hv-brand-500) / 0.1);
+}
+
+.hv-border-brand {
+    border-color: rgb(var(--hv-brand-500) / 0.45);
+}
+
+.hv-border-brand-strong {
+    border-color: rgb(var(--hv-brand-500) / 0.55);
+}
+
+.hv-ring-brand {
+    --tw-ring-color: rgb(var(--hv-brand-500) / 0.35);
+}
+
+.hv-shadow-brand {
+    box-shadow: 0 10px 40px rgb(var(--hv-brand-500) / 0.22);
+}
+.dark .hv-shadow-brand {
+    box-shadow: 0 12px 40px rgb(var(--hv-brand-500) / 0.18);
+}
+
+.hv-accent-dot {
+    background-color: rgb(var(--hv-brand-500) / 1);
+}
+
+.hv-link {
+    font-weight: 600;
+    color: rgb(var(--hv-brand-600) / 1);
+    text-decoration-line: underline;
+    text-underline-offset: 2px;
+}
+.hv-link:hover {
+    color: rgb(var(--hv-brand-500) / 1);
+}
+.dark .hv-link {
+    color: rgb(var(--hv-brand-400) / 1);
+}
+.dark .hv-link:hover {
+    color: rgb(var(--hv-brand-300) / 1);
+}
+
+.hv-link-quiet {
+    font-weight: 600;
+    color: rgb(var(--hv-brand-600) / 1);
+    text-decoration: none;
+}
+.hv-link-quiet:hover {
+    text-decoration: underline;
+}
+.dark .hv-link-quiet {
+    color: rgb(var(--hv-brand-400) / 1);
+}
+
+.hv-btn-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-full px-5 py-3 text-base font-semibold text-white transition-colors;
+    background-color: rgb(var(--hv-brand-500) / 1);
+    box-shadow: 0 10px 30px rgb(var(--hv-brand-500) / 0.28);
+}
+.hv-btn-primary:hover {
+    background-color: rgb(var(--hv-brand-600) / 1);
+}
+.dark .hv-btn-primary {
+    box-shadow: 0 10px 30px rgb(var(--hv-brand-500) / 0.2);
+}
+
+.hv-btn-primary-sm {
+    @apply inline-flex items-center justify-center gap-2 rounded-full px-4 py-2.5 text-sm font-semibold text-white transition-colors;
+    background-color: rgb(var(--hv-brand-500) / 1);
+}
+.hv-btn-primary-sm:hover {
+    background-color: rgb(var(--hv-brand-600) / 1);
+}
+
+.hv-btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 rounded-full border border-slate-300/90 bg-white px-5 py-3 text-base font-medium text-slate-800 transition-colors dark:border-slate-700 dark:bg-slate-950/60 dark:text-slate-100;
+}
+.hv-btn-secondary:hover {
+    border-color: rgb(var(--hv-brand-500) / 0.45);
+}
+.dark .hv-btn-secondary:hover {
+    border-color: rgb(var(--hv-brand-400) / 0.45);
+}
+
+.hv-card-icon {
+    display: inline-flex;
+    height: 2.5rem;
+    width: 2.5rem;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0.75rem;
+    border-width: 1px;
+    border-color: rgb(var(--hv-brand-500) / 0.35);
+    background-color: rgb(var(--hv-brand-500) / 0.1);
+    color: rgb(var(--hv-brand-600) / 1);
+}
+.dark .hv-card-icon {
+    color: rgb(var(--hv-brand-400) / 1);
+}
+
+.hv-card-pro {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border-radius: 1rem;
+    border-width: 1px;
+    padding: 1.5rem;
+    box-shadow: 0 22px 50px rgba(15, 23, 42, 0.08);
+    border-color: rgb(var(--hv-brand-500) / 0.5);
+    background: linear-gradient(to bottom, rgb(var(--hv-brand-500) / 0.08), rgb(255 255 255 / 0.95), rgb(255 255 255 / 0.95));
+}
+.dark .hv-card-pro {
+    box-shadow: 0 22px 60px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(30, 41, 59, 0.5);
+    background: linear-gradient(to bottom, rgb(var(--hv-brand-500) / 0.12), rgb(15 23 42 / 0.9), rgb(2 6 23 / 0.92));
+}
+
+.hv-card-pro-badge {
+    @apply absolute right-4 top-4 rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide;
+    border-color: rgb(var(--hv-brand-500) / 0.5);
+    background-color: rgb(var(--hv-brand-500) / 0.1);
+    color: rgb(var(--hv-brand-800) / 1);
+}
+.dark .hv-card-pro-badge {
+    color: rgb(var(--hv-brand-200) / 1);
+}
+
+.hv-blog-card {
+    @apply flex flex-col gap-2 rounded-2xl border border-slate-200/90 bg-white/90 p-6 transition-colors dark:border-slate-800 dark:bg-slate-900/60;
+}
+.hv-blog-card:hover {
+    border-color: rgb(var(--hv-brand-500) / 0.45);
+}
+.dark .hv-blog-card:hover {
+    border-color: rgb(var(--hv-brand-400) / 0.4);
+}
+
+.hv-code-accent {
+    color: rgb(var(--hv-brand-600) / 1);
+}
+.dark .hv-code-accent {
+    color: rgb(var(--hv-brand-400) / 1);
+}
+
+/* Üst / alt menü bağlantıları */
+a.hv-muted-nav {
+    color: rgb(71 85 105 / 1);
+}
+.dark a.hv-muted-nav {
+    color: rgb(203 213 225 / 1);
+}
+a.hv-muted-nav:hover {
+    color: rgb(var(--hv-brand-600) / 1);
+}
+.dark a.hv-muted-nav:hover {
+    color: rgb(var(--hv-brand-400) / 1);
+}
+
+.hv-drawer-link:hover {
+    background-color: rgb(var(--hv-brand-500) / 0.08);
+}
+
+.hv-brand-logo-box {
+    display: flex;
+    height: 2.5rem;
+    width: 2.5rem;
+    align-items: center;
+    justify-content: center;
+    border-radius: 1rem;
+    background-color: rgb(var(--hv-brand-500) / 0.15);
+    box-shadow: 0 0 0 1px rgb(var(--hv-brand-500) / 0.35);
+}
+.dark .hv-brand-logo-box {
+    background-color: rgb(var(--hv-brand-500) / 0.1);
+    box-shadow: 0 0 0 1px rgb(var(--hv-brand-400) / 0.4);
+}
+
+.hv-decor-blob-sm {
+    background-color: rgb(var(--hv-brand-400) / 0.1);
+}
+.dark .hv-decor-blob-sm {
+    background-color: rgb(var(--hv-brand-500) / 0.06);
+}
+
+/* Markdown */
+.markdown-body {
+    @apply text-base leading-relaxed text-slate-700 dark:text-slate-300;
+}
+.markdown-body :where(h1) {
+    @apply text-3xl font-semibold text-slate-900 dark:text-slate-50;
+}
+.markdown-body :where(h2) {
+    @apply mt-8 text-xl font-semibold text-slate-900 dark:text-slate-100;
+}
+.markdown-body :where(h3) {
+    @apply mt-6 text-lg font-semibold text-slate-900 dark:text-slate-100;
+}
+.markdown-body :where(p) {
+    @apply mt-3;
+}
+.markdown-body :where(ul) {
+    @apply mt-3 list-disc pl-5;
+}
+.markdown-body :where(ol) {
+    @apply mt-3 list-decimal pl-5;
+}
+.markdown-body :where(li) {
+    @apply my-1;
+}
+.markdown-body :where(a) {
+    @apply font-medium underline-offset-2 hover:underline;
+    color: rgb(var(--hv-brand-600) / 1);
+}
+.dark .markdown-body :where(a) {
+    color: rgb(var(--hv-brand-400) / 1);
+}
+.markdown-body :where(a):hover {
+    color: rgb(var(--hv-brand-500) / 1);
+}
+.markdown-body :where(code) {
+    border-radius: 0.25rem;
+    background-color: rgb(226 232 240 / 0.9);
+    padding: 0.125rem 0.375rem;
+    font-family: ui-monospace, monospace;
+    font-size: 0.875rem;
+    color: rgb(var(--hv-brand-800) / 1);
+}
+.dark .markdown-body :where(code) {
+    background-color: rgb(15 23 42 / 0.9);
+    color: rgb(var(--hv-brand-300) / 1);
+}
+.markdown-body :where(pre) {
+    @apply mt-4 overflow-x-auto rounded-xl border border-slate-200 bg-slate-100/80 p-4 text-sm text-slate-800 dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-200;
+}
+.markdown-body :where(pre code) {
+    @apply bg-transparent p-0 text-inherit;
+}
+.markdown-body :where(blockquote) {
+    margin-top: 1rem;
+    border-left-width: 2px;
+    border-color: rgb(var(--hv-brand-400) / 0.6);
+    padding-left: 1rem;
+    color: rgb(71 85 105 / 1);
+}
+.dark .markdown-body :where(blockquote) {
+    border-color: rgb(var(--hv-brand-500) / 0.45);
+    color: rgb(148 163 184 / 1);
+}
+.markdown-body :where(hr) {
+    @apply my-8 border-slate-200 dark:border-slate-800;
+}
+
+/* -------------------------------------------------------------------------
+   Admin panel — gündüz modu açık arka plan; gece modunda koyu (html.dark)
+   ------------------------------------------------------------------------- */
+.admin-card {
+    @apply rounded-2xl border border-slate-200 bg-white p-6 shadow-sm;
+}
+.dark .admin-card {
+    @apply border-slate-800 bg-slate-950/90 shadow-none;
+}
+
+.admin-form-panel {
+    @apply rounded-2xl border border-slate-200 bg-white p-6 shadow-sm;
+}
+.dark .admin-form-panel {
+    @apply border-slate-800/80 bg-slate-900/40 shadow-none;
+}
+
+.admin-panel-info {
+    @apply rounded-2xl border border-slate-200 bg-slate-50 p-5;
+}
+.dark .admin-panel-info {
+    @apply border-slate-800/80 bg-slate-900/40;
+}
+
+.admin-muted {
+    @apply text-sm text-slate-600;
+}
+.dark .admin-muted {
+    @apply text-slate-400;
+}
+
+.admin-page-title {
+    @apply text-xl font-semibold text-slate-900;
+}
+.dark .admin-page-title {
+    @apply text-slate-100;
+}
+
+.admin-kicker {
+    @apply text-[11px] font-medium uppercase tracking-wide text-slate-500;
+}
+.dark .admin-kicker {
+    @apply text-slate-500;
+}
+
+.admin-field {
+    @apply w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none;
+    @apply placeholder:text-slate-400 focus:border-orange-500 focus:ring-1 focus:ring-orange-500/30;
+}
+.dark .admin-field {
+    @apply border-slate-600 bg-slate-900/70 text-slate-100 placeholder:text-slate-500 focus:border-orange-500/60;
+}
+
+.admin-label {
+    @apply block text-xs font-medium text-slate-700;
+}
+.dark .admin-label {
+    @apply text-slate-300;
+}
+
+.admin-label-block {
+    @apply block text-sm font-medium text-slate-800;
+}
+.dark .admin-label-block {
+    @apply text-slate-200;
+}
+
+.admin-checkbox {
+    @apply rounded border-slate-300 bg-white text-orange-600 focus:ring-orange-500/40;
+}
+.dark .admin-checkbox {
+    @apply border-slate-600 bg-slate-900 text-emerald-500 focus:ring-emerald-500/40;
+}
+
+.admin-table-wrap {
+    @apply mt-6 overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm;
+}
+.dark .admin-table-wrap {
+    @apply border-slate-800 bg-slate-950/80 shadow-none;
+}
+
+.admin-table-head {
+    @apply border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-slate-500;
+}
+.dark .admin-table-head {
+    @apply border-slate-800 bg-slate-900/50 text-slate-400;
+}
+
+.admin-table-body {
+    @apply divide-y divide-slate-200;
+}
+.dark .admin-table-body {
+    @apply divide-slate-800/80;
+}
+
+.admin-table-row {
+    @apply hover:bg-slate-50;
+}
+.dark .admin-table-row {
+    @apply hover:bg-slate-900/40;
+}
+
+.admin-td-strong {
+    @apply font-medium text-slate-900;
+}
+.dark .admin-td-strong {
+    @apply text-slate-200;
+}
+
+.admin-td-soft {
+    @apply text-slate-600;
+}
+.dark .admin-td-soft {
+    @apply text-slate-300;
+}
+
+.admin-td-muted {
+    @apply text-slate-500;
+}
+
+.admin-link {
+    @apply text-orange-600 hover:text-orange-800;
+}
+.dark .admin-link {
+    @apply text-orange-400 hover:text-orange-300;
+}
+
+.admin-link-emerald {
+    @apply text-emerald-700 hover:text-emerald-900;
+}
+.dark .admin-link-emerald {
+    @apply text-emerald-400 hover:text-emerald-300;
+}
+
+.admin-badge-ok {
+    @apply rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-medium text-emerald-800;
+}
+.dark .admin-badge-ok {
+    @apply bg-emerald-500/15 text-emerald-300;
+}
+
+.admin-badge-off {
+    @apply rounded-full bg-slate-200 px-2 py-0.5 text-[11px] text-slate-600;
+}
+.dark .admin-badge-off {
+    @apply bg-slate-800 text-slate-400;
+}
+
+.admin-btn-emerald {
+    @apply inline-flex items-center justify-center rounded-full bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-700;
+}
+.dark .admin-btn-emerald {
+    @apply bg-emerald-500 hover:bg-emerald-400;
+}
+
+.admin-btn-emerald-lg {
+    @apply inline-flex rounded-full bg-emerald-600 px-5 py-2 text-sm font-semibold text-white hover:bg-emerald-700;
+}
+.dark .admin-btn-emerald-lg {
+    @apply bg-emerald-500 hover:bg-emerald-400;
+}
+
+.admin-btn-outline {
+    @apply inline-flex rounded-full border border-slate-300 px-5 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100;
+}
+.dark .admin-btn-outline {
+    @apply border-slate-600 text-slate-300 hover:border-slate-500 hover:bg-slate-900/80;
+}
+
+.admin-inner {
+    @apply rounded-xl border border-slate-200 bg-slate-50 p-4;
+}
+.dark .admin-inner {
+    @apply border-slate-800 bg-slate-900/40;
+}
+
+.admin-inner-dashed {
+    @apply rounded-xl border border-dashed border-slate-300 bg-slate-50/90 p-4;
+}
+.dark .admin-inner-dashed {
+    @apply border-slate-800 bg-slate-900/20;
+}
+
+.admin-radio-tile {
+    @apply flex cursor-pointer gap-3 rounded-xl border border-slate-200 bg-white p-4 has-[:checked]:border-orange-500/50 has-[:checked]:bg-orange-50;
+}
+.dark .admin-radio-tile {
+    @apply border-slate-800 bg-slate-900/50 has-[:checked]:bg-orange-500/10;
+}
+
+.admin-file {
+    @apply mt-4 block w-full text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-slate-200 file:px-3 file:py-2 file:text-slate-800 file:font-medium;
+}
+.dark .admin-file {
+    @apply text-slate-400 file:bg-slate-800 file:text-slate-200;
+}
+
+.admin-stat-ok {
+    @apply text-lg font-semibold text-emerald-700;
+}
+.dark .admin-stat-ok {
+    @apply text-emerald-300;
+}
+
+.admin-text-body {
+    @apply text-sm text-slate-700;
+}
+.dark .admin-text-body {
+    @apply text-slate-300;
+}
+
+.admin-key {
+    @apply font-mono text-sm text-orange-700;
+}
+.dark .admin-key {
+    @apply text-orange-300/90;
+}
+
+/* Quill (admin zengin metin) — toolbar + gece modu */
+[data-admin-quill] .ql-toolbar.ql-snow {
+    @apply border-0 border-b border-slate-200 bg-slate-50;
+}
+.dark [data-admin-quill] .ql-toolbar.ql-snow {
+    @apply border-slate-600 bg-slate-900;
+}
+[data-admin-quill] .ql-container.ql-snow {
+    @apply border-0 font-sans text-sm text-slate-900;
+}
+.dark [data-admin-quill] .ql-container.ql-snow {
+    @apply text-slate-100;
+}
+.dark [data-admin-quill] .ql-editor.ql-blank::before {
+    @apply text-slate-500;
+}
+.dark [data-admin-quill] .ql-snow .ql-stroke {
+    stroke: rgb(203 213 225);
+}
+.dark [data-admin-quill] .ql-snow .ql-fill {
+    fill: rgb(203 213 225);
+}
+.dark [data-admin-quill] .ql-snow .ql-picker {
+    @apply text-slate-200;
+}
+.dark [data-admin-quill] .ql-snow .ql-picker-options {
+    @apply border-slate-600 bg-slate-900;
+}

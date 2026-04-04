@@ -44,7 +44,7 @@ class SslController extends Controller
             $request->user(),
             $domain,
             $validated['email'] ?? null,
-            config('panelsar.lets_encrypt_email') ?: null
+            config('hostvim.lets_encrypt_email') ?: null
         );
 
         if (! $result['ok']) {

@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { Outlet } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import Sidebar from './Sidebar'
 import Header from './Header'
 import { useThemeStore } from '../../store/themeStore'
@@ -8,6 +9,7 @@ import { useAuthStore } from '../../store/authStore'
 import { authService } from '../../services/authService'
 
 export default function Layout() {
+  const { t } = useTranslation()
   const sidebarCollapsed = useThemeStore((s) => s.sidebarCollapsed)
   const mobileSidebarOpen = useThemeStore((s) => s.mobileSidebarOpen)
   const closeMobileSidebar = useThemeStore((s) => s.closeMobileSidebar)
@@ -62,19 +64,19 @@ export default function Layout() {
         <main className="flex-1 overflow-y-auto p-4 sm:p-6">
           {!onboardingSeen && (
             <div className="mb-4 rounded-xl border border-primary-200 dark:border-primary-900/40 bg-primary-50/80 dark:bg-primary-950/20 p-4">
-              <p className="text-sm font-semibold text-gray-900 dark:text-white">Hızlı başlangıç modu</p>
+              <p className="text-sm font-semibold text-gray-900 dark:text-white">{t('ui_mode.onboarding_title')}</p>
               <p className="mt-1 text-xs text-gray-600 dark:text-gray-300">
-                Kolay mod temel özellikleri gösterir. Gelişmiş modda tüm teknik araçlar görünür.
+                {t('ui_mode.onboarding_desc')}
               </p>
               <div className="mt-3 flex flex-wrap gap-2">
                 <button className="btn-primary py-1.5 text-xs" onClick={() => { setMode('easy'); markOnboardingSeen() }}>
-                  Kolay Modu Kullan
+                  {t('ui_mode.use_easy')}
                 </button>
                 <button className="btn-secondary py-1.5 text-xs" onClick={() => { setMode('advanced'); markOnboardingSeen() }}>
-                  Gelişmiş Moda Geç
+                  {t('ui_mode.switch_to_advanced')}
                 </button>
                 <button className="btn-secondary py-1.5 text-xs" onClick={markOnboardingSeen}>
-                  Kapat
+                  {t('common.close')}
                 </button>
               </div>
             </div>

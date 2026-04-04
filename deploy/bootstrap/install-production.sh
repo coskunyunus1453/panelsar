@@ -1,19 +1,19 @@
 #!/usr/bin/env bash
 #
-# Panelsar — tek sunucuda üretim kurulumu (Debian 12 / Ubuntu 22.04+)
+# Hostvim — tek sunucuda üretim kurulumu (Debian 12 / Ubuntu 22.04+)
 #
 # Hedef: güvenlik (engine yalnızca loopback), hız (gzip, static cache), kolaylık (tek komut iskeleti)
 #
 # Kullanım (root) — sıfır sunucu:
-#   git clone <repo> /var/www/panelsar && cd /var/www/panelsar
+#   git clone <repo> /var/www/hostvim && cd /var/www/hostvim
 #   sudo bash deploy/bootstrap/install-production.sh
 #
 # Sadece kod/config güncellemesi (paket kurulumu atlanır):
-#   cd /var/www/panelsar && git pull --ff-only
+#   cd /var/www/hostvim && git pull --ff-only
 #   SKIP_APT=1 sudo -E bash deploy/bootstrap/install-production.sh
 #
 # Ortam değişkenleri (isteğe bağlı):
-#   PANELSAR_HOME=/var/www/panelsar
+#   HOSTVIM_HOME=/var/www/hostvim   (eski: PANELSAR_HOME hâlâ yedek olarak okunur)
 #   SERVER_NAME=_          # sadece IP ile erişim için default_server (nginx şablonunda _)
 #   LETS_ENCRYPT_EMAIL=admin@ornek.com
 #   SKIP_APT=1             # paket kurulumunu atla (yeniden çalıştırma)
@@ -21,21 +21,27 @@
 #   WITH_MARIADB=1         # MariaDB kur ve panel veritabanını oluştur (önerilir)
 #   WITH_POSTGRES=1        # Engine için PostgreSQL (isteğe bağlı)
 #   WITH_NODE_REPO=1       # NodeSource 20.x ekle (frontend build için önerilir)
-#   PANELSAR_GO_VERSION=1.22.3  # engine/go.mod ile uyumlu (varsayılan; go.dev'den kurulur)
-#   PANELSAR_PHP_VERSION=8.4    # panel/composer.lock (Ondrej/Sury); Symfony 8 için 8.4 önerilir
-#   PANELSAR_EXTRA_PHP_FPM_VERSIONS="8.3 8.2"  # ek FPM (boş = yalnız ana sürüm)
+#   HOSTVIM_GO_VERSION=1.22.3  # engine/go.mod ile uyumlu (varsayılan; go.dev'den kurulur)
+#   HOSTVIM_PHP_VERSION=8.4    # panel/composer.lock (Ondrej/Sury); Symfony 8 için 8.4 önerilir
+#   HOSTVIM_EXTRA_PHP_FPM_VERSIONS="8.3 8.2"  # ek FPM (boş = yalnız ana sürüm)
 #   WITH_PHPMYADMIN=1           # apt phpMyAdmin + Nginx /phpmyadmin + PHPMYADMIN_URL
 #   WITH_CERTBOT=1              # certbot + python3-certbot-nginx (Let's Encrypt)
 #   WITH_APACHE=1               # apache2; Nginx 80 ile çakışmaz — Apache :8080 + engine apache_http_port: 8080
 #   WITH_LOCAL_POSTFIX=1        # Postfix + mailutils (panel giden posta: sendmail; Admin → Giden posta’dan SMTP’ye geçilebilir)
 #   SKIP_DB_SEED=1              # migrate sonrası db:seed atla
-#   RESET_PANEL_DB=1            # DİKKAT: Panel veritabanını her çalıştırmada sıfırlar (kullanıcı/domain vb. silinir)
-#   PANELSAR_SEED_DEMO_USERS=1  # Demo reseller/user hesaplarını da seed et (varsayılan: 0)
-#   (engine systemd drop-in) PANELSAR_TERMINAL_NO_ROOT=1  # web terminali www-data kabuğunda (varsayılan: root sudo)
-#   PANELSAR_ADMIN_EMAIL=...    # ilk admin e-posta (varsayılan: admin@<sunucu-hostname>)
-#   PANELSAR_ADMIN_PASSWORD=... # sabit şifre; verilmezse kurulumda rastgele üretilir
+#   RESET_PANEL_DB=1            # DİKKAT: migrate:fresh + (varsayılan) data/www vb. temizlik — üretimde yalnızca gerektiğinde
+#   HOSTVIM_FRESH_INSTALL=1     # RESET_PANEL_DB=1 ile aynı (fabrika / boş lab sunucusu; müşteri “onarım”unda kullanmayın)
+#   HOSTVIM_SEED_DEMO_USERS=1  # Demo reseller/user hesaplarını da seed et (varsayılan: 0)
+#   (engine systemd drop-in) HOSTVIM_TERMINAL_NO_ROOT=1  # web terminali www-data kabuğunda (varsayılan: root sudo)
+#   HOSTVIM_ADMIN_EMAIL=...    # ilk admin e-posta (varsayılan: admin@<sunucu-hostname>)
+#   HOSTVIM_ADMIN_PASSWORD=... # sabit şifre; verilmezse kurulumda rastgele üretilir
 #
 set -euo pipefail
+
+# Fabrika sıfırlama (install.sh ile aynı anahtar; doğrudan bu betik çalıştırılıyorsa da geçerli)
+if [[ "${HOSTVIM_FRESH_INSTALL:-0}" == "1" ]] || [[ "${HOSTVIM_FRESH_INSTALL:-0}" == "yes" ]]; then
+  export RESET_PANEL_DB=1
+fi
 
 # Kolay kurulum: varsayılan olarak MariaDB + Node 20 kaynağı
 WITH_MARIADB="${WITH_MARIADB:-1}"
@@ -49,7 +55,7 @@ source "$SCRIPT_DIR/ensure-go-toolchain.sh"
 # shellcheck source=ensure-php-packages.sh
 source "$SCRIPT_DIR/ensure-php-packages.sh"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
-PANELSAR_HOME="${PANELSAR_HOME:-/var/www/panelsar}"
+HOSTVIM_HOME="${HOSTVIM_HOME:-${PANELSAR_HOME:-/var/www/hostvim}}"
 SERVER_NAME="${SERVER_NAME:-_}"
 LETS_ENCRYPT_EMAIL="${LETS_ENCRYPT_EMAIL:-admin@localhost}"
 APP_PROFILE="${APP_PROFILE:-customer}"
@@ -62,18 +68,18 @@ if [[ "${ENFORCE_ADMIN_2FA:-}" == "" ]]; then
 fi
 
 if [[ ! -d "$REPO_ROOT/panel" ]] || [[ ! -d "$REPO_ROOT/engine" ]]; then
-  echo "Hata: panel/ veya engine/ bulunamadı. Bu betiği repo kökünden çalıştırın (PANELSAR_HOME=$PANELSAR_HOME)." >&2
+  echo "Hata: panel/ veya engine/ bulunamadı. Bu betiği repo kökünden çalıştırın (HOSTVIM_HOME=$HOSTVIM_HOME)." >&2
   exit 1
 fi
 
-if [[ "$PANELSAR_HOME" != "$REPO_ROOT" ]]; then
-  echo "Uyarı: PANELSAR_HOME ($PANELSAR_HOME) ile repo ($REPO_ROOT) farklı. Aynı yapın önerilir." >&2
+if [[ "$HOSTVIM_HOME" != "$REPO_ROOT" ]]; then
+  echo "Uyarı: HOSTVIM_HOME ($HOSTVIM_HOME) ile repo ($REPO_ROOT) farklı. Aynı yapın önerilir." >&2
 fi
 
 export DEBIAN_FRONTEND=noninteractive
 
 detect_php_fpm_sock() {
-  local pv="${PANELSAR_PHP_VERSION:-8.4}"
+  local pv="${HOSTVIM_PHP_VERSION:-8.4}"
   local s
   for s in "/run/php/php${pv}-fpm.sock" /run/php/php8.4-fpm.sock /run/php/php8.3-fpm.sock /run/php/php8.2-fpm.sock /run/php/php-fpm.sock; do
     if [[ -S "$s" ]]; then
@@ -113,7 +119,7 @@ yaml_value_from_block() {
   ' "$file"
 }
 
-panelsar_git_safe_directory() {
+hostvim_git_safe_directory() {
   local d="$1"
   [[ -d "$d/.git" ]] || return 0
   if ! git config --system --get-all safe.directory 2>/dev/null | grep -qxF "$d"; then
@@ -122,7 +128,7 @@ panelsar_git_safe_directory() {
 }
 
 # Nginx panel 80/443 kullanır; Apache yalnızca HTTP 8080 (engine hosting.apache_http_port ile uyumlu)
-panelsar_apache_bind_8080() {
+hostvim_apache_bind_8080() {
   local pc=/etc/apache2/ports.conf
   [[ -f "$pc" ]] || return 1
   sed -i \
@@ -196,7 +202,7 @@ if [[ "${SKIP_APT:-}" != "1" ]]; then
 
   if [[ "${WITH_APACHE:-1}" == "1" ]] || [[ "${WITH_APACHE:-1}" == "yes" ]]; then
     apt-get install -y -qq apache2
-    panelsar_apache_bind_8080
+    hostvim_apache_bind_8080
     systemctl enable apache2
     systemctl restart apache2
     echo "==> Apache etkin: HTTP :8080 (Nginx panel :80). Engine apache_http_port=8080 ile uyumlu."
@@ -227,9 +233,28 @@ fi
 # PHP-FPM soketi (apt sonrası)
 PHP_FPM_SOCK="$(detect_php_fpm_sock)"
 
-mkdir -p "$PANELSAR_HOME/data"/{www,tmp,ssl,backups,logs,vhosts}
+mkdir -p "$HOSTVIM_HOME/data"/{www,tmp,ssl,backups,logs,vhosts}
 mkdir -p /etc/panelsar
-chown -R www-data:www-data "$PANELSAR_HOME/data"
+chown -R www-data:www-data "$HOSTVIM_HOME/data"
+
+# RESET modunda eski hosting kalıntılarını da temizle (plesk benzeri "silince anında düşsün" davranışı).
+if [[ "${RESET_PANEL_DB:-0}" == "1" ]] || [[ "${RESET_PANEL_DB:-0}" == "yes" ]]; then
+  CLEAN_HOSTING_STATE_ON_RESET="${CLEAN_HOSTING_STATE_ON_RESET:-1}"
+  if [[ "$CLEAN_HOSTING_STATE_ON_RESET" == "1" ]] || [[ "$CLEAN_HOSTING_STATE_ON_RESET" == "yes" ]]; then
+    echo "==> RESET_PANEL_DB=1: eski hosting state temizleniyor (webroot/vhost/ssl/backup)."
+    rm -rf "$HOSTVIM_HOME/data/www/"* 2>/dev/null || true
+    rm -rf "$HOSTVIM_HOME/data/ssl/"* 2>/dev/null || true
+    rm -rf "$HOSTVIM_HOME/data/backups/"* 2>/dev/null || true
+    rm -rf /var/backups/panelsar/* 2>/dev/null || true
+    rm -f /etc/nginx/sites-enabled/panelsar-*.conf 2>/dev/null || true
+    rm -f /etc/apache2/sites-enabled/panelsar-*.conf 2>/dev/null || true
+    rm -f /etc/apache2/sites-available/panelsar-*.conf 2>/dev/null || true
+    nginx -t >/dev/null 2>&1 && systemctl reload nginx || true
+    if command -v apache2ctl >/dev/null 2>&1; then
+      apache2ctl configtest >/dev/null 2>&1 && systemctl reload apache2 || true
+    fi
+  fi
+fi
 
 # Kimlik anahtarları:
 # - İlk kurulumda güvenli rastgele üretilir.
@@ -252,6 +277,21 @@ INTERNAL_KEY="${EXISTING_INTERNAL_KEY:-$(openssl rand -hex 32)}"
 ENGINE_SECRET="${EXISTING_ENGINE_SECRET:-$(openssl rand -hex 32)}"
 ENGINE_JWT="${EXISTING_ENGINE_JWT:-$(openssl rand -hex 32)}"
 ENGINE_DB_PASS="$(openssl rand -hex 24)"
+PANEL_ORIGINS="${PANEL_ORIGINS:-http://localhost,http://127.0.0.1}"
+if [[ "$SERVER_NAME" != "_" ]]; then
+  PANEL_ORIGINS="$PANEL_ORIGINS,http://$SERVER_NAME,https://$SERVER_NAME"
+fi
+
+# Önceki kurulumlardan kalan zayıf/placeholder anahtarlar yayın güvenliği için döndürülür.
+if [[ "$INTERNAL_KEY" == "hostvim-engine-internal-dev" ]] || [[ "$INTERNAL_KEY" == *"change"* ]]; then
+  INTERNAL_KEY="$(openssl rand -hex 32)"
+fi
+if [[ "$ENGINE_SECRET" == *"change"* ]]; then
+  ENGINE_SECRET="$(openssl rand -hex 32)"
+fi
+if [[ "$ENGINE_JWT" == *"change"* ]] || [[ "$ENGINE_JWT" == *"dev"* ]]; then
+  ENGINE_JWT="$(openssl rand -hex 32)"
+fi
 
 # Engine yaml
 ENGINE_TMPL="$REPO_ROOT/deploy/configs/engine.production.yaml"
@@ -260,9 +300,10 @@ sed \
   -e "s|__ENGINE_SECRET_KEY__|$ENGINE_SECRET|g" \
   -e "s|__ENGINE_JWT_SECRET__|$ENGINE_JWT|g" \
   -e "s|__ENGINE_DB_PASSWORD__|$ENGINE_DB_PASS|g" \
-  -e "s|__PANELSAR_HOME__|$PANELSAR_HOME|g" \
+  -e "s|__HOSTVIM_HOME__|$HOSTVIM_HOME|g" \
   -e "s|__LETS_ENCRYPT_EMAIL__|$LETS_ENCRYPT_EMAIL|g" \
   -e "s|__PHP_FPM_SOCKET__|$PHP_FPM_SOCK|g" \
+  -e "s|__PANEL_ORIGINS__|$PANEL_ORIGINS|g" \
   "$ENGINE_TMPL" > "$ENGINE_DST"
 chmod 640 "$ENGINE_DST"
 chown root:www-data "$ENGINE_DST"
@@ -277,45 +318,48 @@ fi
 
 # Go engine derle (apt'teki golang-go genelde esiktir; ensure-go-toolchain.sh go.dev sürümünü kurar)
 ensure_go_toolchain
-(cd "$REPO_ROOT/engine" && go build -buildvcs=false -o /usr/local/bin/panelsar-engine ./cmd/panelsar-engine)
-chmod 755 /usr/local/bin/panelsar-engine
+(cd "$REPO_ROOT/engine" && go build -buildvcs=false -o /usr/local/bin/hostvim-engine ./cmd/hostvim-engine)
+chmod 755 /usr/local/bin/hostvim-engine
 
 # systemd
 sed \
-  -e "s|__PANELSAR_HOME__|$PANELSAR_HOME|g" \
-  -e "s|__ENGINE_BINARY__|/usr/local/bin/panelsar-engine|g" \
-  "$REPO_ROOT/deploy/systemd/panelsar-engine.service" > /etc/systemd/system/panelsar-engine.service
+  -e "s|__HOSTVIM_HOME__|$HOSTVIM_HOME|g" \
+  -e "s|__ENGINE_BINARY__|/usr/local/bin/hostvim-engine|g" \
+  "$REPO_ROOT/deploy/systemd/hostvim-engine.service" > /etc/systemd/system/hostvim-engine.service
 systemctl daemon-reload
-if [[ -x /usr/local/bin/panelsar-engine ]]; then
-  systemctl enable panelsar-engine
-  systemctl restart panelsar-engine || true
+if [[ -x /usr/local/bin/hostvim-engine ]]; then
+  systemctl enable hostvim-engine
+  systemctl restart hostvim-engine || true
 fi
 
 # Engine www-data iken nginx sites-enabled'a yazamaz; sudo ile izinli betikler
-if [[ -f "$REPO_ROOT/deploy/host/panelsar-nginx-vhost" ]]; then
-  install -m 755 "$REPO_ROOT/deploy/host/panelsar-nginx-vhost" /usr/local/sbin/panelsar-nginx-vhost
+if [[ -f "$REPO_ROOT/deploy/host/hostvim-nginx-vhost" ]]; then
+  install -m 755 "$REPO_ROOT/deploy/host/hostvim-nginx-vhost" /usr/local/sbin/hostvim-nginx-vhost
 fi
-if [[ -f "$REPO_ROOT/deploy/host/panelsar-stack-install" ]]; then
-  install -m 755 "$REPO_ROOT/deploy/host/panelsar-stack-install" /usr/local/sbin/panelsar-stack-install
+if [[ -f "$REPO_ROOT/deploy/host/hostvim-stack-install" ]]; then
+  install -m 755 "$REPO_ROOT/deploy/host/hostvim-stack-install" /usr/local/sbin/hostvim-stack-install
 fi
-if [[ -f "$REPO_ROOT/deploy/host/panelsar-terminal-root" ]]; then
-  install -m 755 "$REPO_ROOT/deploy/host/panelsar-terminal-root" /usr/local/sbin/panelsar-terminal-root
+if [[ -f "$REPO_ROOT/deploy/host/hostvim-terminal-root" ]]; then
+  install -m 755 "$REPO_ROOT/deploy/host/hostvim-terminal-root" /usr/local/sbin/hostvim-terminal-root
 fi
-if [[ -f "$REPO_ROOT/deploy/host/panelsar-php-ini" ]]; then
-  install -m 755 "$REPO_ROOT/deploy/host/panelsar-php-ini" /usr/local/sbin/panelsar-php-ini
+if [[ -f "$REPO_ROOT/deploy/host/hostvim-php-ini" ]]; then
+  install -m 755 "$REPO_ROOT/deploy/host/hostvim-php-ini" /usr/local/sbin/hostvim-php-ini
 fi
-if [[ -f "$REPO_ROOT/deploy/host/panelsar-security" ]]; then
-  install -m 755 "$REPO_ROOT/deploy/host/panelsar-security" /usr/local/sbin/panelsar-security
+if [[ -f "$REPO_ROOT/deploy/host/hostvim-security" ]]; then
+  install -m 755 "$REPO_ROOT/deploy/host/hostvim-security" /usr/local/sbin/hostvim-security
 fi
-cat > /etc/sudoers.d/panelsar-engine <<'SUDOERS'
-www-data ALL=(root) NOPASSWD: /usr/local/sbin/panelsar-nginx-vhost
-www-data ALL=(root) NOPASSWD: /usr/local/sbin/panelsar-stack-install
-www-data ALL=(root) NOPASSWD: /usr/local/sbin/panelsar-terminal-root
-www-data ALL=(root) NOPASSWD: /usr/local/sbin/panelsar-php-ini
-www-data ALL=(root) NOPASSWD: /usr/local/sbin/panelsar-security
+if [[ -f "$REPO_ROOT/deploy/host/hostvim-cleaner" ]]; then
+  install -m 755 "$REPO_ROOT/deploy/host/hostvim-cleaner" /usr/local/sbin/hostvim-cleaner
+fi
+cat > /etc/sudoers.d/hostvim-engine <<'SUDOERS'
+www-data ALL=(root) NOPASSWD: /usr/local/sbin/hostvim-nginx-vhost
+www-data ALL=(root) NOPASSWD: /usr/local/sbin/hostvim-stack-install
+www-data ALL=(root) NOPASSWD: /usr/local/sbin/hostvim-terminal-root
+www-data ALL=(root) NOPASSWD: /usr/local/sbin/hostvim-php-ini
+www-data ALL=(root) NOPASSWD: /usr/local/sbin/hostvim-security
 SUDOERS
-chmod 440 /etc/sudoers.d/panelsar-engine
-visudo -cf /etc/sudoers.d/panelsar-engine
+chmod 440 /etc/sudoers.d/hostvim-engine
+visudo -cf /etc/sudoers.d/hostvim-engine
 
 # Panel .env
 PANEL_ROOT="$REPO_ROOT/panel"
@@ -356,7 +400,7 @@ if [[ "${WITH_LOCAL_POSTFIX:-1}" == "1" ]] || [[ "${WITH_LOCAL_POSTFIX:-1}" == "
   _MAIL_FROM="noreply@$(hostname -f 2>/dev/null || hostname)"
   update_env "MAIL_MAILER" "sendmail"
   update_env "MAIL_FROM_ADDRESS" "\"${_MAIL_FROM}\""
-  update_env "MAIL_FROM_NAME" "\"Panelsar\""
+  update_env "MAIL_FROM_NAME" "\"Hostvim\""
 fi
 
 # phpMyAdmin (kuruluysa panelde otomatik link)
@@ -418,7 +462,7 @@ mkdir -p "$PANEL_ROOT/vendor"
 chown -R www-data:www-data "$PANEL_ROOT"
 chmod -R ug+rwx "$PANEL_ROOT/storage" "$PANEL_ROOT/bootstrap/cache"
 
-panelsar_git_safe_directory "$REPO_ROOT"
+hostvim_git_safe_directory "$REPO_ROOT"
 
 sudo -u www-data composer --working-dir="$PANEL_ROOT" install --no-dev --optimize-autoloader --no-interaction
 
@@ -437,9 +481,9 @@ if [[ -f "$FRONTEND_ROOT/package.json" ]]; then
     exit 1
   fi
   if [[ -f "$FRONTEND_ROOT/package-lock.json" ]]; then
-    (cd "$FRONTEND_ROOT" && npm ci && VITE_APP_PROFILE="$APP_PROFILE" npm run build)
+    (cd "$FRONTEND_ROOT" && npm ci && VITE_BASE_URL="${VITE_BASE_URL:-}" VITE_APP_PROFILE="$APP_PROFILE" npm run build)
   else
-    (cd "$FRONTEND_ROOT" && npm install && VITE_APP_PROFILE="$APP_PROFILE" npm run build)
+    (cd "$FRONTEND_ROOT" && npm install && VITE_BASE_URL="${VITE_BASE_URL:-}" VITE_APP_PROFILE="$APP_PROFILE" npm run build)
   fi
   rsync -a --delete \
     --exclude index.php \
@@ -451,9 +495,10 @@ if [[ "${RESET_PANEL_DB:-0}" == "1" ]] || [[ "${RESET_PANEL_DB:-0}" == "yes" ]];
   echo "==> RESET_PANEL_DB=1: Panel veritabanı sıfırlanıyor (migrate:fresh)."
   sudo -u www-data php "$PANEL_ROOT/artisan" migrate:fresh --force
 else
+  echo "==> Panel veritabanı korunuyor: migrate --force (yeniden kurulum / güncelleme; kullanıcı ve site kayıtları silinmez)."
   sudo -u www-data php "$PANEL_ROOT/artisan" migrate --force
 fi
-sudo -u www-data php "$PANEL_ROOT/artisan" panelsar:init-outbound-mail --no-interaction 2>/dev/null || true
+sudo -u www-data php "$PANEL_ROOT/artisan" hostvim:init-outbound-mail --no-interaction 2>/dev/null || true
 
 if [[ "${SKIP_DB_SEED:-}" != "1" ]]; then
   RESET_DB_MODE=0
@@ -461,10 +506,10 @@ if [[ "${SKIP_DB_SEED:-}" != "1" ]]; then
     RESET_DB_MODE=1
   fi
 
-  HOST_FQDN="$(hostname -f 2>/dev/null || hostname || echo panelsar.local)"
+  HOST_FQDN="$(hostname -f 2>/dev/null || hostname || echo hostvim.local)"
   HOST_FQDN="${HOST_FQDN// /}"
-  ADMIN_EMAIL="${PANELSAR_ADMIN_EMAIL:-admin@${HOST_FQDN}}"
-  SEED_DEMO_USERS="${PANELSAR_SEED_DEMO_USERS:-0}"
+  ADMIN_EMAIL="${HOSTVIM_ADMIN_EMAIL:-admin@${HOST_FQDN}}"
+  SEED_DEMO_USERS="${HOSTVIM_SEED_DEMO_USERS:-0}"
   USER_COUNT=""
   if [[ "$RESET_DB_MODE" == "0" ]] && { [[ "${WITH_MARIADB}" == "1" ]] || [[ "${WITH_MARIADB}" == "yes" ]]; }; then
     DB_PW=$(grep '^DB_PASSWORD=' "$ENV_FILE" | cut -d= -f2- | tr -d '\r')
@@ -482,23 +527,23 @@ if [[ "${SKIP_DB_SEED:-}" != "1" ]]; then
   ADMIN_PASSWORD=""
   if [[ "$RESET_DB_MODE" == "1" ]]; then
     # Fresh kurulum modunda her zaman yeni admin kimliği üret.
-    ADMIN_PASSWORD="${PANELSAR_ADMIN_PASSWORD:-$(openssl rand -hex 12)}"
+    ADMIN_PASSWORD="${HOSTVIM_ADMIN_PASSWORD:-$(openssl rand -hex 12)}"
     WRITE_LOGIN=1
-  elif [[ -n "${PANELSAR_ADMIN_PASSWORD:-}" ]]; then
-    ADMIN_PASSWORD="$PANELSAR_ADMIN_PASSWORD"
+  elif [[ -n "${HOSTVIM_ADMIN_PASSWORD:-}" ]]; then
+    ADMIN_PASSWORD="$HOSTVIM_ADMIN_PASSWORD"
     WRITE_LOGIN=1
   elif [[ "$USER_COUNT" == "0" ]]; then
     ADMIN_PASSWORD="$(openssl rand -hex 12)"
     WRITE_LOGIN=1
   fi
 
-  LOGIN_FILE="/root/panelsar-admin-login.txt"
+  LOGIN_FILE="/root/hostvim-admin-login.txt"
   PANEL_URL_HINT="$(grep -E '^APP_URL=' "$ENV_FILE" 2>/dev/null | cut -d= -f2- | tr -d '\r' || true)"
   [[ -n "$PANEL_URL_HINT" ]] || PANEL_URL_HINT="http://$(hostname -I 2>/dev/null | awk '{print $1}' || echo localhost)"
 
   if [[ "$WRITE_LOGIN" == "1" ]]; then
     {
-      echo "Panelsar — ilk admin girişi"
+      echo "Hostvim — ilk admin girişi"
       echo "Panel URL: ${PANEL_URL_HINT}"
       echo "E-posta:   ${ADMIN_EMAIL}"
       echo "Şifre:     ${ADMIN_PASSWORD}"
@@ -509,14 +554,14 @@ if [[ "${SKIP_DB_SEED:-}" != "1" ]]; then
 
   if [[ -n "$ADMIN_PASSWORD" ]]; then
     sudo -u www-data env \
-      PANELSAR_ADMIN_EMAIL="$ADMIN_EMAIL" \
-      PANELSAR_ADMIN_PASSWORD="$ADMIN_PASSWORD" \
-      PANELSAR_SEED_DEMO_USERS="$SEED_DEMO_USERS" \
+      HOSTVIM_ADMIN_EMAIL="$ADMIN_EMAIL" \
+      HOSTVIM_ADMIN_PASSWORD="$ADMIN_PASSWORD" \
+      HOSTVIM_SEED_DEMO_USERS="$SEED_DEMO_USERS" \
       php "$PANEL_ROOT/artisan" db:seed --force
   else
     sudo -u www-data env \
-      PANELSAR_ADMIN_EMAIL="$ADMIN_EMAIL" \
-      PANELSAR_SEED_DEMO_USERS="$SEED_DEMO_USERS" \
+      HOSTVIM_ADMIN_EMAIL="$ADMIN_EMAIL" \
+      HOSTVIM_SEED_DEMO_USERS="$SEED_DEMO_USERS" \
       php "$PANEL_ROOT/artisan" db:seed --force
   fi
 fi
@@ -524,21 +569,36 @@ fi
 sudo -u www-data php "$PANEL_ROOT/artisan" config:cache
 sudo -u www-data php "$PANEL_ROOT/artisan" route:cache
 sudo -u www-data php "$PANEL_ROOT/artisan" view:cache
-sudo -u www-data php "$PANEL_ROOT/artisan" panelsar:ensure-system-cron || true
+sudo -u www-data php "$PANEL_ROOT/artisan" hostvim:ensure-system-cron || true
 
 # OS-level scheduler: Laravel schedule:run her dakika tetiklensin.
-cat > /etc/cron.d/panelsar-panel-scheduler <<EOF
+rm -f /etc/cron.d/panelsar-panel-scheduler 2>/dev/null || true
+cat > /etc/cron.d/hostvim-panel-scheduler <<EOF
 SHELL=/bin/bash
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 * * * * * www-data cd "$PANEL_ROOT" && /usr/bin/php artisan schedule:run >> /dev/null 2>&1
 EOF
-chmod 644 /etc/cron.d/panelsar-panel-scheduler
+chmod 644 /etc/cron.d/hostvim-panel-scheduler
 systemctl enable --now cron 2>/dev/null || systemctl enable --now crond 2>/dev/null || true
 
+# Geçici .tmp_* dizinleri (yarım unzip/copy): günlük temizlik
+rm -f /etc/cron.d/panelsar-cleaner 2>/dev/null || true
+if [[ -x /usr/local/sbin/hostvim-cleaner ]]; then
+  HOSTVIM_CLEANER_WEB_ROOT="${HOSTVIM_HOSTING_WEB_ROOT:-${HOSTVIM_HOME}/data/www}"
+  cat > /etc/cron.d/hostvim-cleaner <<CRON
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+# Her gün 04:17 — 2 saatten eski .tmp_* ( /tmp + web_root )
+17 4 * * * root HOSTVIM_HOSTING_WEB_ROOT=${HOSTVIM_CLEANER_WEB_ROOT} /usr/local/sbin/hostvim-cleaner 2>&1 | logger -t hostvim-cleaner
+CRON
+  chmod 644 /etc/cron.d/hostvim-cleaner
+fi
+
 # Queue worker: uzun süren işleri request dışına alır (installer/deploy/stack vb.).
-cat > /etc/systemd/system/panelsar-panel-queue.service <<EOF
+systemctl disable --now panelsar-panel-queue.service 2>/dev/null || true
+cat > /etc/systemd/system/hostvim-panel-queue.service <<EOF
 [Unit]
-Description=Panelsar Laravel Queue Worker
+Description=Hostvim Laravel Queue Worker
 After=network.target
 
 [Service]
@@ -556,22 +616,22 @@ TimeoutStopSec=30
 WantedBy=multi-user.target
 EOF
 systemctl daemon-reload
-systemctl enable --now panelsar-panel-queue.service
+systemctl enable --now hostvim-panel-queue.service
 
 # Nginx
-NGX_DST="/etc/nginx/sites-available/panelsar.conf"
+NGX_DST="/etc/nginx/sites-available/hostvim.conf"
 sed \
   -e "s|__SERVER_NAME__|$SERVER_NAME|g" \
   -e "s|__PANEL_PUBLIC__|$PANEL_ROOT/public|g" \
   -e "s|__PHP_FPM_SOCK__|$PHP_FPM_SOCK|g" \
-  "$REPO_ROOT/deploy/nginx/panelsar.conf" > "$NGX_DST"
+  "$REPO_ROOT/deploy/nginx/hostvim.conf" > "$NGX_DST"
 
 if [[ "$SERVER_NAME" == "_" ]]; then
   sed -i 's/listen 80;/listen 80 default_server;/' "$NGX_DST" || true
   sed -i 's/listen \[::\]:80;/listen [::]:80 default_server;/' "$NGX_DST" || true
 fi
 
-ln -sf "$NGX_DST" /etc/nginx/sites-enabled/panelsar.conf
+ln -sf "$NGX_DST" /etc/nginx/sites-enabled/hostvim.conf
 rm -f /etc/nginx/sites-enabled/default 2>/dev/null || true
 nginx -t
 systemctl reload nginx
@@ -588,8 +648,8 @@ if [[ "${SKIP_UFW:-}" != "1" ]] && command -v ufw >/dev/null 2>&1; then
 fi
 
 echo ""
-echo "=== Panelsar kurulum özeti ==="
-echo "  Panel kökü:     $PANELSAR_HOME"
+echo "=== Hostvim kurulum özeti ==="
+echo "  Panel kökü:     $HOSTVIM_HOME"
 echo "  Engine API:     http://127.0.0.1:9090 (yalnızca sunucu içi — dışarıya açmayın)"
 echo "  ENGINE_INTERNAL_KEY panel .env ile eşleşiyor."
 echo "  Nginx site:     $NGX_DST"
@@ -608,10 +668,16 @@ if [[ "${SKIP_DB_SEED:-}" != "1" ]]; then
     echo "#  Adres:      ${PANEL_URL_HINT}"
     echo "#  E-posta:    ${ADMIN_EMAIL}"
     echo "#  Şifre:      ${ADMIN_PASSWORD}"
+    echo "#  (Kopya: /root/hostvim-admin-login.txt)"
     echo "################################################################"
-    echo "#  (Kopya: /root/panelsar-admin-login.txt)"
-  elif [[ -f /root/panelsar-admin-login.txt ]]; then
+  elif [[ -f /root/hostvim-admin-login.txt ]]; then
     echo "#  (Önceki kurulumdan kayıtlı giriş bilgisi:)"
+    while IFS= read -r line || [[ -n "$line" ]]; do
+      echo "#  $line"
+    done < /root/hostvim-admin-login.txt
+    echo "################################################################"
+  elif [[ -f /root/panelsar-admin-login.txt ]]; then
+    echo "#  (Eski yol: /root/panelsar-admin-login.txt)"
     while IFS= read -r line || [[ -n "$line" ]]; do
       echo "#  $line"
     done < /root/panelsar-admin-login.txt
@@ -626,5 +692,5 @@ fi
 echo "Sonraki adımlar:"
 echo "  1) DNS ile alan adını bu sunucuya yönlendirin; ücretsiz SSL: sudo certbot --nginx -d ornek.com --email $LETS_ENCRYPT_EMAIL --agree-tos --non-interactive"
 echo "  2) APP_URL ve PHPMYADMIN_URL değerlerini .env içinde gerçek HTTPS URL ile güncelleyin: nano $ENV_FILE"
-echo "  3) sudo -u www-data php $PANEL_ROOT/artisan config:cache && php artisan panelsar:install-check"
+echo "  3) sudo -u www-data php $PANEL_ROOT/artisan config:cache && php artisan hostvim:install-check"
 echo ""

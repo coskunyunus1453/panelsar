@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/panelsar/engine/internal/config"
-	"github.com/panelsar/engine/internal/sites"
+	"hostvim/engine/internal/config"
+	"hostvim/engine/internal/sites"
 )
 
 // Run belge kökünde izin verilen composer / npm komutlarını çalıştırır.

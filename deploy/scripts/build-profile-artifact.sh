@@ -31,7 +31,7 @@ fi
 STAMP="$(date +%Y%m%d-%H%M%S)"
 COMMIT="$(git -C "$REPO_ROOT" rev-parse --short HEAD 2>/dev/null || echo "unknown")"
 PKG_ROOT="$OUT_DIR/work-${PROFILE}-${STAMP}"
-PKG_NAME="panelsar-${PROFILE}-${STAMP}-${COMMIT}.tar.gz"
+PKG_NAME="hostvim-${PROFILE}-${STAMP}-${COMMIT}.tar.gz"
 PKG_PATH="$OUT_DIR/$PKG_NAME"
 
 mkdir -p "$OUT_DIR"

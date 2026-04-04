@@ -143,9 +143,9 @@ class SecurityController extends Controller
         $code = 502;
         $lower = strtolower($err);
 
-        if (str_contains($lower, 'sudo') || str_contains($lower, 'panelsar-security')) {
+        if (str_contains($lower, 'sudo') || str_contains($lower, 'hostvim-security') || str_contains($lower, 'panelsar-security')) {
             $code = 422;
-            $hint = 'Sunucuda /usr/local/sbin/panelsar-security ve sudoers NOPASSWD kuralını kontrol edin. Gerekirse deploy/bootstrap/install-production.sh yeniden çalıştırın.';
+            $hint = 'Sunucuda /usr/local/sbin/hostvim-security (veya eski panelsar-security) ve sudoers NOPASSWD kuralını kontrol edin. Gerekirse deploy/bootstrap/install-production.sh yeniden çalıştırın.';
         } elseif (str_contains($lower, 'missing /etc/modsecurity') || str_contains($lower, 'modsecurity')) {
             $code = 422;
             $hint = 'ModSecurity yapılandırması bulunamadı. Sunucuda Apache + modsecurity2 kurulu mu kontrol edin.';

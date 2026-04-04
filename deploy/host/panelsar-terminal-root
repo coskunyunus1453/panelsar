@@ -1,5 +1,0 @@
-#!/bin/bash
-# Panelsar web terminali: engine (www-data) tarafından sudo ile çağrılır; root login kabuğu açar.
-# Yalnızca /etc/sudoers.d/panelsar-engine içindeki NOPASSWD satırı ile kullanılmalıdır.
-export TERM="${TERM:-xterm-256color}"
-exec /bin/bash -l

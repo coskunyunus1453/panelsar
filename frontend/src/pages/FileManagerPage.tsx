@@ -13,7 +13,6 @@ import {
   FileText,
   Folder,
   FolderOpen,
-  HelpCircle,
   LayoutGrid,
   List as ListIcon,
   RefreshCw,
@@ -28,7 +27,35 @@ import {
 import toast from 'react-hot-toast'
 import clsx from 'clsx'
 
-type ListEntry = { name: string; is_dir: boolean; size: number; mtime?: number }
+type ListEntry = {
+  name: string
+  is_dir: boolean
+  size: number
+  mtime?: number
+  mode?: string
+  owner?: string
+  group?: string
+}
+
+type TrashItem = {
+  id: string
+  original_path: string
+  deleted_at?: string
+  name?: string
+  is_dir?: boolean
+  size?: number
+}
+
+type FileWithRelPath = File & { webkitRelativePath?: string }
+
+type NormalizedUploadItem = {
+  file: File
+  relFromBase: string
+  parentRel: string
+  baseName: string
+}
+
+type UploadConflictRow = NormalizedUploadItem & { existing: ListEntry }
 
 type EditorTab = {
   path: string
@@ -127,7 +154,7 @@ function isSafeNewFileName(name: string): boolean {
   if (t.includes('/') || t.includes('\\')) return false
   if (t === '.' || t === '..') return false
   if (EDIT_NAME.test(t)) return true
-  return /^[\w.\-]+$/.test(t)
+  return /^[\w.-]+$/.test(t)
 }
 
 /** Klasör/dosya göreli yolu — segment başına sadece . .. \ ve kontrolsüz uzunluk engellenir (UTF-8 dosya adları OK). */
@@ -185,7 +212,30 @@ function formatMtimeIso(sec?: number): string {
   }
 }
 
-const FILEMGR_HELP_KEY = 'panelsar_filemgr_help_seen'
+async function fetchAllFileEntries(domainId: number, dirRel: string): Promise<ListEntry[]> {
+  const all: ListEntry[] = []
+  let offset = 0
+  const limit = 2000
+  for (;;) {
+    const u = new URLSearchParams()
+    u.set('limit', String(limit))
+    u.set('offset', String(offset))
+    u.set('sort', 'name')
+    u.set('order', 'asc')
+    if (dirRel) u.set('path', dirRel)
+    const { data } = await api.get<{ entries?: ListEntry[]; total?: number }>(
+      `/domains/${domainId}/files?${u.toString()}`,
+    )
+    const chunk = data?.entries ?? []
+    all.push(...chunk)
+    const total = data?.total ?? 0
+    if (chunk.length === 0 || all.length >= total) break
+    offset += limit
+  }
+  return all
+}
+
+const FILEMGR_HELP_KEY = 'hostvim_filemgr_help_seen'
 
 export default function FileManagerPage() {
   const { t } = useTranslation()
@@ -275,9 +325,38 @@ export default function FileManagerPage() {
     return () => document.removeEventListener('mousedown', fn)
   }, [fileOpsOpen])
 
+  useEffect(() => {
+    const close = () => setContextMenu(null)
+    window.addEventListener('click', close)
+    window.addEventListener('scroll', close)
+    return () => {
+      window.removeEventListener('click', close)
+      window.removeEventListener('scroll', close)
+    }
+  }, [])
+
   // Rename/Move modal state
   const [renameDialog, setRenameDialog] = useState<{ from: string; newName: string } | null>(null)
   const [moveDialog, setMoveDialog] = useState<{ from: string; targetDir: string; baseName: string } | null>(null)
+  const [trashOpen, setTrashOpen] = useState(false)
+  const [chmodDialog, setChmodDialog] = useState<{ path: string; mode: string } | null>(null)
+  const [clipboardPath, setClipboardPath] = useState<string | null>(null)
+  const [clipboardMode, setClipboardMode] = useState<'copy' | 'cut'>('copy')
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; rel: string; isDir: boolean } | null>(null)
+  const [pasteConflictDialog, setPasteConflictDialog] = useState<{
+    open: boolean
+    sourcePath: string
+    destDir: string
+    baseTarget: string
+  } | null>(null)
+
+  const [uploadBusy, setUploadBusy] = useState(false)
+  const [uploadConflictDialog, setUploadConflictDialog] = useState<{
+    open: boolean
+    basePath: string
+    noConflict: NormalizedUploadItem[]
+    conflicts: UploadConflictRow[]
+  } | null>(null)
 
   const domainsQ = useQuery({
     queryKey: ['domains', 'paginated'],
@@ -527,38 +606,142 @@ export default function FileManagerPage() {
     },
   })
 
-  const uploadM = useMutation({
-    mutationFn: async (file: File) => {
-      const fd = new FormData()
-      fd.append('file', file)
-      fd.append('path', path)
-      await api.post(`/domains/${domainId}/files/upload`, fd)
-    },
-    onSuccess: async () => {
-      toast.success(t('files.upload_ok'))
-      setOffset(0)
-      await qc.invalidateQueries({ queryKey: ['files', domainId, path] })
-      await qc.refetchQueries({ queryKey: ['files', domainId, path] })
-    },
-    onError: (err: unknown) => {
-      const ax = err as {
-        response?: { data?: { error?: string; message?: string; errors?: { file?: string[] } } }
-      }
-      const d = ax.response?.data
-      const v = d?.errors?.file?.[0]
-      toast.error(v ?? d?.error ?? d?.message ?? t('files.upload_err'))
-    },
-  })
+  const postOneUpload = useCallback(async (item: NormalizedUploadItem) => {
+    const fd = new FormData()
+    fd.append('file', item.file, item.baseName)
+    fd.append('path', item.parentRel)
+    await api.post(`/domains/${domainId}/files/upload`, fd)
+  }, [domainId])
 
-  const deleteM = useMutation({
-    mutationFn: async (rel: string) => {
+  const deleteRemotePath = useCallback(
+    async (rel: string) => {
       await api.delete(`/domains/${domainId}/files`, {
         params: { path: rel },
         data: { path: rel },
       })
     },
+    [domainId],
+  )
+
+  const runUploadItems = useCallback(
+    async (items: NormalizedUploadItem[]) => {
+      if (items.length === 0) {
+        await qc.invalidateQueries({ queryKey: ['files', domainId, path] })
+        return
+      }
+      let ok = 0
+      let failed = 0
+      for (const it of items) {
+        try {
+          await postOneUpload(it)
+          ok++
+        } catch (err: unknown) {
+          failed++
+          const ax = err as {
+            response?: { data?: { error?: string; message?: string; errors?: { file?: string[] } } }
+          }
+          const d = ax.response?.data
+          const v = d?.errors?.file?.[0]
+          toast.error(v ?? d?.error ?? d?.message ?? t('files.upload_err'))
+        }
+      }
+      setOffset(0)
+      await qc.invalidateQueries({ queryKey: ['files', domainId, path] })
+      await qc.refetchQueries({ queryKey: ['files', domainId, path] })
+      if (failed === 0 && ok > 0) {
+        toast.success(t('files.upload_ok'))
+      } else if (ok > 0 && failed > 0) {
+        toast.success(t('files.upload_partial_ok', { ok, failed: t('files.upload_partial_fail', { n: failed }) }))
+      } else if (failed > 0 && ok === 0) {
+        toast.error(t('files.upload_err'))
+      }
+    },
+    [domainId, path, postOneUpload, qc, t],
+  )
+
+  const processIncomingFiles = useCallback(
+    async (rawFiles: File[]) => {
+      if (!domainId || rawFiles.length === 0) return
+      const basePath = path
+      const items: NormalizedUploadItem[] = []
+      for (const file of rawFiles) {
+        const wrp = (file as FileWithRelPath).webkitRelativePath
+        const relFromBase =
+          wrp && String(wrp).trim() !== '' ? String(wrp).replace(/\\/g, '/') : file.name
+        if (!isSafeRelativePath(relFromBase)) {
+          toast.error(t('files.invalid_path'))
+          continue
+        }
+        const segs = relFromBase.split('/').filter(Boolean)
+        if (segs.length === 0) continue
+        const baseName = segs[segs.length - 1]
+        const parentSub = segs.length > 1 ? segs.slice(0, -1).join('/') : ''
+        const parentRel = parentSub ? joinRel(basePath, parentSub) : basePath
+        items.push({ file, relFromBase, parentRel, baseName })
+      }
+      if (items.length === 0) return
+
+      setUploadBusy(true)
+      try {
+        const rootListing = await fetchAllFileEntries(domainId, basePath)
+        for (const it of items) {
+          const segs = it.relFromBase.split('/').filter(Boolean)
+          const top = segs[0]
+          const te = rootListing.find((e) => e.name === top)
+          if (segs.length > 1 && te && !te.is_dir) {
+            toast.error(t('files.upload_path_blocked', { name: top }))
+            setUploadBusy(false)
+            return
+          }
+        }
+
+        const parentCache = new Map<string, ListEntry[]>()
+        parentCache.set(basePath, rootListing)
+        const loadParent = async (p: string) => {
+          if (!parentCache.has(p)) {
+            parentCache.set(p, await fetchAllFileEntries(domainId, p))
+          }
+          return parentCache.get(p)!
+        }
+
+        const noConflict: NormalizedUploadItem[] = []
+        const conflicts: UploadConflictRow[] = []
+        for (const it of items) {
+          const list = await loadParent(it.parentRel)
+          const ex = list.find((e) => e.name === it.baseName)
+          if (ex) {
+            conflicts.push({ ...it, existing: ex })
+          } else {
+            noConflict.push(it)
+          }
+        }
+
+        if (conflicts.length === 0) {
+          await runUploadItems(items)
+        } else {
+          setUploadConflictDialog({
+            open: true,
+            basePath,
+            noConflict,
+            conflicts,
+          })
+        }
+      } catch (err: unknown) {
+        const ax = err as { response?: { data?: { message?: string } } }
+        toast.error(ax.response?.data?.message ?? String(err))
+      } finally {
+        setUploadBusy(false)
+      }
+    },
+    [domainId, path, runUploadItems, t],
+  )
+
+  const trashMoveM = useMutation({
+    mutationFn: async (rel: string) => {
+      await api.post(`/domains/${domainId}/files/trash/move`, { path: rel })
+    },
     onSuccess: () => {
-      toast.success(t('files.deleted'))
+      toast.success(t('files.moved_to_trash'))
       setSelected(null)
       setOffset(0)
       qc.invalidateQueries({ queryKey: ['files', domainId, path] })
@@ -621,6 +804,73 @@ export default function FileManagerPage() {
     onSuccess: () => {
       toast.success(t('files.chmod_ok'))
       qc.invalidateQueries({ queryKey: ['files', domainId, path] })
+      setChmodDialog(null)
+    },
+    onError: (err: unknown) => {
+      const ax = err as { response?: { data?: { message?: string } } }
+      toast.error(ax.response?.data?.message ?? String(err))
+    },
+  })
+
+  const bulkChmodM = useMutation({
+    mutationFn: async (vars: { paths: string[]; mode: string }) => {
+      const settled = await Promise.allSettled(
+        vars.paths.map((p) => api.post(`/domains/${domainId}/files/chmod`, { path: p, mode: vars.mode })),
+      )
+      const failed = settled.filter((x) => x.status === 'rejected').length
+      return { total: vars.paths.length, failed }
+    },
+    onSuccess: ({ total, failed }) => {
+      if (failed === 0) toast.success(t('files.bulk_chmod_ok', { total }))
+      else toast.error(t('files.bulk_chmod_fail', { failed, total }))
+      qc.invalidateQueries({ queryKey: ['files', domainId, path] })
+    },
+    onError: (err: unknown) => {
+      const ax = err as { response?: { data?: { message?: string } } }
+      toast.error(ax.response?.data?.message ?? String(err))
+    },
+  })
+
+  const trashQ = useQuery({
+    queryKey: ['files-trash', domainId],
+    enabled: Boolean(domainId) && trashOpen,
+    queryFn: async () => {
+      const { data } = await api.get<{ items: TrashItem[] }>(`/domains/${domainId}/files/trash`)
+      return data?.items ?? []
+    },
+  })
+
+  const trashRestoreM = useMutation({
+    mutationFn: async (id: string) => api.post(`/domains/${domainId}/files/trash/restore`, { id }),
+    onSuccess: async () => {
+      toast.success(t('files.trash_restored'))
+      await qc.invalidateQueries({ queryKey: ['files-trash', domainId] })
+      await qc.invalidateQueries({ queryKey: ['files', domainId, path] })
+    },
+    onError: (err: unknown) => {
+      const ax = err as { response?: { data?: { message?: string } } }
+      toast.error(ax.response?.data?.message ?? String(err))
+    },
+  })
+
+  const trashDeleteM = useMutation({
+    mutationFn: async (id: string) =>
+      api.delete(`/domains/${domainId}/files/trash/item`, { params: { id } }),
+    onSuccess: async () => {
+      toast.success(t('files.trash_deleted'))
+      await qc.invalidateQueries({ queryKey: ['files-trash', domainId] })
+    },
+    onError: (err: unknown) => {
+      const ax = err as { response?: { data?: { message?: string } } }
+      toast.error(ax.response?.data?.message ?? String(err))
+    },
+  })
+
+  const trashEmptyM = useMutation({
+    mutationFn: async () => api.delete(`/domains/${domainId}/files/trash/empty`),
+    onSuccess: async () => {
+      toast.success(t('files.trash_emptied'))
+      await qc.invalidateQueries({ queryKey: ['files-trash', domainId] })
     },
     onError: (err: unknown) => {
       const ax = err as { response?: { data?: { message?: string } } }
@@ -719,14 +969,14 @@ export default function FileManagerPage() {
 
   const onDrop = useCallback(
     (accepted: File[]) => {
-      accepted.forEach((f) => uploadM.mutate(f))
+      void processIncomingFiles(accepted)
     },
-    [uploadM],
+    [processIncomingFiles],
   )
 
   const { getRootProps, getInputProps, isDragActive, open } = useDropzone({
     onDrop,
-    disabled: domainId === '' || uploadM.isPending,
+    disabled: domainId === '' || uploadBusy,
     noClick: true,
     multiple: true,
   })
@@ -764,6 +1014,107 @@ export default function FileManagerPage() {
   }, [currentPageNum])
 
   const rowKey = (e: ListEntry) => `${e.name}|${e.is_dir}`
+  const splitExt = (name: string): { base: string; ext: string } => {
+    const i = name.lastIndexOf('.')
+    if (i <= 0) return { base: name, ext: '' }
+    return { base: name.slice(0, i), ext: name.slice(i) }
+  }
+  const isConflictError = (err: unknown): boolean => {
+    const ax = err as { response?: { data?: { message?: string; error?: string } } }
+    const m = String(ax?.response?.data?.message ?? ax?.response?.data?.error ?? '').toLowerCase()
+    return m.includes('target already exists')
+  }
+  const executePasteWithStrategy = async (
+    sourcePath: string,
+    destDir: string,
+    strategy: 'rename' | 'overwrite' | 'skip',
+  ) => {
+    const name = sourcePath.split('/').pop() || 'copy'
+    const baseTarget = joinRel(destDir, name)
+    const op = async (from: string, to: string) => {
+      if (clipboardMode === 'cut') {
+        await api.post(`/domains/${domainId}/files/move`, { from, to })
+      } else {
+        await api.post(`/domains/${domainId}/files/copy`, { from, to })
+      }
+    }
+
+    if (strategy === 'skip') {
+      toast(t('files.paste_skipped'))
+      return
+    }
+
+    if (strategy === 'overwrite') {
+      await api.delete(`/domains/${domainId}/files`, {
+        params: { path: baseTarget },
+        data: { path: baseTarget },
+      })
+      await op(sourcePath, baseTarget)
+    } else {
+      const { base, ext } = splitExt(name)
+      let done = false
+      for (let i = 1; i <= 200; i++) {
+        const candidateName = `${base}-copy-${i}${ext}`
+        const candidate = joinRel(destDir, candidateName)
+        try {
+          await op(sourcePath, candidate)
+          done = true
+          break
+        } catch (e) {
+          if (!isConflictError(e)) throw e
+        }
+      }
+      if (!done) throw new Error('Could not create unique target')
+    }
+  }
+
+  const runClipboardPaste = async (destDir: string) => {
+    if (!clipboardPath) return
+    const name = clipboardPath.split('/').pop() || 'copy'
+    const baseTarget = joinRel(destDir, name)
+    const op = async (from: string, to: string) => {
+      if (clipboardMode === 'cut') {
+        await api.post(`/domains/${domainId}/files/move`, { from, to })
+      } else {
+        await api.post(`/domains/${domainId}/files/copy`, { from, to })
+      }
+    }
+    try {
+      await op(clipboardPath, baseTarget)
+    } catch (err) {
+      if (!isConflictError(err)) throw err
+      setPasteConflictDialog({
+        open: true,
+        sourcePath: clipboardPath,
+        destDir,
+        baseTarget,
+      })
+      return
+    }
+
+    if (clipboardMode === 'cut') {
+      setClipboardPath(null)
+    }
+    await qc.invalidateQueries({ queryKey: ['files', domainId, path] })
+    toast.success(t('files.paste_done'))
+  }
+  const contextMenuPos = useMemo(() => {
+    if (!contextMenu) return null
+    const menuW = 224
+    const menuH = 320
+    const pad = 8
+    const ww = window.innerWidth || 1280
+    const wh = window.innerHeight || 720
+
+    let left = contextMenu.x
+    let top = contextMenu.y
+
+    if (left + menuW > ww - pad) left = Math.max(pad, ww - menuW - pad)
+    if (top + menuH > wh - pad) top = Math.max(pad, top - menuH)
+    if (top < pad) top = pad
+
+    return { left, top }
+  }, [contextMenu])
 
   const dirtyCount = tabs.filter((x) => !x.loading && x.content !== x.original).length
   const activeReadOnly = !!(currentTab && isExecutionRiskFilePath(currentTab.path))
@@ -772,7 +1123,17 @@ export default function FileManagerPage() {
   )
 
   return (
-    <div className="space-y-4">
+    <div
+      {...getRootProps({
+        className: clsx(
+          'space-y-4 min-h-[min(85vh,56rem)] rounded-xl p-1 -m-1 outline-none transition-colors',
+          domainId !== '' && 'border-2 border-dashed border-transparent',
+          isDragActive &&
+            'border-primary-400 bg-primary-50/25 ring-2 ring-primary-500/35 dark:border-primary-500/60 dark:bg-primary-950/20',
+        ),
+      })}
+    >
+      <input {...getInputProps()} />
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <FolderOpen className="h-8 w-8 text-primary-500" />
@@ -781,26 +1142,9 @@ export default function FileManagerPage() {
             <p className="text-gray-500 dark:text-gray-400 text-sm">{t('files.subtitle')}</p>
           </div>
         </div>
-        <button
-          type="button"
-          className="btn-secondary inline-flex items-center gap-2 text-sm"
-          onClick={() => setHelpModalOpen(true)}
-        >
-          <HelpCircle className="h-4 w-4" />
-          {t('files.help_open')}
-        </button>
       </div>
 
-      <div
-        {...getRootProps()}
-        className={clsx(
-          'card overflow-hidden transition-colors',
-          domainId !== '' &&
-            'border-2 border-dashed border-gray-200 dark:border-gray-600',
-          isDragActive && 'ring-2 ring-primary-500 border-primary-400 bg-primary-50/30 dark:bg-primary-900/10',
-        )}
-      >
-        <input {...getInputProps()} />
+      <div className="card overflow-hidden border border-gray-200 dark:border-gray-700">
         <div className="flex flex-wrap items-end gap-3 border-b border-gray-100 dark:border-gray-800 px-4 py-3">
           <div>
             <label className="label text-xs">{t('domains.name')}</label>
@@ -833,6 +1177,12 @@ export default function FileManagerPage() {
             {t('common.refresh')}
           </button>
         </div>
+
+        {domainId !== '' && (
+          <p className="border-b border-gray-100 px-4 py-1.5 text-xs text-gray-500 dark:border-gray-800 dark:text-gray-400">
+            {t('files.upload_drop_hint')}
+          </p>
+        )}
 
         {domainId === '' && (
           <p className="p-8 text-center text-sm text-gray-500 dark:text-gray-400">
@@ -937,7 +1287,8 @@ export default function FileManagerPage() {
                   <div className="absolute left-0 top-full z-30 mt-1 min-w-[220px] rounded-lg border border-gray-200 bg-white py-1 shadow-lg dark:border-gray-700 dark:bg-gray-900">
                     <button
                       type="button"
-                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-800"
+                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-gray-50 disabled:opacity-40 dark:hover:bg-gray-800"
+                      disabled={uploadBusy}
                       onClick={() => {
                         setFileOpsOpen(false)
                         open()
@@ -1012,11 +1363,7 @@ export default function FileManagerPage() {
                       onClick={() => {
                         setFileOpsOpen(false)
                         const rel = selected ? joinRel(path, selected) : path
-                        const target = window.prompt(t('files.chmod_path_prompt'), rel)
-                        if (!target?.trim() || !isSafeRelativePath(target.trim())) return
-                        const mode = window.prompt(t('files.chmod_mode_prompt'), '644')
-                        if (!mode?.trim()) return
-                        chmodM.mutate({ path: target.trim(), mode: mode.trim() })
+                        setChmodDialog({ path: rel, mode: '644' })
                       }}
                     >
                       <Unlock className="h-4 w-4" />
@@ -1028,12 +1375,20 @@ export default function FileManagerPage() {
                       onClick={() => {
                         setFileOpsOpen(false)
                         const sourceDefault = selected ? joinRel(path, selected) : path
+                        if (!sourceDefault.trim()) {
+                          toast.error(t('files.zip_pick_source'))
+                          return
+                        }
                         const source = window.prompt(t('files.zip_source_prompt'), sourceDefault)
                         if (!source?.trim() || !isSafeRelativePath(source.trim())) return
-                        const defaultZip = `${source.trim().replace(/\/+$/g, '') || 'archive'}.zip`
+                        const cleaned = source.trim().replace(/\/+$/g, '')
+                        const defaultZip = `${cleaned || 'archive'}.zip`
                         const target = window.prompt(t('files.zip_target_prompt'), defaultZip)
                         if (!target?.trim() || !isSafeRelativePath(target.trim())) return
-                        zipM.mutate({ source: source.trim(), target: target.trim() })
+                        const targetZip = target.trim().toLowerCase().endsWith('.zip')
+                          ? target.trim()
+                          : `${target.trim()}.zip`
+                        zipM.mutate({ source: source.trim(), target: targetZip })
                       }}
                     >
                       {t('files.op_zip')}
@@ -1060,19 +1415,33 @@ export default function FileManagerPage() {
               <div className="ml-auto flex flex-wrap items-center gap-2">
                 <button
                   type="button"
-                  className="btn-secondary py-1.5 text-sm"
-                  onClick={() => toast(t('files.perm_backup_na'))}
-                >
-                  {t('files.perm_backup')}
-                </button>
-                <button
-                  type="button"
                   className="btn-secondary inline-flex items-center gap-1.5 py-1.5 text-sm"
-                  onClick={() => toast(t('files.recycle_na'))}
+                  onClick={() => setTrashOpen(true)}
                 >
                   <Trash2 className="h-4 w-4" />
                   {t('files.recycle_bin')}
                 </button>
+                {selectedIds.size > 0 && (
+                  <button
+                    type="button"
+                    className="btn-secondary py-1.5 text-sm"
+                    onClick={() => {
+                      const mode = window.prompt(t('files.bulk_chmod_prompt'), '755')
+                      if (!mode?.trim() || !/^[0-7]{3,4}$/.test(mode.trim())) {
+                        toast.error(t('files.invalid_mode'))
+                        return
+                      }
+                      const paths = entries
+                        .filter((e) => selectedIds.has(rowKey(e)))
+                        .map((e) => joinRel(path, e.name))
+                        .filter((p) => isSafeRelativePath(p))
+                      if (paths.length === 0) return
+                      bulkChmodM.mutate({ paths, mode: mode.trim() })
+                    }}
+                  >
+                    {t('files.bulk_chmod_btn', { count: selectedIds.size })}
+                  </button>
+                )}
                 <div className="inline-flex overflow-hidden rounded-md border border-gray-200 dark:border-gray-600">
                   <button
                     type="button"
@@ -1261,6 +1630,11 @@ export default function FileManagerPage() {
                       return (
                         <tr
                           key={rk}
+                          onContextMenu={(ev) => {
+                            ev.preventDefault()
+                            setContextMenu({ x: ev.clientX, y: ev.clientY, rel, isDir: e.is_dir })
+                            setSelected(e.name)
+                          }}
                           className={clsx(
                             'border-t border-gray-100 dark:border-gray-800',
                             isSel && 'bg-primary-50/50 dark:bg-primary-900/15',
@@ -1325,7 +1699,7 @@ export default function FileManagerPage() {
                             </span>
                           </td>
                           <td className="px-3 py-2 align-top font-mono text-xs text-gray-600 dark:text-gray-400">
-                            {t('files.perm_na')}
+                            {[e.mode || '---', e.owner || '-', e.group || '-'].join(' ')}
                           </td>
                           <td className="px-3 py-2 align-top">
                             {e.is_dir ? (
@@ -1387,7 +1761,7 @@ export default function FileManagerPage() {
                               title={t('common.delete')}
                               onClick={() => {
                                 if (window.confirm(t('common.confirm_delete'))) {
-                                  deleteM.mutate(rel)
+                                  trashMoveM.mutate(rel)
                                 }
                               }}
                             >
@@ -1422,6 +1796,11 @@ export default function FileManagerPage() {
                         key={rk}
                         role="button"
                         tabIndex={0}
+                        onContextMenu={(ev) => {
+                          ev.preventDefault()
+                          setContextMenu({ x: ev.clientX, y: ev.clientY, rel, isDir: e.is_dir })
+                          setSelected(e.name)
+                        }}
                         className={clsx(
                           'flex flex-col items-center gap-1 rounded-lg border p-3 text-center text-sm outline-none',
                           selected === e.name
@@ -1742,6 +2121,550 @@ export default function FileManagerPage() {
         </div>
       )}
 
+      {chmodDialog && (
+        <div className="fixed inset-0 z-[58] flex items-center justify-center bg-black/60 p-2 sm:p-4">
+          <div className="mx-auto w-full max-w-md overflow-hidden rounded-xl bg-white shadow-xl dark:bg-gray-900">
+            <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3 dark:border-gray-800">
+              <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">{t('files.op_chmod')}</h2>
+              <button
+                type="button"
+                className="rounded-lg p-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800"
+                onClick={() => setChmodDialog(null)}
+                aria-label="Kapat"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="p-4 space-y-3">
+              <div>
+                <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-300">
+                  {t('files.path')}
+                </label>
+                <input
+                  className="input w-full font-mono"
+                  value={chmodDialog.path}
+                  onChange={(e) =>
+                    setChmodDialog((prev) => (prev ? { ...prev, path: e.target.value } : prev))
+                  }
+                  placeholder="public_html/index.php"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-300">
+                  {t('files.mode')}
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    className="btn-secondary py-1 text-xs"
+                    onClick={() => setChmodDialog((p) => (p ? { ...p, mode: '644' } : p))}
+                  >
+                    644
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-secondary py-1 text-xs"
+                    onClick={() => setChmodDialog((p) => (p ? { ...p, mode: '755' } : p))}
+                  >
+                    755
+                  </button>
+                  <input
+                    className="input w-28 font-mono"
+                    value={chmodDialog.mode}
+                    onChange={(e) =>
+                      setChmodDialog((prev) => (prev ? { ...prev, mode: e.target.value } : prev))
+                    }
+                    inputMode="numeric"
+                    placeholder="644"
+                  />
+                </div>
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{t('files.chmod_hint')}</p>
+              </div>
+            </div>
+            <div className="flex items-center justify-end gap-2 border-t border-gray-200 px-4 py-3 dark:border-gray-800">
+              <button type="button" className="btn-secondary" onClick={() => setChmodDialog(null)}>
+                {t('common.cancel')}
+              </button>
+              <button
+                type="button"
+                className="btn-primary"
+                disabled={chmodM.isPending}
+                onClick={() => {
+                  if (!chmodDialog) return
+                  const p = chmodDialog.path.trim().replace(/^\/+/g, '')
+                  const m = chmodDialog.mode.trim()
+                  if (!p || !isSafeRelativePath(p)) {
+                    toast.error(t('files.invalid_path'))
+                    return
+                  }
+                  if (!/^[0-7]{3,4}$/.test(m)) {
+                    toast.error(t('files.invalid_mode'))
+                    return
+                  }
+                  chmodM.mutate({ path: p, mode: m })
+                }}
+              >
+                {t('common.save')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {trashOpen && (
+        <div className="fixed inset-0 z-[58] flex items-center justify-center bg-black/60 p-2 sm:p-4">
+          <div className="mx-auto w-full max-w-2xl overflow-hidden rounded-xl bg-white shadow-xl dark:bg-gray-900">
+            <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3 dark:border-gray-800">
+              <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                {t('files.recycle_bin')}
+              </h2>
+              <button
+                type="button"
+                className="rounded-lg p-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800"
+                onClick={() => setTrashOpen(false)}
+                aria-label="Kapat"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="p-4">
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                <p className="text-xs text-gray-500 dark:text-gray-400">{t('files.trash_hint')}</p>
+                <button
+                  type="button"
+                  className="btn-secondary py-1.5 text-xs"
+                  disabled={trashEmptyM.isPending}
+                  onClick={() => {
+                    if (window.confirm(t('files.trash_confirm_empty'))) trashEmptyM.mutate()
+                  }}
+                >
+                  {t('files.trash_empty')}
+                </button>
+              </div>
+
+              {trashQ.isLoading ? (
+                <p className="text-sm text-gray-500">{t('common.loading')}</p>
+              ) : trashQ.isError ? (
+                <p className="text-sm text-red-600">{t('common.error')}</p>
+              ) : (trashQ.data?.length ?? 0) === 0 ? (
+                <p className="text-sm text-gray-500">{t('files.trash_empty_state')}</p>
+              ) : (
+                <div className="max-h-[55vh] overflow-auto rounded-lg border border-gray-200 dark:border-gray-800">
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-50 text-gray-700 dark:bg-gray-800/80 dark:text-gray-300">
+                      <tr className="border-b border-gray-200 dark:border-gray-700">
+                        <th className="px-3 py-2 text-left">{t('files.name')}</th>
+                        <th className="px-3 py-2 text-left">{t('files.path')}</th>
+                        <th className="w-44 px-3 py-2 text-right">{t('files.col_action')}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(trashQ.data ?? []).map((it) => (
+                        <tr key={it.id} className="border-b border-gray-100 dark:border-gray-800">
+                          <td className="px-3 py-2 font-mono text-xs text-gray-800 dark:text-gray-100">
+                            {it.name || it.id}
+                          </td>
+                          <td className="px-3 py-2 font-mono text-xs text-gray-600 dark:text-gray-300">
+                            {it.original_path}
+                          </td>
+                          <td className="px-3 py-2 text-right">
+                            <button
+                              type="button"
+                              className="mr-2 text-xs font-medium text-primary-600 hover:underline dark:text-primary-400"
+                              disabled={trashRestoreM.isPending}
+                              onClick={() => trashRestoreM.mutate(it.id)}
+                            >
+                              {t('files.trash_restore')}
+                            </button>
+                            <button
+                              type="button"
+                              className="text-xs font-medium text-red-600 hover:underline dark:text-red-400"
+                              disabled={trashDeleteM.isPending}
+                              onClick={() => {
+                                if (window.confirm(t('files.trash_confirm_delete'))) {
+                                  trashDeleteM.mutate(it.id)
+                                }
+                              }}
+                            >
+                              {t('files.trash_delete')}
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {contextMenu && (
+        <div
+          className="fixed z-[70] w-56 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-900"
+          style={{ left: contextMenuPos?.left ?? contextMenu.x, top: contextMenuPos?.top ?? contextMenu.y }}
+          role="menu"
+        >
+          {contextMenu.isDir && (
+            <>
+              <button
+                type="button"
+                className="block w-full px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-800"
+                onClick={() => {
+                  const name = window.prompt(t('files.op_new_folder'), '')
+                  if (name?.trim()) {
+                    const rel = joinRel(contextMenu.rel, name.trim())
+                  api
+                    .post(`/domains/${domainId}/files/mkdir`, { path: rel })
+                    .then(() => {
+                      toast.success(t('files.folder_created'))
+                      qc.invalidateQueries({ queryKey: ['files', domainId, path] })
+                    })
+                    .catch((err: unknown) => {
+                      const ax = err as { response?: { data?: { message?: string } } }
+                      toast.error(ax.response?.data?.message ?? t('files.mkdir_err'))
+                    })
+                  }
+                  setContextMenu(null)
+                }}
+              >
+                {t('files.ctx_new_folder')}
+              </button>
+              <button
+                type="button"
+                className="block w-full px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-800"
+                onClick={() => {
+                  const name = window.prompt(t('files.op_new_file'), '')
+                  if (!name?.trim()) return
+                  const base = name.trim()
+                  if (!isSafeNewFileName(base)) {
+                    toast.error(t('files.invalid_filename'))
+                    return
+                  }
+                  const rel = joinRel(contextMenu.rel, base)
+                  api
+                    .post(`/domains/${domainId}/files/create`, { path: rel, content: '' })
+                    .then(() => {
+                      toast.success(t('files.file_created'))
+                      qc.invalidateQueries({ queryKey: ['files', domainId, path] })
+                    })
+                    .catch((err: unknown) => {
+                      const ax = err as { response?: { data?: { message?: string } } }
+                      toast.error(ax.response?.data?.message ?? t('files.create_file_err'))
+                    })
+                  setContextMenu(null)
+                }}
+              >
+                {t('files.ctx_new_file')}
+              </button>
+            </>
+          )}
+          {!contextMenu.isDir && (
+            <button
+              type="button"
+              className="block w-full px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-800"
+              onClick={() => {
+                void openFileWrapped(contextMenu.rel)
+                setContextMenu(null)
+              }}
+            >
+              {t('files.ctx_edit')}
+            </button>
+          )}
+          {!contextMenu.isDir && (
+            <button
+              type="button"
+              className="block w-full px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-800"
+              onClick={() => {
+                void downloadAsFile(contextMenu.rel)
+                setContextMenu(null)
+              }}
+            >
+              {t('files.ctx_download')}
+            </button>
+          )}
+          <button
+            type="button"
+            className="block w-full px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-800"
+            onClick={() => {
+              const base = contextMenu.rel.split('/').pop() || ''
+              setRenameDialog({ from: contextMenu.rel, newName: base })
+              setContextMenu(null)
+            }}
+          >
+            {t('files.ctx_rename')}
+          </button>
+          <button
+            type="button"
+            className="block w-full px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-800"
+            onClick={() => {
+              setClipboardPath(contextMenu.rel)
+              setClipboardMode('copy')
+              toast.success(t('files.ctx_copy_ok'))
+              setContextMenu(null)
+            }}
+          >
+            {t('files.ctx_copy')}
+          </button>
+          <button
+            type="button"
+            className="block w-full px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-800"
+            onClick={() => {
+              setClipboardPath(contextMenu.rel)
+              setClipboardMode('cut')
+              toast.success(t('files.ctx_cut_ok'))
+              setContextMenu(null)
+            }}
+          >
+            {t('files.ctx_cut')}
+          </button>
+          <button
+            type="button"
+            className="block w-full px-3 py-2 text-left text-sm hover:bg-gray-50 disabled:opacity-40 dark:hover:bg-gray-800"
+            disabled={!clipboardPath || !contextMenu.isDir}
+            onClick={async () => {
+              try {
+                await runClipboardPaste(contextMenu.rel)
+              } catch (err: unknown) {
+                const ax = err as { response?: { data?: { message?: string } } }
+                toast.error(ax.response?.data?.message ?? String(err))
+              } finally {
+                setContextMenu(null)
+              }
+            }}
+          >
+            {t('files.ctx_paste')}
+          </button>
+          <button
+            type="button"
+            className="block w-full px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-800"
+            onClick={() => {
+              setChmodDialog({ path: contextMenu.rel, mode: contextMenu.isDir ? '755' : '644' })
+              setContextMenu(null)
+            }}
+          >
+            {t('files.ctx_chmod')}
+          </button>
+          <button
+            type="button"
+            className="block w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/40"
+            onClick={() => {
+              if (window.confirm(t('common.confirm_delete'))) {
+                trashMoveM.mutate(contextMenu.rel)
+              }
+              setContextMenu(null)
+            }}
+          >
+            {t('files.ctx_delete_to_trash')}
+          </button>
+        </div>
+      )}
+
+      {uploadConflictDialog?.open && (
+        <div className="fixed inset-0 z-[76] flex items-center justify-center bg-black/60 p-2 sm:p-4">
+          <div className="mx-auto flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-xl bg-white shadow-xl dark:bg-gray-900">
+            <div className="flex shrink-0 items-center justify-between border-b border-gray-200 px-4 py-3 dark:border-gray-800">
+              <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                {t('files.upload_conflict_title')}
+              </h2>
+              <button
+                type="button"
+                className="rounded-lg p-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800"
+                onClick={() => setUploadConflictDialog(null)}
+                aria-label="Kapat"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4 text-sm">
+              <p className="text-gray-700 dark:text-gray-300">{t('files.upload_conflict_desc')}</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                {t('files.upload_conflict_summary', {
+                  n: uploadConflictDialog.conflicts.length,
+                  m: uploadConflictDialog.noConflict.length,
+                })}
+              </p>
+              <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
+                <table className="w-full min-w-[520px] text-left text-xs">
+                  <thead className="bg-gray-50 dark:bg-gray-800/80">
+                    <tr>
+                      <th className="px-3 py-2 font-medium text-gray-700 dark:text-gray-200">
+                        {t('files.upload_col_rel_path')}
+                      </th>
+                      <th className="px-3 py-2 font-medium text-gray-700 dark:text-gray-200">
+                        {t('files.upload_col_existing')}
+                      </th>
+                      <th className="px-3 py-2 font-medium text-gray-700 dark:text-gray-200">
+                        {t('files.upload_col_new')}
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                    {uploadConflictDialog.conflicts.map((row) => {
+                      const relDisp = uploadConflictDialog.basePath
+                        ? joinRel(uploadConflictDialog.basePath, row.relFromBase)
+                        : row.relFromBase
+                      const ex = row.existing
+                      const exTxt = ex.is_dir
+                        ? `${t('files.upload_type_folder')}${
+                            ex.size && ex.size > 0 ? ` · ${formatSize(ex.size)}` : ''
+                          }`
+                        : `${t('files.upload_type_file')} · ${formatSize(ex.size)}`
+                      const newTxt = `${t('files.upload_type_file')} · ${formatSize(row.file.size)}`
+                      return (
+                        <tr key={`${row.parentRel}/${row.baseName}`} className="text-gray-800 dark:text-gray-200">
+                          <td className="max-w-[200px] px-3 py-2 font-mono text-[11px] break-all">{relDisp}</td>
+                          <td className="px-3 py-2">{exTxt}</td>
+                          <td className="px-3 py-2">{newTxt}</td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <div className="flex shrink-0 flex-wrap justify-end gap-2 border-t border-gray-200 px-4 py-3 dark:border-gray-800">
+              <button
+                type="button"
+                className="btn-secondary"
+                disabled={uploadBusy}
+                onClick={() => setUploadConflictDialog(null)}
+              >
+                {t('files.upload_cancel_batch')}
+              </button>
+              <button
+                type="button"
+                className="btn-secondary"
+                disabled={uploadBusy}
+                onClick={async () => {
+                  const dlg = uploadConflictDialog
+                  if (!dlg?.open) return
+                  setUploadConflictDialog(null)
+                  setUploadBusy(true)
+                  try {
+                    await runUploadItems(dlg.noConflict)
+                  } finally {
+                    setUploadBusy(false)
+                  }
+                }}
+              >
+                {t('files.upload_skip_conflicts')}
+              </button>
+              <button
+                type="button"
+                className="btn-primary"
+                disabled={uploadBusy}
+                onClick={async () => {
+                  const dlg = uploadConflictDialog
+                  if (!dlg?.open) return
+                  setUploadConflictDialog(null)
+                  setUploadBusy(true)
+                  try {
+                    for (const c of dlg.conflicts) {
+                      const targetRel = c.parentRel ? joinRel(c.parentRel, c.baseName) : c.baseName
+                      await deleteRemotePath(targetRel)
+                    }
+                    await runUploadItems([...dlg.noConflict, ...dlg.conflicts])
+                  } catch (err: unknown) {
+                    const ax = err as { response?: { data?: { message?: string } } }
+                    toast.error(ax.response?.data?.message ?? String(err))
+                  } finally {
+                    setUploadBusy(false)
+                  }
+                }}
+              >
+                {t('files.upload_overwrite_conflicts')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {pasteConflictDialog?.open && (
+        <div className="fixed inset-0 z-[75] flex items-center justify-center bg-black/60 p-2 sm:p-4">
+          <div className="mx-auto w-full max-w-md overflow-hidden rounded-xl bg-white shadow-xl dark:bg-gray-900">
+            <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3 dark:border-gray-800">
+              <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                {t('files.paste_conflict_title')}
+              </h2>
+              <button
+                type="button"
+                className="rounded-lg p-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800"
+                onClick={() => setPasteConflictDialog(null)}
+                aria-label="Kapat"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="space-y-3 p-4 text-sm">
+              <p className="text-gray-700 dark:text-gray-300">{t('files.paste_conflict_desc')}</p>
+              <div className="rounded-lg bg-gray-50 p-3 font-mono text-xs text-gray-700 dark:bg-gray-800/70 dark:text-gray-200">
+                {pasteConflictDialog.baseTarget}
+              </div>
+            </div>
+            <div className="flex flex-wrap justify-end gap-2 border-t border-gray-200 px-4 py-3 dark:border-gray-800">
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={async () => {
+                  if (!pasteConflictDialog) return
+                  setPasteConflictDialog(null)
+                  await executePasteWithStrategy(
+                    pasteConflictDialog.sourcePath,
+                    pasteConflictDialog.destDir,
+                    'skip',
+                  )
+                }}
+              >
+                {t('files.paste_action_skip')}
+              </button>
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={async () => {
+                  if (!pasteConflictDialog) return
+                  const next = pasteConflictDialog
+                  setPasteConflictDialog(null)
+                  try {
+                    await executePasteWithStrategy(next.sourcePath, next.destDir, 'rename')
+                    if (clipboardMode === 'cut') setClipboardPath(null)
+                    await qc.invalidateQueries({ queryKey: ['files', domainId, path] })
+                    toast.success(t('files.paste_done'))
+                  } catch (err: unknown) {
+                    const ax = err as { response?: { data?: { message?: string } } }
+                    toast.error(ax.response?.data?.message ?? String(err))
+                  }
+                }}
+              >
+                {t('files.paste_action_rename')}
+              </button>
+              <button
+                type="button"
+                className="btn-primary"
+                onClick={async () => {
+                  if (!pasteConflictDialog) return
+                  const next = pasteConflictDialog
+                  setPasteConflictDialog(null)
+                  try {
+                    await executePasteWithStrategy(next.sourcePath, next.destDir, 'overwrite')
+                    if (clipboardMode === 'cut') setClipboardPath(null)
+                    await qc.invalidateQueries({ queryKey: ['files', domainId, path] })
+                    toast.success(t('files.paste_done'))
+                  } catch (err: unknown) {
+                    const ax = err as { response?: { data?: { message?: string } } }
+                    toast.error(ax.response?.data?.message ?? String(err))
+                  }
+                }}
+              >
+                {t('files.paste_action_overwrite')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {editorOpen && tabs.length > 0 && (
         <div
           className="fixed inset-0 z-[60] flex flex-col bg-black/50 p-2 sm:p-4"
@@ -1856,15 +2779,9 @@ export default function FileManagerPage() {
                         automaticLayout: true,
                       }}
                       beforeMount={() => {
-                        // Deep import'lar bazı build ortamlarında TS2307 üretebilir; runtime’da monaco-editor
-                        // içeriği mevcut olduğu için TS'i bu importlarda bastırıyoruz.
-                        // @ts-ignore
                         void import('monaco-editor/esm/vs/basic-languages/html/html.contribution')
-                        // @ts-ignore
                         void import('monaco-editor/esm/vs/basic-languages/css/css.contribution')
-                        // @ts-ignore
                         void import('monaco-editor/esm/vs/basic-languages/javascript/javascript.contribution')
-                        // @ts-ignore
                         void import('monaco-editor/esm/vs/basic-languages/php/php.contribution')
                       }}
                     />

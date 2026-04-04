@@ -9,12 +9,12 @@ use App\Models\SiteDomainAlias;
 use App\Models\SiteSubdomain;
 use App\Services\DomainService;
 use App\Services\EngineApiService;
-use App\Services\HostnameReservationService;
 use App\Services\HostingQuotaService;
+use App\Services\HostnameReservationService;
+use App\Services\SafeAuditLogger;
 use App\Services\SslIssueService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Log;
 
 /**
  * Modern “Site” API — her site bir `Domain` kaydıdır; alt alan ve alias çocuk tablolarda.
@@ -63,11 +63,11 @@ class SiteController extends Controller
             $validated['server_type'] ?? 'nginx',
         );
 
-        Log::info('sites.created', [
+        SafeAuditLogger::info('sites.created', [
             'user_id' => $request->user()->id,
             'site_id' => $domain->id,
             'domain' => $domain->name,
-        ]);
+        ], $request);
 
         $ssl = null;
         if ($request->boolean('issue_lets_encrypt')) {
@@ -75,13 +75,13 @@ class SiteController extends Controller
                 $request->user(),
                 $domain->fresh(),
                 $validated['lets_encrypt_email'] ?? null,
-                config('panelsar.lets_encrypt_email') ?: null
+                config('hostvim.lets_encrypt_email') ?: null
             );
-            Log::info('sites.create_ssl_attempt', [
+            SafeAuditLogger::info('sites.create_ssl_attempt', [
                 'user_id' => $request->user()->id,
                 'site_id' => $domain->id,
                 'ok' => $ssl['ok'] ?? false,
-            ]);
+            ], $request);
         }
 
         return response()->json([
@@ -120,11 +120,11 @@ class SiteController extends Controller
             ], 422);
         }
 
-        Log::info('sites.delete', [
+        SafeAuditLogger::info('sites.delete', [
             'user_id' => $request->user()->id,
             'site_id' => $domain->id,
             'domain' => $domain->name,
-        ]);
+        ], $request);
 
         $this->domainService->delete($domain);
 
@@ -167,11 +167,11 @@ class SiteController extends Controller
 
         $resp = $this->engine->siteAddSubdomain($site->name, $payload);
         if (! empty($resp['error'])) {
-            Log::warning('sites.subdomain_engine_failed', [
+            SafeAuditLogger::warning('sites.subdomain_engine_failed', [
                 'user_id' => $request->user()->id,
                 'site_id' => $site->id,
                 'error' => $resp['error'],
-            ]);
+            ], $request);
 
             return response()->json(['message' => $resp['error']], 422);
         }
@@ -190,12 +190,12 @@ class SiteController extends Controller
             return response()->json(['message' => __('sites.subdomain_db_rollback')], 503);
         }
 
-        Log::info('sites.subdomain_added', [
+        SafeAuditLogger::info('sites.subdomain_added', [
             'user_id' => $request->user()->id,
             'site_id' => $site->id,
             'hostname' => $hostLc,
             'path_segment' => $pathSegment,
-        ]);
+        ], $request);
 
         return response()->json([
             'message' => __('sites.subdomain_added'),
@@ -228,11 +228,11 @@ class SiteController extends Controller
 
         $sub->delete();
 
-        Log::info('sites.subdomain_removed', [
+        SafeAuditLogger::info('sites.subdomain_removed', [
             'user_id' => $request->user()->id,
             'site_id' => $site->id,
             'path_segment' => $validated['path_segment'],
-        ]);
+        ], $request);
 
         return response()->json(['message' => __('sites.subdomain_removed')]);
     }
@@ -252,12 +252,6 @@ class SiteController extends Controller
 
         $resp = $this->engine->siteAddAlias($site->name, $hostLc);
         if (! empty($resp['error'])) {
-            Log::warning('sites.alias_engine_failed', [
-                'user_id' => $request->user()->id,
-                'site_id' => $site->id,
-                'error' => $resp['error'],
-            ]);
-
             return response()->json(['message' => $resp['error']], 422);
         }
 
@@ -273,11 +267,11 @@ class SiteController extends Controller
             return response()->json(['message' => __('sites.alias_db_rollback')], 503);
         }
 
-        Log::info('sites.alias_added', [
+        SafeAuditLogger::info('sites.alias_added', [
             'user_id' => $request->user()->id,
             'site_id' => $site->id,
             'hostname' => $hostLc,
-        ]);
+        ], $request);
 
         return response()->json([
             'message' => __('sites.alias_added'),
@@ -311,11 +305,11 @@ class SiteController extends Controller
 
         $alias->delete();
 
-        Log::info('sites.alias_removed', [
+        SafeAuditLogger::info('sites.alias_removed', [
             'user_id' => $request->user()->id,
             'site_id' => $site->id,
             'hostname' => $hostLc,
-        ]);
+        ], $request);
 
         return response()->json(['message' => __('sites.alias_removed')]);
     }

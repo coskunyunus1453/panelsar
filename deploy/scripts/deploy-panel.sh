@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Panelsar panel — tek sunucu deploy sırası (örnek).
-# Kullanım: PANEL_ROOT=/var/www/panelsar/panel bash deploy/scripts/deploy-panel.sh
+# Hostvim panel — tek sunucu deploy sırası (örnek).
+# Kullanım: PANEL_ROOT=/var/www/hostvim/panel bash deploy/scripts/deploy-panel.sh
 set -euo pipefail
 
-PANEL_ROOT="${PANEL_ROOT:?PANEL_ROOT tanımlayın (örn. /var/www/panelsar/panel)}"
+PANEL_ROOT="${PANEL_ROOT:?PANEL_ROOT tanımlayın (örn. /var/www/hostvim/panel)}"
 FRONTEND_ROOT="${FRONTEND_ROOT:-$(dirname "$PANEL_ROOT")/frontend}"
 REPO_ROOT="$(cd "$(dirname "$PANEL_ROOT")" && pwd)"
 RUN_USER="${RUN_USER:-www-data}"
@@ -36,7 +36,7 @@ fi
 
 echo "==> migrate"
 sudo -u "$RUN_USER" php artisan migrate --force
-sudo -u "$RUN_USER" php artisan panelsar:init-outbound-mail --no-interaction 2>/dev/null || true
+sudo -u "$RUN_USER" php artisan hostvim:init-outbound-mail --no-interaction 2>/dev/null || true
 
 echo "==> optimize"
 sudo -u "$RUN_USER" php artisan config:cache
@@ -50,9 +50,9 @@ if [[ -d "$FRONTEND_ROOT" ]] && [[ -f "$FRONTEND_ROOT/package.json" ]]; then
   fi
   echo "==> frontend build ($FRONTEND_ROOT)"
   if [[ -f "$FRONTEND_ROOT/package-lock.json" ]]; then
-    (cd "$FRONTEND_ROOT" && npm ci && npm run build)
+    (cd "$FRONTEND_ROOT" && npm ci && VITE_BASE_URL="${VITE_BASE_URL:-}" npm run build)
   else
-    (cd "$FRONTEND_ROOT" && npm install && npm run build)
+    (cd "$FRONTEND_ROOT" && npm install && VITE_BASE_URL="${VITE_BASE_URL:-}" npm run build)
   fi
   echo "==> rsync frontend dist -> panel/public (index.php korunur)"
   rsync -a --delete \
@@ -61,7 +61,7 @@ if [[ -d "$FRONTEND_ROOT" ]] && [[ -f "$FRONTEND_ROOT/package.json" ]]; then
     "$FRONTEND_ROOT/dist/" "$PANEL_ROOT/public/"
 fi
 
-echo "==> panelsar:install-check"
-sudo -u "$RUN_USER" php artisan panelsar:install-check || true
+echo "==> hostvim:install-check"
+sudo -u "$RUN_USER" php artisan hostvim:install-check || true
 
 echo "Tamam."

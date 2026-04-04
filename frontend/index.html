@@ -1,17 +1,240 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="tr">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/panelsar-icon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="Panelsar - Modern Hosting Control Panel" />
-    <title>Panelsar</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f8fafc" />
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0f172a" />
+    <meta name="description" content="Hostvim — modern barındırma kontrol paneli. Siteler, alan adları, SSL, yedekleme ve dosya yönetimi tek yerden." />
+    <meta name="keywords" content="hosting panel, kontrol paneli, web hosting, SSL, yedekleme, Hostvim" />
+    <meta name="author" content="Hostvim" />
+    <meta name="robots" content="index, follow" />
+    <meta name="referrer" content="strict-origin-when-cross-origin" />
+    <meta name="format-detection" content="telephone=no" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Hostvim" />
+    <meta property="og:title" content="Hostvim — Hosting Kontrol Paneli" />
+    <meta property="og:description" content="Sitelerinizi, alan adlarınızı ve sunucu işlemlerinizi güvenli ve hızlı yönetin." />
+    <meta property="og:locale" content="tr_TR" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Hostvim — Hosting Kontrol Paneli" />
+    <meta name="twitter:description" content="Modern barındırma yönetimi: SSL, yedek, dosyalar ve daha fazlası." />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Hostvim" />
+    <link rel="icon" type="image/svg+xml" href="./hostvim-icon.svg" />
+    <link rel="apple-touch-icon" href="./hostvim-icon.svg" />
+    <title>Hostvim — Hosting Kontrol Paneli</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <style>
+      :root {
+        --ps-bg: #0f172a;
+        --ps-bg-mid: #1e293b;
+        --ps-accent: #3b82f6;
+        --ps-accent-dim: rgba(59, 130, 246, 0.35);
+        --ps-text: #f1f5f9;
+        --ps-muted: #94a3b8;
+        --ps-card: rgba(30, 41, 59, 0.75);
+        --ps-border: rgba(148, 163, 184, 0.15);
+      }
+      @media (prefers-color-scheme: light) {
+        :root {
+          --ps-bg: #f8fafc;
+          --ps-bg-mid: #e2e8f0;
+          --ps-text: #0f172a;
+          --ps-muted: #64748b;
+          --ps-card: rgba(255, 255, 255, 0.85);
+          --ps-border: rgba(15, 23, 42, 0.08);
+        }
+      }
+      html, body {
+        margin: 0;
+        min-height: 100%;
+        font-family: 'Inter', system-ui, -apple-system, sans-serif;
+        background: var(--ps-bg);
+        color: var(--ps-text);
+        -webkit-font-smoothing: antialiased;
+      }
+      #hostvim-boot {
+        min-height: 100vh;
+        min-height: 100dvh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 1.5rem;
+        padding-bottom: max(1.5rem, env(safe-area-inset-bottom));
+        box-sizing: border-box;
+        background:
+          radial-gradient(ellipse 120% 80% at 50% -20%, var(--ps-accent-dim), transparent 55%),
+          linear-gradient(165deg, var(--ps-bg) 0%, var(--ps-bg-mid) 45%, var(--ps-bg) 100%);
+      }
+      .ps-boot-card {
+        width: 100%;
+        max-width: 28rem;
+        border-radius: 1.25rem;
+        border: 1px solid var(--ps-border);
+        background: var(--ps-card);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        padding: 2rem 1.75rem;
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.35);
+      }
+      .ps-boot-brand {
+        display: flex;
+        align-items: center;
+        gap: 0.875rem;
+        margin-bottom: 1.5rem;
+      }
+      .ps-boot-brand img {
+        width: 2.75rem;
+        height: 2.75rem;
+        border-radius: 0.75rem;
+        flex-shrink: 0;
+      }
+      .ps-boot-brand h1 {
+        margin: 0;
+        font-size: 1.35rem;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+        line-height: 1.2;
+      }
+      .ps-boot-brand p {
+        margin: 0.2rem 0 0;
+        font-size: 0.8125rem;
+        color: var(--ps-muted);
+        font-weight: 500;
+      }
+      .ps-boot-features {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        margin: 1.25rem 0 1.5rem;
+      }
+      .ps-boot-pill {
+        font-size: 0.6875rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        padding: 0.35rem 0.65rem;
+        border-radius: 9999px;
+        border: 1px solid var(--ps-border);
+        color: var(--ps-muted);
+        background: rgba(59, 130, 246, 0.08);
+      }
+      @media (prefers-color-scheme: light) {
+        .ps-boot-pill {
+          background: rgba(59, 130, 246, 0.12);
+        }
+      }
+      .ps-boot-skel {
+        display: flex;
+        flex-direction: column;
+        gap: 0.65rem;
+        margin-bottom: 1.25rem;
+      }
+      .ps-boot-line {
+        height: 0.5rem;
+        border-radius: 9999px;
+        background: linear-gradient(90deg, var(--ps-border), rgba(148, 163, 184, 0.25), var(--ps-border));
+        background-size: 200% 100%;
+        animation: ps-shimmer 1.4s ease-in-out infinite;
+      }
+      .ps-boot-line:nth-child(1) { width: 100%; }
+      .ps-boot-line:nth-child(2) { width: 88%; }
+      .ps-boot-line:nth-child(3) { width: 62%; }
+      @keyframes ps-shimmer {
+        0% { background-position: 100% 0; }
+        100% { background-position: -100% 0; }
+      }
+      .ps-boot-status {
+        display: flex;
+        align-items: center;
+        gap: 0.65rem;
+        font-size: 0.8125rem;
+        color: var(--ps-muted);
+        font-weight: 500;
+      }
+      .ps-boot-dot {
+        width: 0.5rem;
+        height: 0.5rem;
+        border-radius: 50%;
+        background: var(--ps-accent);
+        box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.5);
+        animation: ps-pulse 1.2s ease-out infinite;
+      }
+      @keyframes ps-pulse {
+        0%, 100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.45); opacity: 1; }
+        70% { box-shadow: 0 0 0 10px rgba(59, 130, 246, 0); opacity: 0.85; }
+      }
+      .ps-boot-foot {
+        margin-top: 2rem;
+        text-align: center;
+        font-size: 0.75rem;
+        color: var(--ps-muted);
+        max-width: 22rem;
+        line-height: 1.5;
+      }
+      .ps-boot-foot code {
+        font-size: 0.7rem;
+        padding: 0.15rem 0.35rem;
+        border-radius: 0.25rem;
+        background: var(--ps-border);
+      }
+      noscript .ps-noscript {
+        margin: 2rem auto;
+        max-width: 24rem;
+        padding: 1rem 1.25rem;
+        border-radius: 0.75rem;
+        border: 1px solid rgba(239, 68, 68, 0.4);
+        background: rgba(239, 68, 68, 0.1);
+        color: var(--ps-text);
+        font-size: 0.875rem;
+        text-align: center;
+      }
+    </style>
   </head>
-  <body class="bg-gray-50 dark:bg-panel-bg">
-    <div id="root"></div>
+  <body>
+    <noscript>
+      <div class="ps-noscript">
+        Hostvim arayüzü için tarayıcıda <strong>JavaScript</strong> gerekir. Lütfen JavaScript’i etkinleştirip sayfayı yenileyin.
+      </div>
+    </noscript>
+    <div id="root">
+      <div id="hostvim-boot" aria-busy="true" aria-live="polite">
+        <div class="ps-boot-card">
+          <div class="ps-boot-brand">
+            <img src="./hostvim-icon.svg" alt="" width="44" height="44" decoding="async" />
+            <div>
+              <h1>Hostvim</h1>
+              <p>Hosting kontrol paneli</p>
+            </div>
+          </div>
+          <div class="ps-boot-features" aria-hidden="true">
+            <span class="ps-boot-pill">Alan adları</span>
+            <span class="ps-boot-pill">SSL</span>
+            <span class="ps-boot-pill">Yedekleme</span>
+            <span class="ps-boot-pill">Dosyalar</span>
+            <span class="ps-boot-pill">İzleme</span>
+          </div>
+          <div class="ps-boot-skel" aria-hidden="true">
+            <div class="ps-boot-line"></div>
+            <div class="ps-boot-line"></div>
+            <div class="ps-boot-line"></div>
+          </div>
+          <div class="ps-boot-status">
+            <span class="ps-boot-dot" aria-hidden="true"></span>
+            <span>Uygulama yükleniyor…</span>
+          </div>
+        </div>
+        <p class="ps-boot-foot">
+          Oturum açma ve panel özellikleri yüklenene kadar bu ekran görünür. Sorun sürerse önbelleği temizleyip <code>Ctrl+Shift+R</code> ile sert yenileyin.
+        </p>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

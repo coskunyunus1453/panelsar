@@ -51,13 +51,13 @@ class VendorLicenseService
     }
 
     /**
-     * @param array<string, mixed> $payload
+     * @param  array<string, mixed>  $payload
      */
     public function signPayload(array $payload): string
     {
-        $secret = (string) config('panelsar.vendor_license_signing_key', '');
+        $secret = (string) config('hostvim.vendor_license_signing_key', '');
         if ($secret === '') {
-            $secret = hash('sha256', (string) config('app.key', 'panelsar-default-key'));
+            $secret = hash('sha256', (string) config('app.key', 'hostvim-default-key'));
         }
 
         return hash_hmac('sha256', json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), $secret);
@@ -72,7 +72,7 @@ class VendorLicenseService
             return false;
         }
         if ($license->expires_at && $license->expires_at->isPast()) {
-            $graceHours = max(0, (int) config('panelsar.vendor_license_grace_hours', 24));
+            $graceHours = max(0, (int) config('hostvim.vendor_license_grace_hours', 24));
             if ($graceHours <= 0 || $license->expires_at->copy()->addHours($graceHours)->isPast()) {
                 return false;
             }
@@ -81,4 +81,3 @@ class VendorLicenseService
         return true;
     }
 }
-

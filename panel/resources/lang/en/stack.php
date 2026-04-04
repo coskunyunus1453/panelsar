@@ -2,7 +2,7 @@
 
 return [
     'install_ok' => 'Bundle installed successfully.',
-    'mail_test_subject' => 'Panelsar mail test',
+    'mail_test_subject' => 'Hostvim mail test',
     'mail_test_body' => 'Outbound mail settings are working.',
     'mail_test_sent' => 'Test message was handed off via SMTP or sendmail to :email. Check inbox and spam.',
     'mail_test_requires_saved_settings' => 'Save mail settings in the panel first. Without saved settings, tests may use .env/log drivers that do not deliver real email.',

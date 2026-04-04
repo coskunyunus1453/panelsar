@@ -1,4 +1,4 @@
-module github.com/panelsar/engine
+module hostvim/engine
 
 go 1.22
 

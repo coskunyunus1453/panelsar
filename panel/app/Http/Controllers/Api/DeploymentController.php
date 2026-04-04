@@ -7,11 +7,11 @@ use App\Http\Controllers\Controller;
 use App\Models\DeploymentConfig;
 use App\Models\DeploymentRun;
 use App\Models\Domain;
+use App\Services\SafeAuditLogger;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Symfony\Component\Process\Process;
 
@@ -100,6 +100,7 @@ class DeploymentController extends Controller
             $this->executeDeploy($domain, $cfg, 'manual', $run->user_id, $run->id);
         })->afterResponse();
         $this->audit($request, $domain, 'run_manual_queued', true, null);
+
         return response()->json(['message' => 'deploy queued', 'run' => $run], 202);
     }
 
@@ -113,6 +114,7 @@ class DeploymentController extends Controller
             ->latest('id')
             ->limit(30)
             ->get();
+
         return response()->json(['runs' => $rows]);
     }
 
@@ -124,20 +126,9 @@ class DeploymentController extends Controller
         }
         $branch = $this->extractWebhookBranch($request);
         if (! $this->isBranchAllowed($cfg, $branch)) {
-            Log::warning('panelsar.deploy_audit', [
-                'action' => 'webhook_blocked_branch',
-                'domain' => $domain->name,
-                'branch' => $branch,
-                'ip' => $request->ip(),
-            ]);
             return response()->json(['message' => 'branch not allowed'], 422);
         }
         if (! $this->verifyWebhookSignature($request, (string) $cfg->webhook_token)) {
-            Log::warning('panelsar.deploy_audit', [
-                'action' => 'webhook_invalid_signature',
-                'domain' => $domain->name,
-                'ip' => $request->ip(),
-            ]);
             return response()->json(['message' => 'invalid signature'], 403);
         }
         if (! $this->verifyWebhookReplayWindow($request, $domain)) {
@@ -152,13 +143,13 @@ class DeploymentController extends Controller
         Bus::dispatch(function () use ($domain, $cfg, $run): void {
             $this->executeDeploy($domain, $cfg, 'webhook', null, $run->id);
         })->afterResponse();
-        Log::info('panelsar.deploy_audit', [
+        SafeAuditLogger::info('hostvim.deploy_audit', [
             'action' => 'webhook_queued',
             'domain' => $domain->name,
-            'ip' => $request->ip(),
             'run_id' => $run->id,
             'branch' => $branch,
-        ]);
+        ], $request);
+
         return response()->json(['message' => 'webhook deploy queued', 'run' => $run], 202);
     }
 
@@ -190,6 +181,7 @@ class DeploymentController extends Controller
             $this->executeRollback($domain, $cfg, (string) $target->commit_hash, $run->id);
         })->afterResponse();
         $this->audit($request, $domain, 'rollback_queued', true, null);
+
         return response()->json(['message' => 'rollback queued', 'run' => $run], 202);
     }
 
@@ -325,7 +317,7 @@ class DeploymentController extends Controller
         if ($realDocroot === false || ! is_dir($realDocroot)) {
             throw new \RuntimeException('document root not found');
         }
-        $hostingRoot = (string) config('panelsar.hosting_web_root', '');
+        $hostingRoot = (string) config('hostvim.hosting_web_root', '');
         $realHostingRoot = $hostingRoot !== '' ? realpath($hostingRoot) : false;
         if ($realHostingRoot === false || ! is_dir($realHostingRoot)) {
             throw new \RuntimeException('hosting root invalid');
@@ -334,19 +326,14 @@ class DeploymentController extends Controller
         if (! str_starts_with($realDocroot.DIRECTORY_SEPARATOR, $prefix)) {
             throw new \RuntimeException('document root escapes hosting root');
         }
+
         return $realDocroot;
     }
 
     private function audit(Request $request, Domain $domain, string $action, bool $success, ?string $error): void
     {
-        Log::info('panelsar.deploy_audit', [
-            'action' => $action,
-            'domain' => $domain->name,
-            'user_id' => $request->user()?->id,
-            'success' => $success,
-            'error' => $error,
-            'ip' => $request->ip(),
-        ]);
+        // Security hardening: detailed deployment audit logs disabled.
+
     }
 
     private function extractWebhookBranch(Request $request): ?string
@@ -358,6 +345,7 @@ class DeploymentController extends Controller
         if (str_starts_with($ref, 'refs/heads/')) {
             return substr($ref, strlen('refs/heads/'));
         }
+
         return $ref;
     }
 
@@ -373,6 +361,7 @@ class DeploymentController extends Controller
         if ($allowed === []) {
             return true;
         }
+
         return in_array($branch, $allowed, true);
     }
 
@@ -382,6 +371,7 @@ class DeploymentController extends Controller
         $gitHub = trim((string) $request->header('X-Hub-Signature-256', ''));
         if ($gitHub !== '') {
             $calc = 'sha256='.hash_hmac('sha256', $raw, $secret);
+
             return hash_equals($calc, $gitHub);
         }
         $gitLabToken = trim((string) $request->header('X-Gitlab-Token', ''));
@@ -389,6 +379,7 @@ class DeploymentController extends Controller
             return hash_equals($secret, $gitLabToken);
         }
         $token = trim((string) $request->header('X-Deploy-Token'));
+
         return $token !== '' && hash_equals($secret, $token);
     }
 
@@ -405,15 +396,16 @@ class DeploymentController extends Controller
         }
         $key = 'deploy:webhook:dedupe:'.$domain->id.':'.$deliveryId;
         if (Cache::has($key)) {
-            Log::warning('panelsar.deploy_audit', [
+            SafeAuditLogger::warning('hostvim.deploy_audit', [
                 'action' => 'webhook_replay_blocked',
                 'domain' => $domain->name,
-                'delivery_id' => $deliveryId,
-                'ip' => $request->ip(),
-            ]);
+                'delivery_fp' => substr(hash('sha256', $deliveryId), 0, 16),
+            ], $request);
+
             return false;
         }
         Cache::put($key, 1, now()->addMinutes(15));
+
         return true;
     }
 }

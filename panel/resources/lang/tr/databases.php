@@ -9,4 +9,21 @@ return [
     'rotate_password_unsupported' => 'Bu veritabanı tipi için şifre döndürme yok.',
     'grant_host_mysql_only' => 'Erişim hostu yalnızca MySQL için geçerlidir.',
     'provision_failed' => 'Veritabanı sunucuda oluşturulamadı (paneldeki MySQL/MariaDB ayarlarını kontrol edin)',
+
+    'export_not_mysql' => 'Dışa aktarma yalnızca MySQL veritabanları için geçerlidir.',
+    'export_not_postgresql' => 'Dışa aktarma yalnızca PostgreSQL veritabanları için geçerlidir.',
+    'export_unsupported_type' => 'Bu veritabanı tipi için dışa aktarma yok.',
+    'export_failed' => 'Dışa aktarma başarısız.',
+    'provision_disabled_export' => 'Panel yapılandırmasında veritabanı araçları kapalı; dışa aktarma kullanılamaz.',
+
+    'import_not_mysql' => 'İçe aktarma yalnızca MySQL veritabanları için geçerlidir.',
+    'import_not_postgresql' => 'İçe aktarma yalnızca PostgreSQL veritabanları için geçerlidir.',
+    'import_unsupported_type' => 'Bu veritabanı tipi için içe aktarma yok.',
+    'import_failed' => 'İçe aktarma başarısız.',
+    'imported' => 'Yedek başarıyla içe aktarıldı. Önceki veritabanı içeriği tamamen değiştirildi.',
+    'provision_disabled_import' => 'Panel yapılandırmasında veritabanı araçları kapalı; içe aktarma kullanılamaz.',
+    'import_file_unreadable' => 'Yüklenen dosya okunamadı.',
+    'import_sql_only' => 'Yalnızca .sql dosyası kabul edilir.',
+    'import_confirm_expected' => 'TÜMVERİSİLİNECEK',
+    'import_confirm_mismatch' => 'Onay metni eşleşmiyor. Dil dosyanızdaki ifadeyi aynen yazın.',
 ];

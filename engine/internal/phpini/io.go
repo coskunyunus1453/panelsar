@@ -11,7 +11,7 @@ import (
 	"syscall"
 )
 
-const helper = "/usr/local/sbin/panelsar-php-ini"
+const helper = "/usr/local/sbin/hostvim-php-ini"
 
 func isPermissionDenied(err error) bool {
 	if err == nil {
@@ -69,7 +69,7 @@ func Write(path string, content []byte, perm fs.FileMode) error {
 
 func writeElevated(path string, content []byte) error {
 	if _, statErr := os.Stat(helper); statErr != nil {
-		return fmt.Errorf("permission denied — panelsar-php-ini kurulu değil veya sudoers eksik: %v", statErr)
+		return fmt.Errorf("permission denied — hostvim-php-ini kurulu değil veya sudoers eksik: %v", statErr)
 	}
 	cmd := exec.Command("sudo", "-n", helper, "write", path)
 	cmd.Stdin = bytes.NewReader(content)

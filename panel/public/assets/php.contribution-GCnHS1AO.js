@@ -1,0 +1,1 @@
+import{_ as p}from"./index-CImAbVYL.js";import{r}from"./_.contribution-B157lprA.js";r({id:"php",extensions:[".php",".php4",".php5",".phtml",".ctp"],aliases:["PHP","php"],mimetypes:["application/x-php"],loader:()=>p(()=>import("./php-BVQguGre.js"),[],import.meta.url)});

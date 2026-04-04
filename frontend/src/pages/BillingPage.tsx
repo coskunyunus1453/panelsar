@@ -1,3 +1,5 @@
+import { useEffect, useRef } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import api from '../services/api'
@@ -26,6 +28,9 @@ type SubRow = {
 
 export default function BillingPage() {
   const { t } = useTranslation()
+  const [searchParams] = useSearchParams()
+  const autoCheckoutStarted = useRef(false)
+
   const isAllowedCheckoutHost = (url: string): boolean => {
     try {
       const u = new URL(url)
@@ -72,6 +77,26 @@ export default function BillingPage() {
       else toast.error(msg ?? String(err))
     },
   })
+
+  useEffect(() => {
+    if (searchParams.get('autoCheckout') !== '1' || autoCheckoutStarted.current) {
+      return
+    }
+    const raw = sessionStorage.getItem('pendingCheckout')
+    if (!raw) {
+      return
+    }
+    autoCheckoutStarted.current = true
+    sessionStorage.removeItem('pendingCheckout')
+    try {
+      const p = JSON.parse(raw) as { package_id: number; billing_cycle: 'monthly' | 'yearly' }
+      if (typeof p.package_id === 'number' && (p.billing_cycle === 'monthly' || p.billing_cycle === 'yearly')) {
+        checkoutM.mutate(p)
+      }
+    } catch {
+      /* ignore */
+    }
+  }, [searchParams, checkoutM])
 
   const packages = pkgs.data?.packages ?? []
   const subRows: SubRow[] = subs.data?.data ?? []

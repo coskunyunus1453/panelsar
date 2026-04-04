@@ -10,7 +10,7 @@ class EnforceVendorHost
 {
     public function handle(Request $request, Closure $next): Response
     {
-        $allowed = config('panelsar.vendor_portal_hosts', []);
+        $allowed = config('hostvim.vendor_portal_hosts', []);
         if (! is_array($allowed) || count($allowed) === 0) {
             if (app()->environment('production')) {
                 return response()->json([
@@ -18,6 +18,7 @@ class EnforceVendorHost
                     'code' => 'vendor_host_allowlist_missing',
                 ], 503);
             }
+
             return $next($request);
         }
 

@@ -2,15 +2,20 @@ package files
 
 import (
 	"archive/zip"
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
 	"io/fs"
 	"os"
+	"os/user"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"syscall"
+	"time"
 )
 
 type ListEntry struct {
@@ -18,7 +23,31 @@ type ListEntry struct {
 	IsDir   bool   `json:"is_dir"`
 	Size    int64  `json:"size"`
 	Mode    string `json:"mode"`
+	Owner   string `json:"owner"`
+	Group   string `json:"group"`
 	ModTime int64  `json:"mtime"`
+}
+
+func resolveOwnerGroup(info fs.FileInfo) (string, string) {
+	st, ok := info.Sys().(*syscall.Stat_t)
+	if !ok || st == nil {
+		return "", ""
+	}
+
+	uid := strconv.FormatUint(uint64(st.Uid), 10)
+	gid := strconv.FormatUint(uint64(st.Gid), 10)
+
+	owner := uid
+	group := gid
+
+	if u, err := user.LookupId(uid); err == nil && strings.TrimSpace(u.Username) != "" {
+		owner = u.Username
+	}
+	if g, err := user.LookupGroupId(gid); err == nil && strings.TrimSpace(g.Name) != "" {
+		group = g.Name
+	}
+
+	return owner, group
 }
 
 func ResolveUnderRoot(root, rel string) (string, error) {
@@ -93,11 +122,14 @@ func List(root, rel string) ([]ListEntry, error) {
 		if err != nil {
 			continue
 		}
+		owner, group := resolveOwnerGroup(info)
 		out = append(out, ListEntry{
 			Name:    e.Name(),
 			IsDir:   e.IsDir(),
 			Size:    info.Size(),
 			Mode:    info.Mode().String(),
+			Owner:   owner,
+			Group:   group,
 			ModTime: info.ModTime().Unix(),
 		})
 	}
@@ -266,10 +298,49 @@ func Copy(root, fromRel, toRel string) error {
 	if err != nil {
 		return err
 	}
-	if st.IsDir() {
-		return copyDir(fromAbs, toAbs)
+
+	parent := filepath.Dir(toAbs)
+	if err := os.MkdirAll(parent, 0o755); err != nil {
+		return err
 	}
-	return copyFile(fromAbs, toAbs, st.Mode().Perm())
+	id := randomTempID()
+	base := filepath.Base(toAbs)
+	tmpPath := filepath.Join(parent, ".tmp_copy_"+id+"_"+base)
+
+	if st.IsDir() {
+		if err := os.Mkdir(tmpPath, 0o755); err != nil {
+			return err
+		}
+		committed := false
+		defer func() {
+			if !committed {
+				_ = os.RemoveAll(tmpPath)
+			}
+		}()
+		if err := copyDir(fromAbs, tmpPath); err != nil {
+			return err
+		}
+		if err := os.Rename(tmpPath, toAbs); err != nil {
+			return err
+		}
+		committed = true
+		return nil
+	}
+
+	committed := false
+	defer func() {
+		if !committed {
+			_ = os.RemoveAll(tmpPath)
+		}
+	}()
+	if err := copyFile(fromAbs, tmpPath, st.Mode().Perm()); err != nil {
+		return err
+	}
+	if err := os.Rename(tmpPath, toAbs); err != nil {
+		return err
+	}
+	committed = true
+	return nil
 }
 
 func copyDir(src, dst string) error {
@@ -374,30 +445,16 @@ func writeZipFile(zw *zip.Writer, srcPath, zipName string, info fs.FileInfo) err
 	return err
 }
 
-func UnzipPath(root, archiveRel, targetDirRel string) error {
-	arc, err := ResolveUnderRoot(root, archiveRel)
-	if err != nil {
-		return err
-	}
-	targetDir, err := ResolveUnderRoot(root, targetDirRel)
-	if err != nil {
-		return err
-	}
-	if err := os.MkdirAll(targetDir, 0o755); err != nil {
-		return err
-	}
-	r, err := zip.OpenReader(arc)
-	if err != nil {
-		return err
-	}
-	defer r.Close()
+// unzipIntoDirectory zip girdilerini rootDir altına yazar (zip slip kontrolü rootDir’e göre).
+func unzipIntoDirectory(rootDir string, r *zip.Reader) error {
+	sep := string(os.PathSeparator)
 	for _, f := range r.File {
 		name := filepath.Clean(filepath.FromSlash(strings.ReplaceAll(f.Name, "\\", "/")))
-		if name == "." || name == ".." || filepath.IsAbs(name) || strings.HasPrefix(name, ".."+string(os.PathSeparator)) {
+		if name == "." || name == ".." || filepath.IsAbs(name) || strings.HasPrefix(name, ".."+sep) {
 			return fmt.Errorf("archive entry escapes target")
 		}
-		dst := filepath.Join(targetDir, name)
-		if dst != targetDir && !strings.HasPrefix(dst, targetDir+string(os.PathSeparator)) {
+		dst := filepath.Join(rootDir, name)
+		if dst != rootDir && !strings.HasPrefix(dst, rootDir+sep) {
 			return fmt.Errorf("archive entry escapes target")
 		}
 		if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
@@ -427,6 +484,94 @@ func UnzipPath(root, archiveRel, targetDirRel string) error {
 		rc.Close()
 	}
 	return nil
+}
+
+func UnzipPath(root, archiveRel, targetDirRel string) error {
+	arc, err := ResolveUnderRoot(root, archiveRel)
+	if err != nil {
+		return err
+	}
+	finalDir, err := ResolveUnderRoot(root, targetDirRel)
+	if err != nil {
+		return err
+	}
+	parent := filepath.Dir(finalDir)
+	if err := os.MkdirAll(parent, 0o755); err != nil {
+		return err
+	}
+
+	id := randomTempID()
+	tmpDir := filepath.Join(parent, ".tmp_unzip_"+id)
+	if _, err := os.Stat(tmpDir); err == nil {
+		return fmt.Errorf("temporary unzip path already exists")
+	}
+	if err := os.Mkdir(tmpDir, 0o755); err != nil {
+		return err
+	}
+
+	committed := false
+	defer func() {
+		if !committed {
+			_ = os.RemoveAll(tmpDir)
+		}
+	}()
+
+	zr, err := zip.OpenReader(arc)
+	if err != nil {
+		return err
+	}
+	defer zr.Close()
+
+	if err := unzipIntoDirectory(tmpDir, &zr.Reader); err != nil {
+		return err
+	}
+
+	fi, err := os.Stat(finalDir)
+	if errors.Is(err, os.ErrNotExist) {
+		if err := os.Rename(tmpDir, finalDir); err != nil {
+			return err
+		}
+		committed = true
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if !fi.IsDir() {
+		return fmt.Errorf("unzip target exists and is not a directory")
+	}
+
+	oldBk := filepath.Join(parent, ".tmp_unzip_replace_"+id)
+	if _, err := os.Stat(oldBk); err == nil {
+		return fmt.Errorf("temporary backup path already exists")
+	}
+	if err := os.Rename(finalDir, oldBk); err != nil {
+		return err
+	}
+	restoreOld := true
+	defer func() {
+		if restoreOld {
+			_ = os.Rename(oldBk, finalDir)
+		}
+	}()
+	if err := os.Rename(tmpDir, finalDir); err != nil {
+		return err
+	}
+	restoreOld = false
+	committed = true
+	if err := os.RemoveAll(oldBk); err != nil {
+		return err
+	}
+	return nil
+}
+
+// randomTempID üretir; geçici dizin/dosya adları için kullanılır.
+func randomTempID() string {
+	var b [8]byte
+	if _, err := rand.Read(b[:]); err != nil {
+		return strconv.FormatInt(int64(os.Getpid()), 36) + strconv.FormatInt(time.Now().UnixNano(), 36)
+	}
+	return hex.EncodeToString(b[:])
 }
 
 // IsExecutionRiskFile returns true for file extensions that could be executed by the server.

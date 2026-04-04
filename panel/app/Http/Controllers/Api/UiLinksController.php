@@ -13,8 +13,8 @@ class UiLinksController extends Controller
     public function show(): JsonResponse
     {
         return response()->json([
-            'phpmyadmin_url' => (string) config('panelsar.ui.phpmyadmin_url', ''),
-            'adminer_url' => (string) config('panelsar.ui.adminer_url', ''),
+            'phpmyadmin_url' => (string) config('hostvim.ui.phpmyadmin_url', ''),
+            'adminer_url' => (string) config('hostvim.ui.adminer_url', ''),
         ]);
     }
 }

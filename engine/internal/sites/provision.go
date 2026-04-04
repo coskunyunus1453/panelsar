@@ -48,7 +48,7 @@ h1{color:#2563eb}
 </head>
 <body>
 <h1>%s</h1>
-<p>Bu site <strong>Panelsar</strong> kontrol paneli ile oluşturuldu.</p>
+<p>Bu site <strong>Hostvim</strong> kontrol paneli ile oluşturuldu.</p>
 <p>Belge kökü: <code>%s</code></p>
 <p>PHP (panel ayarı): <strong>%s</strong></p>
 </body>
@@ -105,7 +105,7 @@ func ProvisionSubdomain(webRoot, parentDomain, hostname, pathSegment, phpVersion
 	html := fmt.Sprintf(`<!DOCTYPE html>
 <html lang="tr">
 <head><meta charset="utf-8"><title>%s</title></head>
-<body><h1>%s</h1><p>Alt alan — Panelsar</p><p><code>%s</code></p></body>
+<body><h1>%s</h1><p>Alt alan — Hostvim</p><p><code>%s</code></p></body>
 </html>`, hostname, hostname, docRoot)
 	if err := os.WriteFile(filepath.Join(docRoot, "index.html"), []byte(html), 0o644); err != nil {
 		return "", err

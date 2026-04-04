@@ -6,15 +6,16 @@ use App\Http\Controllers\Controller;
 use App\Models\HostingPackage;
 use App\Models\Subscription as PanelSubscription;
 use App\Models\User;
+use App\Services\SafeAuditLogger;
 use App\Services\UserHostingPackageSync;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Log;
 use Stripe\Event;
 use Stripe\Exception\SignatureVerificationException;
 use Stripe\Exception\UnexpectedValueException as StripeUnexpectedValueException;
 use Stripe\StripeClient;
+use Stripe\StripeObject;
 use Stripe\Subscription as StripeSubscription;
 use Stripe\Webhook;
 
@@ -139,19 +140,23 @@ class BillingController extends Controller
         $packageId = $this->stripeMetaInt($stripe->metadata, 'hosting_package_id') ?? $existing?->hosting_package_id;
 
         if ($userId === null || $packageId === null) {
-            Log::warning('Stripe subscription webhook skipped: missing user_id or hosting_package_id', [
-                'stripe_subscription_id' => $stripe->id,
-            ]);
+            SafeAuditLogger::warning('hostvim.billing_stripe', [
+                'action' => 'subscription_webhook_skipped',
+                'reason' => 'missing_meta',
+                'stripe_subscription_fp' => substr(hash('sha256', (string) $stripe->id), 0, 16),
+            ], null);
 
             return;
         }
 
         if (! User::query()->whereKey($userId)->exists() || ! HostingPackage::query()->whereKey($packageId)->exists()) {
-            Log::warning('Stripe subscription webhook skipped: invalid user or package', [
-                'stripe_subscription_id' => $stripe->id,
+            SafeAuditLogger::warning('hostvim.billing_stripe', [
+                'action' => 'subscription_webhook_skipped',
+                'reason' => 'invalid_user_or_package',
+                'stripe_subscription_fp' => substr(hash('sha256', (string) $stripe->id), 0, 16),
                 'user_id' => $userId,
                 'hosting_package_id' => $packageId,
-            ]);
+            ], null);
 
             return;
         }
@@ -211,7 +216,7 @@ class BillingController extends Controller
         $this->hostingPackageSync->syncFromSubscriptions($userId);
     }
 
-    private function stripeMetaInt(?\Stripe\StripeObject $metadata, string $key): ?int
+    private function stripeMetaInt(?StripeObject $metadata, string $key): ?int
     {
         $raw = $this->stripeMetaString($metadata, $key);
         if ($raw === null || $raw === '') {
@@ -225,7 +230,7 @@ class BillingController extends Controller
         return (int) $raw;
     }
 
-    private function stripeMetaString(?\Stripe\StripeObject $metadata, string $key): ?string
+    private function stripeMetaString(?StripeObject $metadata, string $key): ?string
     {
         if ($metadata === null || ! isset($metadata[$key])) {
             return null;

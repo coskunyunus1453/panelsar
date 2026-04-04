@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/panelsar/engine/internal/config"
-	"github.com/panelsar/engine/internal/services"
+	"hostvim/engine/internal/config"
+	"hostvim/engine/internal/services"
 	"github.com/sirupsen/logrus"
 )
 
@@ -74,7 +74,6 @@ func (d *Daemon) ensureDirectories() error {
 	}
 
 	for _, dir := range dirs {
-		d.log.Debugf("Ensuring directory exists: %s", dir)
 		// In production, os.MkdirAll would be called here
 		// Skipped during development to avoid permission issues
 		_ = dir

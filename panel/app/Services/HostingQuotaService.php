@@ -115,7 +115,7 @@ class HostingQuotaService
         if ($pkg !== null && ! $pkg->backup_enabled) {
             abort(422, __('quota.backups_disabled'));
         }
-        $max = (int) config('panelsar.backup.max_backups_per_user', 5);
+        $max = (int) config('hostvim.backup.max_backups_per_user', 5);
         if ($max < 0) {
             return;
         }

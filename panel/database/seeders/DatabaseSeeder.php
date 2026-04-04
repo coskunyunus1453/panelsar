@@ -3,9 +3,9 @@
 namespace Database\Seeders;
 
 use App\Models\HostingPackage;
-use App\Models\VendorPlan;
 use App\Models\Role;
 use App\Models\User;
+use App\Models\VendorPlan;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 
@@ -13,7 +13,7 @@ class DatabaseSeeder extends Seeder
 {
     public function run(): void
     {
-        $vendorEnabled = (bool) config('panelsar.vendor_enabled', false);
+        $vendorEnabled = (bool) config('hostvim.vendor_enabled', false);
         $roles = ['admin', 'reseller', 'user'];
         if ($vendorEnabled) {
             $roles = array_merge($roles, ['vendor_admin', 'vendor_support', 'vendor_finance', 'vendor_devops']);
@@ -176,8 +176,8 @@ class DatabaseSeeder extends Seeder
             ]
         );
 
-        $adminEmail = env('PANELSAR_ADMIN_EMAIL', 'admin@panelsar.com');
-        $adminPassword = env('PANELSAR_ADMIN_PASSWORD', 'password');
+        $adminEmail = env('HOSTVIM_ADMIN_EMAIL', env('PANELSAR_ADMIN_EMAIL', 'admin@hostvim.com'));
+        $adminPassword = env('HOSTVIM_ADMIN_PASSWORD', env('PANELSAR_ADMIN_PASSWORD', 'password'));
 
         $admin = User::firstOrCreate(
             ['email' => $adminEmail],
@@ -191,8 +191,8 @@ class DatabaseSeeder extends Seeder
         );
         $admin->syncRoles(['admin']);
 
-        $vendorAdminEmail = env('PANELSAR_VENDOR_ADMIN_EMAIL');
-        $vendorAdminPassword = env('PANELSAR_VENDOR_ADMIN_PASSWORD');
+        $vendorAdminEmail = env('HOSTVIM_VENDOR_ADMIN_EMAIL', env('PANELSAR_VENDOR_ADMIN_EMAIL'));
+        $vendorAdminPassword = env('HOSTVIM_VENDOR_ADMIN_PASSWORD', env('PANELSAR_VENDOR_ADMIN_PASSWORD'));
         if ($vendorEnabled && $vendorAdminEmail && $vendorAdminPassword) {
             $vendorAdmin = User::firstOrCreate(
                 ['email' => $vendorAdminEmail],
@@ -208,11 +208,13 @@ class DatabaseSeeder extends Seeder
         }
 
         // Production default: only admin user.
-        // Demo accounts are opt-in via PANELSAR_SEED_DEMO_USERS=1.
-        $seedDemoUsers = filter_var((string) env('PANELSAR_SEED_DEMO_USERS', false), FILTER_VALIDATE_BOOLEAN);
+        // Demo accounts are opt-in via HOSTVIM_SEED_DEMO_USERS=1 (veya eski PANELSAR_SEED_DEMO_USERS).
+        $seedDemoUsers = filter_var((string) env('HOSTVIM_SEED_DEMO_USERS', env('PANELSAR_SEED_DEMO_USERS', false)), FILTER_VALIDATE_BOOLEAN);
+        $this->call(CmsDeploymentDocSeeder::class);
+
         if ($seedDemoUsers) {
             $reseller = User::firstOrCreate(
-                ['email' => 'reseller@panelsar.com'],
+                ['email' => 'reseller@hostvim.com'],
                 [
                     'name' => 'Demo Reseller',
                     'password' => Hash::make('password'),
@@ -224,7 +226,7 @@ class DatabaseSeeder extends Seeder
             $reseller->syncRoles(['reseller']);
 
             $user = User::firstOrCreate(
-                ['email' => 'user@panelsar.com'],
+                ['email' => 'user@hostvim.com'],
                 [
                     'name' => 'Demo User',
                     'password' => Hash::make('password'),

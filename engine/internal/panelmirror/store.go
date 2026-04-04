@@ -10,8 +10,8 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/panelsar/engine/internal/config"
-	"github.com/panelsar/engine/internal/sites"
+	"hostvim/engine/internal/config"
+	"hostvim/engine/internal/sites"
 )
 
 var mu sync.Mutex

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\PanelSetting;
+use App\Services\SafeAuditLogger;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\File;
@@ -16,7 +17,9 @@ use Throwable;
 class BrandingController extends Controller
 {
     private const DEFAULT_MAX_UPLOAD_KB = 900;
+
     private const MIN_MAX_UPLOAD_KB = 128;
+
     private const HARD_CAP_UPLOAD_KB = 2048;
 
     public function showPublic(): JsonResponse
@@ -91,6 +94,7 @@ class BrandingController extends Controller
                         'error_ref' => $errRef,
                     ], 413);
                 }
+
                 return response()->json([
                     'message' => __('settings.branding_upload_failed'),
                     'hint' => 'En az bir logo dosyası seçin (logo_customer veya logo_admin).',
@@ -137,13 +141,13 @@ class BrandingController extends Controller
                 $save('branding.logo_admin_url', $request->file('logo_admin'));
             } catch (Throwable $e) {
                 report($e);
-                Log::error('branding.upload.failed', [
+                Log::error('branding.upload.failed', array_filter([
                     'ref' => $errRef,
                     'message' => $e->getMessage(),
-                    'trace' => $e->getTraceAsString(),
+                    'trace' => config('app.debug') ? $e->getTraceAsString() : null,
                     'logo_customer_error' => $request->file('logo_customer')?->getError(),
                     'logo_admin_error' => $request->file('logo_admin')?->getError(),
-                ]);
+                ]));
 
                 return response()->json([
                     'message' => __('settings.branding_upload_failed'),
@@ -161,15 +165,15 @@ class BrandingController extends Controller
             ]);
         } catch (Throwable $e) {
             report($e);
-            Log::critical('branding.update.unhandled', [
+            Log::critical('branding.update.unhandled', SafeAuditLogger::sanitizeContext(array_filter([
                 'ref' => $errRef,
                 'message' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
+                'trace' => config('app.debug') ? $e->getTraceAsString() : null,
                 'content_length' => (int) ($request->server('CONTENT_LENGTH') ?? 0),
                 'php_upload_max_filesize' => (string) ini_get('upload_max_filesize'),
                 'php_post_max_size' => (string) ini_get('post_max_size'),
                 'tmp_dir' => (string) (ini_get('upload_tmp_dir') ?: sys_get_temp_dir()),
-            ]);
+            ])));
 
             return response()->json([
                 'message' => __('settings.branding_upload_failed'),
@@ -291,6 +295,7 @@ class BrandingController extends Controller
         ];
 
         $ok = collect($checks)->every(fn ($c) => (bool) ($c['ok'] ?? false));
+
         return response()->json(['ok' => $ok, 'checks' => $checks]);
     }
 
@@ -334,7 +339,10 @@ class BrandingController extends Controller
 
     private function brandingFilePublicPath(string $basename): string
     {
-        return '/api/branding/files/'.$basename;
+        // Panel alt dizinde (ör. `/proje/panel/public`) servis edilebiliyor.
+        // Mutlak `/api/...` path’i kökten arar ve 404 üretir.
+        // Bu yüzden göreli path döndürüyoruz.
+        return 'api/branding/files/'.$basename;
     }
 
     private function maxUploadKb(): int
@@ -359,6 +367,7 @@ class BrandingController extends Controller
         }
         $unit = strtolower(substr($v, -1));
         $num = (float) $v;
+
         return match ($unit) {
             'g' => (int) round($num * 1024 * 1024 * 1024),
             'm' => (int) round($num * 1024 * 1024),
