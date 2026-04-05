@@ -177,18 +177,26 @@ class DatabaseSeeder extends Seeder
         );
 
         $adminEmail = env('HOSTVIM_ADMIN_EMAIL', env('PANELSAR_ADMIN_EMAIL', 'admin@hostvim.com'));
-        $adminPassword = env('HOSTVIM_ADMIN_PASSWORD', env('PANELSAR_ADMIN_PASSWORD', 'password'));
+        $adminPasswordEnv = env('HOSTVIM_ADMIN_PASSWORD', env('PANELSAR_ADMIN_PASSWORD'));
+        $adminPasswordForNew = ($adminPasswordEnv !== null && $adminPasswordEnv !== '')
+            ? $adminPasswordEnv
+            : 'password';
 
         $admin = User::firstOrCreate(
             ['email' => $adminEmail],
             [
                 'name' => 'Admin',
-                'password' => Hash::make($adminPassword),
+                'password' => Hash::make($adminPasswordForNew),
                 'locale' => 'en',
                 'status' => 'active',
                 'email_verified_at' => now(),
             ]
         );
+        // Kurulum betiği HOSTVIM_ADMIN_PASSWORD verir; önceki yarım seed’de oluşmuş kullanıcıda şifre güncellenmezdi → 422.
+        if ($adminPasswordEnv !== null && $adminPasswordEnv !== '') {
+            $admin->password = Hash::make($adminPasswordEnv);
+            $admin->save();
+        }
         $admin->syncRoles(['admin']);
 
         $vendorAdminEmail = env('HOSTVIM_VENDOR_ADMIN_EMAIL', env('PANELSAR_VENDOR_ADMIN_EMAIL'));
@@ -204,6 +212,8 @@ class DatabaseSeeder extends Seeder
                     'email_verified_at' => now(),
                 ]
             );
+            $vendorAdmin->password = Hash::make($vendorAdminPassword);
+            $vendorAdmin->save();
             $vendorAdmin->syncRoles(['vendor_admin']);
         }
 
