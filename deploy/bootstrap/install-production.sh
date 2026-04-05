@@ -37,7 +37,8 @@
 #   HOSTVIM_ADMIN_EMAIL_DOMAIN=…  # örn. ornek.com → admin@ornek.com (açık e-posta yoksa)
 #   HOSTVIM_APP_URL=…             # örn. https://panel.ornek.com — .env APP_URL + e-posta türetimi için
 #   LETS_ENCRYPT_EMAIL=…          # ACME; HOSTVIM_ADMIN_EMAIL yoksa ilk admin e-postası olarak da kullanılabilir
-#   HOSTVIM_ADMIN_PASSWORD=...    # sabit şifre; verilmezse kurulumda rastgele üretilir
+#   HOSTVIM_ADMIN_PASSWORD=...       # sabit şifre; verilmezse her çalıştırmada yeni rastgele (DB’de admin güncellenir)
+#   HOSTVIM_PRESERVE_ADMIN_PASSWORD=1  # DB’de kullanıcı varken şifreyi değiştirme / dosyada gösterme (otomasyon güncellemesi için)
 #
 set -euo pipefail
 
@@ -609,35 +610,35 @@ if [[ "${SKIP_DB_SEED:-}" != "1" ]]; then
   fi
   [[ -n "$USER_COUNT" ]] || USER_COUNT=0
 
-  WRITE_LOGIN=0
+  # Varsayılan: her kurulum/güncellemede yeni şifre (müşteri öncekini unuttuğunda sorun olmasın). Sabit için HOSTVIM_ADMIN_PASSWORD=...
+  # Otomasyon: HOSTVIM_PRESERVE_ADMIN_PASSWORD=1 → mevcut kullanıcı varken şifre dokunulmaz / dosyada gösterilmez.
   ADMIN_PASSWORD=""
-  if [[ "$RESET_DB_MODE" == "1" ]]; then
-    # Fresh kurulum modunda her zaman yeni admin kimliği üret.
-    ADMIN_PASSWORD="${HOSTVIM_ADMIN_PASSWORD:-$(openssl rand -hex 12)}"
-    WRITE_LOGIN=1
-  elif [[ -n "${HOSTVIM_ADMIN_PASSWORD:-}" ]]; then
+  if [[ -n "${HOSTVIM_ADMIN_PASSWORD:-}" ]]; then
     ADMIN_PASSWORD="$HOSTVIM_ADMIN_PASSWORD"
-    WRITE_LOGIN=1
-  elif [[ "$USER_COUNT" == "0" ]]; then
+  elif [[ "${HOSTVIM_PRESERVE_ADMIN_PASSWORD:-0}" == "1" ]] || [[ "${HOSTVIM_PRESERVE_ADMIN_PASSWORD:-0}" == "yes" ]]; then
+    if [[ "$RESET_DB_MODE" == "1" ]]; then
+      ADMIN_PASSWORD="$(openssl rand -hex 12)"
+    elif [[ "$USER_COUNT" == "0" ]]; then
+      ADMIN_PASSWORD="$(openssl rand -hex 12)"
+    fi
+  else
     ADMIN_PASSWORD="$(openssl rand -hex 12)"
-    WRITE_LOGIN=1
   fi
 
   LOGIN_FILE="/root/hostvim-admin-login.txt"
   PANEL_URL_HINT="$(grep -E '^APP_URL=' "$ENV_FILE" 2>/dev/null | cut -d= -f2- | tr -d '\r' || true)"
   [[ -n "$PANEL_URL_HINT" ]] || PANEL_URL_HINT="http://$(hostname -I 2>/dev/null | awk '{print $1}' || echo localhost)"
 
-  # Her çalıştırmada yaz: güncellemede WRITE_LOGIN=0 olunca eski panelsar-admin-login.txt yanlış gösterilmesin.
   {
     echo "Hostvim — panel giriş bilgisi ($(date -u +%Y-%m-%dT%H:%MZ 2>/dev/null || date))"
     echo "Panel URL: ${PANEL_URL_HINT}"
     echo "E-posta:   ${ADMIN_EMAIL}"
-    if [[ "$WRITE_LOGIN" == "1" ]]; then
+    if [[ -n "$ADMIN_PASSWORD" ]]; then
       echo "Şifre:     ${ADMIN_PASSWORD}"
       echo "İlk girişten sonra şifreyi değiştirin."
     else
-      echo "Şifre:     (bu çalıştırmada üretilmedi — veritabanında zaten kullanıcı vardı; önceki şifre geçerli)"
-      echo "Not: E-postayı burada değiştirmek DB’deki kullanıcıyı otomatik yenilemez; panelden düzenleyin veya HOSTVIM_ADMIN_EMAIL ile sıfırdan seed (RESET) kullanın."
+      echo "Şifre:     (korundu — HOSTVIM_PRESERVE_ADMIN_PASSWORD=1; mevcut admin şifresi değişmedi)"
+      echo "Not: Şifreyi bilmiyorsanız panelden sıfırlayın veya bir kez HOSTVIM_PRESERVE_ADMIN_PASSWORD vermeden kurulumu çalıştırın."
     fi
   } > "$LOGIN_FILE"
   chmod 600 "$LOGIN_FILE"

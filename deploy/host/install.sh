@@ -31,6 +31,8 @@
 #   İlk kurulumda kullanıcı yoksa db:seed admin üretir; HOSTVIM_ADMIN_PASSWORD verilmezse rastgele şifre
 #   Üretim önerisi: HOSTVIM_ADMIN_EMAIL=yonetici@alanadin.com ve/veya HOSTVIM_APP_URL=https://panel.alanadin.com
 #   (verilmezse sırayla LETS_ENCRYPT_EMAIL, APP_URL ana makinesi, son çare admin@sunucu-FQDN kullanılır)
+#   Her çalıştırmada yeni admin şifresi üretilir ( /root/hostvim-admin-login.txt ). Şifreyi elle sabitlemek: HOSTVIM_ADMIN_PASSWORD=...
+#   Sadece kod güncellemesi (şifre dokunulmasın): HOSTVIM_PRESERVE_ADMIN_PASSWORD=1
 #
 # Zorunlu proxy/kırık sertifika (ÖNERİLMEZ): yalnızca geçici tanı veya iç ağda:
 #   HOSTVIM_INSECURE_DOWNLOAD=1 curl -fsSL ...  → betik içinde curl -k kullanılır (eski: PANELSAR_INSECURE_DOWNLOAD)
