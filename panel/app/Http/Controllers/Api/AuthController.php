@@ -62,12 +62,6 @@ class AuthController extends Controller
                 'code' => 'vendor_access_denied',
             ], 403);
         }
-        if ($portal === 'customer' && $user->isVendorAdmin() && ! $user->isAdmin()) {
-            return response()->json([
-                'message' => 'Bu hesap sadece vendor panelinden giris yapabilir.',
-                'code' => 'use_vendor_login',
-            ], 403);
-        }
 
         $requiresTwoFactor = (bool) $user->two_factor_enabled;
         $tokenName = 'panel-token';

@@ -350,7 +350,7 @@ Route::middleware(['auth:sanctum', 'abilities:access:customer-panel'])->group(fu
         Route::patch('settings/php/{version}/modules', [PhpSettingsController::class, 'updateModules']);
     });
 
-    Route::middleware('role:reseller|admin')->prefix('reseller')->group(function () {
+    Route::middleware('role:reseller|admin|vendor_admin')->prefix('reseller')->group(function () {
         Route::middleware('ability:reseller:users')->group(function () {
             Route::get('users', [UserController::class, 'index']);
             Route::post('users', [UserController::class, 'store']);

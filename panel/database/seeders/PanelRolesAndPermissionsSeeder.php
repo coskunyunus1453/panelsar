@@ -49,6 +49,36 @@ class PanelRolesAndPermissionsSeeder extends Seeder
         ];
         $resellerAllow = array_values(array_diff($allNames, $resellerDeny));
 
+        $vendorAbilityNames = collect($allNames)
+            ->filter(static fn (string $n) => str_starts_with($n, 'vendor:'))
+            ->values()
+            ->all();
+
+        /** Vendor yönetici: bayi (reseller) kapsamı + tüm vendor:* — müşteri yetkileri buna dahil */
+        $vendorAdminAllow = array_values(array_unique(array_merge($resellerAllow, $vendorAbilityNames)));
+
+        /** Müşteri hosting + vendor okuma / destek / denetim */
+        $vendorSupportAllow = array_values(array_unique(array_merge($userAllow, [
+            'vendor:read',
+            'vendor:support',
+            'vendor:audit',
+        ])));
+
+        /** Müşteri hosting + lisans faturalama uçları + denetim */
+        $vendorFinanceAllow = array_values(array_unique(array_merge($userAllow, [
+            'vendor:read',
+            'vendor:billing',
+            'vendor:audit',
+        ])));
+
+        /** Müşteri hosting + tenant/lisans/plan yönetimi, düğümler, denetim (fatura/destek uçları hariç) */
+        $vendorDevopsAllow = array_values(array_unique(array_merge($userAllow, [
+            'vendor:read',
+            'vendor:write',
+            'vendor:nodes',
+            'vendor:audit',
+        ])));
+
         $admin = Role::query()->where('name', 'admin')->where('guard_name', 'web')->first();
         $vendorAdmin = Role::query()->where('name', 'vendor_admin')->where('guard_name', 'web')->first();
         $vendorSupport = Role::query()->where('name', 'vendor_support')->where('guard_name', 'web')->first();
@@ -66,16 +96,7 @@ class PanelRolesAndPermissionsSeeder extends Seeder
             ]);
         }
         if ($vendorEnabled && $vendorAdmin) {
-            $vendorAllow = [
-                'dashboard:read',
-                'vendor:read',
-                'vendor:write',
-                'vendor:nodes',
-                'vendor:billing',
-                'vendor:support',
-                'vendor:audit',
-            ];
-            $vendorAdmin->syncPermissions(Permission::query()->whereIn('name', $vendorAllow)->where('guard_name', 'web')->get());
+            $vendorAdmin->syncPermissions(Permission::query()->whereIn('name', $vendorAdminAllow)->where('guard_name', 'web')->get());
             $vendorAdmin->update([
                 'is_system' => true,
                 'assignable_by_reseller' => false,
@@ -83,30 +104,15 @@ class PanelRolesAndPermissionsSeeder extends Seeder
             ]);
         }
         if ($vendorEnabled && $vendorSupport) {
-            $vendorSupport->syncPermissions(Permission::query()->whereIn('name', [
-                'dashboard:read',
-                'vendor:read',
-                'vendor:support',
-                'vendor:audit',
-            ])->where('guard_name', 'web')->get());
+            $vendorSupport->syncPermissions(Permission::query()->whereIn('name', $vendorSupportAllow)->where('guard_name', 'web')->get());
             $vendorSupport->update(['is_system' => true, 'assignable_by_reseller' => false, 'display_name' => 'Vendor Support']);
         }
         if ($vendorEnabled && $vendorFinance) {
-            $vendorFinance->syncPermissions(Permission::query()->whereIn('name', [
-                'dashboard:read',
-                'vendor:read',
-                'vendor:billing',
-                'vendor:audit',
-            ])->where('guard_name', 'web')->get());
+            $vendorFinance->syncPermissions(Permission::query()->whereIn('name', $vendorFinanceAllow)->where('guard_name', 'web')->get());
             $vendorFinance->update(['is_system' => true, 'assignable_by_reseller' => false, 'display_name' => 'Vendor Finance']);
         }
         if ($vendorEnabled && $vendorDevops) {
-            $vendorDevops->syncPermissions(Permission::query()->whereIn('name', [
-                'dashboard:read',
-                'vendor:read',
-                'vendor:nodes',
-                'vendor:audit',
-            ])->where('guard_name', 'web')->get());
+            $vendorDevops->syncPermissions(Permission::query()->whereIn('name', $vendorDevopsAllow)->where('guard_name', 'web')->get());
             $vendorDevops->update(['is_system' => true, 'assignable_by_reseller' => false, 'display_name' => 'Vendor DevOps']);
         }
         if ($reseller) {
