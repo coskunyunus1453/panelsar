@@ -627,16 +627,20 @@ if [[ "${SKIP_DB_SEED:-}" != "1" ]]; then
   PANEL_URL_HINT="$(grep -E '^APP_URL=' "$ENV_FILE" 2>/dev/null | cut -d= -f2- | tr -d '\r' || true)"
   [[ -n "$PANEL_URL_HINT" ]] || PANEL_URL_HINT="http://$(hostname -I 2>/dev/null | awk '{print $1}' || echo localhost)"
 
-  if [[ "$WRITE_LOGIN" == "1" ]]; then
-    {
-      echo "Hostvim — ilk admin girişi"
-      echo "Panel URL: ${PANEL_URL_HINT}"
-      echo "E-posta:   ${ADMIN_EMAIL}"
+  # Her çalıştırmada yaz: güncellemede WRITE_LOGIN=0 olunca eski panelsar-admin-login.txt yanlış gösterilmesin.
+  {
+    echo "Hostvim — panel giriş bilgisi ($(date -u +%Y-%m-%dT%H:%MZ 2>/dev/null || date))"
+    echo "Panel URL: ${PANEL_URL_HINT}"
+    echo "E-posta:   ${ADMIN_EMAIL}"
+    if [[ "$WRITE_LOGIN" == "1" ]]; then
       echo "Şifre:     ${ADMIN_PASSWORD}"
       echo "İlk girişten sonra şifreyi değiştirin."
-    } > "$LOGIN_FILE"
-    chmod 600 "$LOGIN_FILE"
-  fi
+    else
+      echo "Şifre:     (bu çalıştırmada üretilmedi — veritabanında zaten kullanıcı vardı; önceki şifre geçerli)"
+      echo "Not: E-postayı burada değiştirmek DB’deki kullanıcıyı otomatik yenilemez; panelden düzenleyin veya HOSTVIM_ADMIN_EMAIL ile sıfırdan seed (RESET) kullanın."
+    fi
+  } > "$LOGIN_FILE"
+  chmod 600 "$LOGIN_FILE"
 
   if [[ -n "$ADMIN_PASSWORD" ]]; then
     sudo -u www-data env \
@@ -760,27 +764,20 @@ if [[ "${SKIP_DB_SEED:-}" != "1" ]]; then
   echo "################################################################"
   echo "#  PANEL GİRİŞİ — Tarayıcıda panele böyle girin"
   echo "################################################################"
-  if [[ -n "${ADMIN_PASSWORD:-}" ]] && [[ "${WRITE_LOGIN:-0}" == "1" ]]; then
-    echo "#  Adres:      ${PANEL_URL_HINT}"
-    echo "#  E-posta:    ${ADMIN_EMAIL}"
-    echo "#  Şifre:      ${ADMIN_PASSWORD}"
-    echo "#  (Kopya: /root/hostvim-admin-login.txt)"
-    echo "################################################################"
-  elif [[ -f /root/hostvim-admin-login.txt ]]; then
-    echo "#  (Önceki kurulumdan kayıtlı giriş bilgisi:)"
+  if [[ -f /root/hostvim-admin-login.txt ]]; then
+    echo "#  (Güncel: /root/hostvim-admin-login.txt)"
     while IFS= read -r line || [[ -n "$line" ]]; do
       echo "#  $line"
     done < /root/hostvim-admin-login.txt
     echo "################################################################"
   elif [[ -f /root/panelsar-admin-login.txt ]]; then
-    echo "#  (Eski kurulum: /root/panelsar-admin-login.txt)"
+    echo "#  UYARI: Yalnızca eski panelsar-admin-login.txt bulundu; güvenilir olmayabilir."
     while IFS= read -r line || [[ -n "$line" ]]; do
       echo "#  $line"
     done < /root/panelsar-admin-login.txt
     echo "################################################################"
   else
-    echo "#  Bu çalıştırmada yeni şifre üretilmedi (kullanıcılar zaten vardı)."
-    echo "#  Bilinen admin ile girin veya şifre sıfırlayın."
+    echo "#  Giriş dosyası yok. Bilinen admin ile girin veya şifre sıfırlayın."
     echo "################################################################"
   fi
   echo ""
