@@ -46,17 +46,17 @@ func (m *Manager) CreateContainer(ctx context.Context, domain string, userID uin
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	containerName := fmt.Sprintf("panelsar_%s", domain)
+	containerName := fmt.Sprintf("hostvim_%s", domain)
 
 	m.log.Infof("Creating container %s for user %d", containerName, userID)
 
 	container := &ContainerInfo{
 		Name:   containerName,
-		Image:  "panelsar/web:latest",
+		Image:  "hostvim/web:latest",
 		Status: "created",
 		Labels: map[string]string{
-			"panelsar.domain":  domain,
-			"panelsar.user_id": fmt.Sprintf("%d", userID),
+			"hostvim.domain":  domain,
+			"hostvim.user_id": fmt.Sprintf("%d", userID),
 		},
 		UserID: userID,
 	}

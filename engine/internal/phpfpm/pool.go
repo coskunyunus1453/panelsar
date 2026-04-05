@@ -24,7 +24,7 @@ func poolSlug(domain string) string {
 
 // PoolName php-fpm [pool] bölümü adı.
 func PoolName(domain string) string {
-	return "panelsar-" + poolSlug(domain)
+	return "hostvim-" + poolSlug(domain)
 }
 
 // SocketPath bu domain için unix soket yolu (nginx ile aynı olmalı).
@@ -216,7 +216,7 @@ func RemovePool(h HostingPoolSettings, domain, phpVersion string) error {
 
 var debianPHPVersionDir = regexp.MustCompile(`^[0-9]+\.[0-9]+$`)
 
-// RemovePoolBestEffortAllVersions /etc/php altındaki X.Y sürüm dizinlerinde panelsar pool dosyasını arar, varsa siler.
+// RemovePoolBestEffortAllVersions /etc/php altındaki X.Y sürüm dizinlerinde hostvim (ve eski panelsar) pool dosyasını arar, varsa siler.
 // meta eksik site silinirken soket çöplüğünü önlemek için kullanılır. Silinen sürümler (örn. reload için) döner.
 func RemovePoolBestEffortAllVersions(h HostingPoolSettings, domain string) []string {
 	if domain == "" || strings.Contains(domain, "..") {
@@ -233,11 +233,16 @@ func RemovePoolBestEffortAllVersions(h HostingPoolSettings, domain string) []str
 		}
 		ver := e.Name()
 		p := poolConfPath(h, ver, domain)
-		if _, err := os.Stat(p); err != nil {
+		if _, err := os.Stat(p); err == nil {
+			_ = os.Remove(p)
+			removed = append(removed, ver)
 			continue
 		}
-		_ = os.Remove(p)
-		removed = append(removed, ver)
+		leg := filepath.Join(filepath.Dir(p), "panelsar-"+poolSlug(domain)+".conf")
+		if _, err := os.Stat(leg); err == nil {
+			_ = os.Remove(leg)
+			removed = append(removed, ver)
+		}
 	}
 	return removed
 }

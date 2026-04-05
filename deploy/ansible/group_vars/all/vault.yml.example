@@ -4,8 +4,8 @@
 #
 # vault.yml içinde örnek anahtarlar:
 # vault_app_key: "base64:..."
-# vault_db_database: panelsar
-# vault_db_username: panelsar
+# vault_db_database: hostvim
+# vault_db_username: hostvim
 # vault_db_password: "..."
 # vault_engine_internal_key: "..."
 # vault_mysql_provision_user: root

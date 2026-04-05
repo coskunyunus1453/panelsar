@@ -186,7 +186,7 @@ func EffectivePHPSocket(phpVersion, socketOverride string) string {
 }
 
 func confBaseName(domain string) string {
-	return "panelsar-" + strings.ToLower(domain) + ".conf"
+	return "hostvim-" + strings.ToLower(domain) + ".conf"
 }
 
 // ApplyVhost sites-available altına conf yazar ve istenirse sites-enabled’a sembolik bağ oluşturur.
@@ -332,7 +332,7 @@ func RemoveVhost(cfg *config.Config, domain string) error {
 	return nil
 }
 
-// RemoveVhostBestEffort site silme yolu: NginxManageVhosts kapalı olsa bile panelsar conf dosyasını ve mümkünse disable dener; hatalar yoksayılır.
+// RemoveVhostBestEffort site silme yolu: NginxManageVhosts kapalı olsa bile hostvim (veya eski panelsar) conf dosyasını kaldırmayı dener.
 func RemoveVhostBestEffort(cfg *config.Config, domain string) {
 	if domain == "" || strings.Contains(domain, "..") {
 		return
@@ -341,4 +341,7 @@ func RemoveVhostBestEffort(cfg *config.Config, domain string) {
 	avail := filepath.Join(cfg.Paths.VhostsDir, base)
 	_ = runNginxVhostHelper(cfg, "disable", base)
 	_ = os.Remove(avail)
+	legacy := filepath.Join(cfg.Paths.VhostsDir, "panelsar-"+strings.ToLower(domain)+".conf")
+	_ = runNginxVhostHelper(cfg, "disable", "panelsar-"+strings.ToLower(domain)+".conf")
+	_ = os.Remove(legacy)
 }

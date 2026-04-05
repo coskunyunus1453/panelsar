@@ -346,8 +346,8 @@ func handleSiteLogs(cfg *config.Config, d *daemon.Daemon) gin.HandlerFunc {
 
 		nginxAccess := filepath.Join(cfg.Paths.LogDir, domain+"_access.log")
 		nginxError := filepath.Join(cfg.Paths.LogDir, domain+"_error.log")
-		apacheAccess := filepath.Join("/var/log/apache2", "panelsar-"+domain+"-access.log")
-		apacheError := filepath.Join("/var/log/apache2", "panelsar-"+domain+"-error.log")
+		apacheAccess := filepath.Join("/var/log/apache2", "hostvim-"+domain+"-access.log")
+		apacheError := filepath.Join("/var/log/apache2", "hostvim-"+domain+"-error.log")
 
 		entries := []gin.H{}
 		for _, item := range []struct {

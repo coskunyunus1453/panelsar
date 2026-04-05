@@ -29,8 +29,8 @@ const tplHTTP = `# Panelsar — {{.Domain}} (Apache HTTP)
         SetHandler "proxy:unix:{{.PHPSocket}}|fcgi://localhost"
     </FilesMatch>
 
-    ErrorLog ${APACHE_LOG_DIR}/panelsar-{{.Domain}}-error.log
-    CustomLog ${APACHE_LOG_DIR}/panelsar-{{.Domain}}-access.log combined
+    ErrorLog ${APACHE_LOG_DIR}/hostvim-{{.Domain}}-error.log
+    CustomLog ${APACHE_LOG_DIR}/hostvim-{{.Domain}}-access.log combined
 </VirtualHost>
 `
 
@@ -62,8 +62,8 @@ const tplHTTPS = `# Panelsar — {{.Domain}} (Apache HTTPS)
         SetHandler "proxy:unix:{{.PHPSocket}}|fcgi://localhost"
     </FilesMatch>
 
-    ErrorLog ${APACHE_LOG_DIR}/panelsar-{{.Domain}}-ssl-error.log
-    CustomLog ${APACHE_LOG_DIR}/panelsar-{{.Domain}}-ssl-access.log combined
+    ErrorLog ${APACHE_LOG_DIR}/hostvim-{{.Domain}}-ssl-error.log
+    CustomLog ${APACHE_LOG_DIR}/hostvim-{{.Domain}}-ssl-access.log combined
 </VirtualHost>
 `
 
@@ -113,7 +113,7 @@ func buildApacheServerAliasLine(primary string, aliases []string) string {
 }
 
 func confBaseName(domain string) string {
-	return "panelsar-" + strings.ToLower(domain) + ".conf"
+	return "hostvim-" + strings.ToLower(domain) + ".conf"
 }
 
 func sitesAvailable(cfg *config.Config) string {
@@ -260,7 +260,7 @@ func RemoveVhost(cfg *config.Config, domain string) error {
 	return nil
 }
 
-// RemoveVhostBestEffort site silme yolu: ApacheManageVhosts kapalı olsa bile panelsar vhost dosyasını kaldırır.
+// RemoveVhostBestEffort site silme yolu: hostvim ve eski panelsar-* apache vhost dosyalarını kaldırmayı dener.
 func RemoveVhostBestEffort(cfg *config.Config, domain string) {
 	if domain == "" || strings.Contains(domain, "..") {
 		return
@@ -268,6 +268,9 @@ func RemoveVhostBestEffort(cfg *config.Config, domain string) {
 	base := confBaseName(domain)
 	_ = os.Remove(filepath.Join(sitesEnabled(cfg), base))
 	_ = os.Remove(filepath.Join(sitesAvailable(cfg), base))
+	leg := "panelsar-" + strings.ToLower(domain) + ".conf"
+	_ = os.Remove(filepath.Join(sitesEnabled(cfg), leg))
+	_ = os.Remove(filepath.Join(sitesAvailable(cfg), leg))
 	if cfg.Hosting.ApacheReloadAfterVhost {
 		_ = reloadApacheErr()
 	}

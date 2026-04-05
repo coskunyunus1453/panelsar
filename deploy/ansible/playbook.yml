@@ -2,14 +2,14 @@
 # Örnek: repoyu çek + .env şablonu + deploy script.
 # Sırlar: ansible-vault → group_vars/all/vault.yml
 
-- name: Panelsar panel deploy
-  hosts: panelsar_panel
+- name: Hostvim panel deploy
+  hosts: hostvim_panel
   become: true
   vars:
-    code_root: /var/www/panelsar
+    code_root: /var/www/hostvim
     panel_root: "{{ code_root }}/panel"
     panel_user: www-data
-    repo_url: git@github.com:ORG/panelsar.git
+    repo_url: git@github.com:ORG/hostvim.git
   tasks:
     - name: Kod deposu (clone / pull)
       ansible.builtin.git:

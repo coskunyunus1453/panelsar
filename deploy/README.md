@@ -11,9 +11,9 @@ Müşteri **sizin barındırdığınız** kaynaktan kodu çekecek. Yaygın seçe
 | Yöntem | Açıklama |
 |--------|-----------|
 | **Genel Git** | GitHub / GitLab **public** repo → müşteri `git clone` veya `remote-install.sh` ile çeker. |
-| **Özel Git** | Private repo → müşteriye **deploy key** veya **sınırlı PAT** verirsiniz; `PANELSAR_REPO_URL` içinde token kullanılabilir (risk: shell geçmişi). Daha iyisi: müşteriye salt okunur deploy key. |
+| **Özel Git** | Private repo → müşteriye **deploy key** veya **sınırlı PAT** verirsiniz; `HOSTVIM_REPO_URL` içinde token kullanılabilir (risk: shell geçmişi). Daha iyisi: müşteriye salt okunur deploy key. |
 | **Sabit arşiv** | `hostvim-v1.tar.gz` üretip CDN/S3’e koyarsınız; müşteri `curl … \| tar` ile açar (ayrı betik gerekir). |
-| **Kurulum script’i CDN** | Sadece `remote-install.sh` dosyasını kendi domain’inize koyarsınız (`https://install.sirketiniz.com/remote-install.sh`); script içinde `PANELSAR_REPO_URL` sizin repo adresinize ayarlı olur. |
+| **Kurulum script’i CDN** | Sadece `remote-install.sh` dosyasını kendi domain’inize koyarsınız (`https://install.sirketiniz.com/remote-install.sh`); script içinde `HOSTVIM_REPO_URL` sizin repo adresinize ayarlı olur. |
 
 Öneri: **Public veya müşteriye özel erişimli** bir Git URL + müşterinin indirdiği **tek** kurulum dosyasını kendi domain’inizde host edin.
 
@@ -22,7 +22,7 @@ Müşteri **sizin barındırdığınız** kaynaktan kodu çekecek. Yaygın seçe
 **Sadece bir dosya:** repodaki `deploy/host/install.sh` dosyasını kopyalayıp sunucunuzda `https://kodsar.com/panel/install.sh` (veya aynı içerik, farklı ad) olarak yayınlayın.
 
 - **Tüm projeyi** bu dizine atmanız gerekmez.
-- Dosyanın başındaki `PANELSAR_REPO_URL` satırını **kendi Git adresinizle** düzenleyin (veya müşteriye env ile verin).
+- Dosyanın başındaki `HOSTVIM_REPO_URL` satırını **kendi Git adresinizle** düzenleyin (veya müşteriye env ile verin; eski: `PANELSAR_REPO_URL`).
 - Asıl kod **`git clone` ile Git’ten** iner.
 
 aaPanel’in `curl -ksSO` kullanımı **sertifika doğrulamasını kapattığı** için (`-k`) orta düzeyde risklidir. Hostvim örneğinde **doğrulama açık** bırakıldı (daha güvenli).
@@ -37,7 +37,7 @@ URL="https://kodsar.com/panel/install.sh" && if command -v curl >/dev/null 2>&1;
 
 ### Profil bazlı kurulum (önerilen)
 
-Komutu yapıştırırken satır başına `*` veya madde işareti **eklemeyin**; kabukta `*` dosya adlarını genişletir ve komut bozulur (ör. `go panelsar-admin-login.txt` hatası). Sorun yaşarsanız: `cd /tmp && curl … | bash`.
+Komutu yapıştırırken satır başına `*` veya madde işareti **eklemeyin**; kabukta `*` dosya adlarını genişletir ve komut bozulur (ör. `go hostvim-admin-login.txt` hatası). Sorun yaşarsanız: `cd /tmp && curl … | bash`.
 
 **Plesk/cPanel benzeri davranış:** `install.sh` varsayılanında panel MySQL’i ve `data/www` **silinmez**; aynı komutla tekrar çalıştırmak kod + `migrate` güncellemesidir. Sunucuyu baştan sıfırlamak (fabrika) için bilinçli olarak `HOSTVIM_FRESH_INSTALL=1` veya `RESET_PANEL_DB=1` verin.
 
@@ -105,22 +105,22 @@ curl -fsSL https://install.SIRKETINIZ.com/remote-install.sh | sudo bash
 `install.sh` / `remote-install.sh` sonrası sıra:
 
 1. `git`, `curl` ve gerekirse **Go** kurulur.
-2. `PANELSAR_REPO_URL` / `PANELSAR_BRANCH` ile kod `/var/www/hostvim` altına **klonlanır** (veya güncellenir).
+2. `HOSTVIM_REPO_URL` / `HOSTVIM_BRANCH` ile kod `/var/www/hostvim` altına **klonlanır** (veya güncellenir; eski: `PANELSAR_*`).
 3. `install-production.sh` nginx, PHP, MariaDB, engine, ön yüz derlemesi vb. kurar.
 
 **Repo URL’nizi sabitlemek için** müşteriye şunu da verebilirsiniz (tek satır):
 
 ```bash
-curl -fsSL https://install.SIRKETINIZ.com/remote-install.sh | sudo PANELSAR_REPO_URL=https://github.com/SIRKET/hostvim.git PANELSAR_BRANCH=main bash
+curl -fsSL https://install.SIRKETINIZ.com/remote-install.sh | sudo HOSTVIM_REPO_URL=https://github.com/SIRKET/hostvim.git HOSTVIM_BRANCH=main bash
 ```
 
 Özel repoda token kullanmak zorundaysanız (önerilmez, geçici):
 
 ```bash
-sudo PANELSAR_REPO_URL=https://TOKEN@github.com/SIRKET/hostvim.git bash -s <<< "$(curl -fsSL https://install.SIRKETINIZ.com/remote-install.sh)"
+sudo HOSTVIM_REPO_URL=https://TOKEN@github.com/SIRKET/hostvim.git bash -s <<< "$(curl -fsSL https://install.SIRKETINIZ.com/remote-install.sh)"
 ```
 
-Daha güvenlisi: sunucuya **SSH deploy key** ekletmek ve normal `git@github.com:SIRKET/panelsar.git` URL kullanmak.
+Daha güvenlisi: sunucuya **SSH deploy key** ekletmek ve normal `git@github.com:SIRKET/hostvim.git` URL kullanmak.
 
 ## Sıfırdan sunucu (temiz Debian/Ubuntu)
 
@@ -180,9 +180,9 @@ Barındırma **müşterisi** Git veya SSH görmez; tek adres panel arayüzüdür
 
 ## Güvenlik özeti
 
-- Engine **loopback**; panel ile aynı makinede çalışır, `.env` içindeki `ENGINE_INTERNAL_KEY` `/etc/panelsar/engine.yaml` ile eşleşir.
+- Engine **loopback**; panel ile aynı makinede çalışır, `.env` içindeki `ENGINE_INTERNAL_KEY` `/etc/hostvim/engine.yaml` ile eşleşir.
 - Nginx’te temel başlıklar (`X-Frame-Options`, `nosniff`, …) ve gzip.
-- Panel şifreleri `/root/panelsar-panel-mysql.secret` (MariaDB kurulduysa).
+- Panel şifreleri `/root/hostvim-panel-mysql.secret` (MariaDB kurulduysa; eski kurulumlar `panelsar-panel-mysql.secret`).
 
 ## Güncelleme (Git’ten kod çekme)
 
@@ -242,4 +242,4 @@ SKIP_APT=1 sudo -E bash deploy/bootstrap/install-production.sh
 | `scripts/deploy-panel.sh` | `git pull` (repo kökü), composer, migrate, frontend build |
 | `nginx/hostvim.conf` | Site şablonu |
 | `systemd/hostvim-engine.service` | Engine servisi |
-| `configs/engine.production.yaml` | `/etc/panelsar/engine.yaml` şablonu |
+| `configs/engine.production.yaml` | `/etc/hostvim/engine.yaml` şablonu |

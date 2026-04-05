@@ -13,7 +13,7 @@
 #   SKIP_APT=1 sudo -E bash deploy/bootstrap/install-production.sh
 #
 # Ortam değişkenleri (isteğe bağlı):
-#   HOSTVIM_HOME=/var/www/hostvim   (eski: PANELSAR_HOME hâlâ yedek olarak okunur)
+#   HOSTVIM_HOME=/var/www/hostvim   (verilmezse repo kökü = betiğin bulunduğu proje; eski: PANELSAR_HOME yedeği)
 #   SERVER_NAME=_          # sadece IP ile erişim için default_server (nginx şablonunda _)
 #   LETS_ENCRYPT_EMAIL=admin@ornek.com
 #   SKIP_APT=1             # paket kurulumunu atla (yeniden çalıştırma)
@@ -55,7 +55,8 @@ source "$SCRIPT_DIR/ensure-go-toolchain.sh"
 # shellcheck source=ensure-php-packages.sh
 source "$SCRIPT_DIR/ensure-php-packages.sh"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
-HOSTVIM_HOME="${HOSTVIM_HOME:-${PANELSAR_HOME:-/var/www/hostvim}}"
+# Varsayılan: klon/kök dizin = repo (HOSTVIM_HOME uyarısı olmaması için). Üretimde isterseniz /var/www/hostvim verin.
+HOSTVIM_HOME="${HOSTVIM_HOME:-${PANELSAR_HOME:-$REPO_ROOT}}"
 SERVER_NAME="${SERVER_NAME:-_}"
 LETS_ENCRYPT_EMAIL="${LETS_ENCRYPT_EMAIL:-admin@localhost}"
 APP_PROFILE="${APP_PROFILE:-customer}"
@@ -79,7 +80,7 @@ fi
 export DEBIAN_FRONTEND=noninteractive
 
 detect_php_fpm_sock() {
-  local pv="${HOSTVIM_PHP_VERSION:-8.4}"
+  local pv="${HOSTVIM_PHP_VERSION:-${PANELSAR_PHP_VERSION:-8.4}}"
   local s
   for s in "/run/php/php${pv}-fpm.sock" /run/php/php8.4-fpm.sock /run/php/php8.3-fpm.sock /run/php/php8.2-fpm.sock /run/php/php-fpm.sock; do
     if [[ -S "$s" ]]; then
@@ -234,7 +235,7 @@ fi
 PHP_FPM_SOCK="$(detect_php_fpm_sock)"
 
 mkdir -p "$HOSTVIM_HOME/data"/{www,tmp,ssl,backups,logs,vhosts}
-mkdir -p /etc/panelsar
+mkdir -p /etc/hostvim
 chown -R www-data:www-data "$HOSTVIM_HOME/data"
 
 # RESET modunda eski hosting kalıntılarını da temizle (plesk benzeri "silince anında düşsün" davranışı).
@@ -245,10 +246,10 @@ if [[ "${RESET_PANEL_DB:-0}" == "1" ]] || [[ "${RESET_PANEL_DB:-0}" == "yes" ]];
     rm -rf "$HOSTVIM_HOME/data/www/"* 2>/dev/null || true
     rm -rf "$HOSTVIM_HOME/data/ssl/"* 2>/dev/null || true
     rm -rf "$HOSTVIM_HOME/data/backups/"* 2>/dev/null || true
-    rm -rf /var/backups/panelsar/* 2>/dev/null || true
-    rm -f /etc/nginx/sites-enabled/panelsar-*.conf 2>/dev/null || true
-    rm -f /etc/apache2/sites-enabled/panelsar-*.conf 2>/dev/null || true
-    rm -f /etc/apache2/sites-available/panelsar-*.conf 2>/dev/null || true
+    rm -rf /var/backups/hostvim/* /var/backups/panelsar/* 2>/dev/null || true
+    rm -f /etc/nginx/sites-enabled/hostvim-*.conf /etc/nginx/sites-enabled/panelsar-*.conf 2>/dev/null || true
+    rm -f /etc/apache2/sites-enabled/hostvim-*.conf /etc/apache2/sites-enabled/panelsar-*.conf 2>/dev/null || true
+    rm -f /etc/apache2/sites-available/hostvim-*.conf /etc/apache2/sites-available/panelsar-*.conf 2>/dev/null || true
     nginx -t >/dev/null 2>&1 && systemctl reload nginx || true
     if command -v apache2ctl >/dev/null 2>&1; then
       apache2ctl configtest >/dev/null 2>&1 && systemctl reload apache2 || true
@@ -258,15 +259,22 @@ fi
 
 # Kimlik anahtarları:
 # - İlk kurulumda güvenli rastgele üretilir.
-# - Sonraki kurulum/güncellemelerde mevcut /etc/panelsar/engine.yaml içinden okunup korunur.
+# - Sonraki kurulum/güncellemelerde mevcut /etc/hostvim/engine.yaml (veya eski /etc/panelsar/engine.yaml) içinden okunup korunur.
 #   Böylece panel↔engine auth kopmaz.
-ENGINE_DST="/etc/panelsar/engine.yaml"
+ENGINE_DST="/etc/hostvim/engine.yaml"
+ENGINE_LEGACY_DST="/etc/panelsar/engine.yaml"
 FORCE_ROTATE_ENGINE_KEYS="${FORCE_ROTATE_ENGINE_KEYS:-0}"
 
+ENGINE_KEY_SRC=""
 if [[ -f "$ENGINE_DST" ]] && [[ "$FORCE_ROTATE_ENGINE_KEYS" != "1" ]]; then
-  EXISTING_INTERNAL_KEY="$(yaml_value_from_block "$ENGINE_DST" "security" "internal_api_key" || true)"
-  EXISTING_ENGINE_JWT="$(yaml_value_from_block "$ENGINE_DST" "security" "jwt_secret" || true)"
-  EXISTING_ENGINE_SECRET="$(yaml_value_from_block "$ENGINE_DST" "server" "secret_key" || true)"
+  ENGINE_KEY_SRC="$ENGINE_DST"
+elif [[ -f "$ENGINE_LEGACY_DST" ]] && [[ "$FORCE_ROTATE_ENGINE_KEYS" != "1" ]]; then
+  ENGINE_KEY_SRC="$ENGINE_LEGACY_DST"
+fi
+if [[ -n "$ENGINE_KEY_SRC" ]]; then
+  EXISTING_INTERNAL_KEY="$(yaml_value_from_block "$ENGINE_KEY_SRC" "security" "internal_api_key" || true)"
+  EXISTING_ENGINE_JWT="$(yaml_value_from_block "$ENGINE_KEY_SRC" "security" "jwt_secret" || true)"
+  EXISTING_ENGINE_SECRET="$(yaml_value_from_block "$ENGINE_KEY_SRC" "server" "secret_key" || true)"
 else
   EXISTING_INTERNAL_KEY=""
   EXISTING_ENGINE_JWT=""
@@ -287,7 +295,7 @@ if [[ "$SERVER_NAME" != "_" ]]; then
 fi
 
 # Önceki kurulumlardan kalan zayıf/placeholder anahtarlar yayın güvenliği için döndürülür.
-if [[ "$INTERNAL_KEY" == "hostvim-engine-internal-dev" ]] || [[ "$INTERNAL_KEY" == *"change"* ]]; then
+if [[ "$INTERNAL_KEY" == "hostvim-engine-internal-dev" ]] || [[ "$INTERNAL_KEY" == "panelsar-engine-internal-dev" ]] || [[ "$INTERNAL_KEY" == *"change"* ]]; then
   INTERNAL_KEY="$(openssl rand -hex 32)"
 fi
 if [[ "$ENGINE_SECRET" == *"change"* ]]; then
@@ -314,10 +322,10 @@ chown root:www-data "$ENGINE_DST"
 
 # PostgreSQL engine kullanıcısı (isteğe bağlı)
 if [[ "${WITH_POSTGRES:-}" == "1" ]] || [[ "${WITH_POSTGRES:-}" == "yes" ]]; then
-  sudo -u postgres psql -tc "SELECT 1 FROM pg_roles WHERE rolname='panelsar'" | grep -q 1 || \
-    sudo -u postgres psql -c "CREATE USER panelsar WITH PASSWORD '$ENGINE_DB_PASS';"
-  sudo -u postgres psql -tc "SELECT 1 FROM pg_database WHERE datname='panelsar'" | grep -q 1 || \
-    sudo -u postgres psql -c "CREATE DATABASE panelsar OWNER panelsar;"
+  sudo -u postgres psql -tc "SELECT 1 FROM pg_roles WHERE rolname='hostvim'" | grep -q 1 || \
+    sudo -u postgres psql -c "CREATE USER hostvim WITH PASSWORD '$ENGINE_DB_PASS';"
+  sudo -u postgres psql -tc "SELECT 1 FROM pg_database WHERE datname='hostvim'" | grep -q 1 || \
+    sudo -u postgres psql -c "CREATE DATABASE hostvim OWNER hostvim;"
 fi
 
 # Go engine derle (apt'teki golang-go genelde esiktir; ensure-go-toolchain.sh go.dev sürümünü kurar)
@@ -416,49 +424,53 @@ fi
 # MariaDB panel DB
 if [[ "${WITH_MARIADB}" == "1" ]] || [[ "${WITH_MARIADB}" == "yes" ]]; then
   # Yeniden kurulumda her seferinde yeni şifre üretmek, CREATE USER IF NOT EXISTS ile uyumsuzluk (1045) yaratır
-  if [[ -s /root/panelsar-panel-mysql.secret ]]; then
+  if [[ -s /root/hostvim-panel-mysql.secret ]]; then
+    PANEL_DB_PASS="$(cat /root/hostvim-panel-mysql.secret)"
+  elif [[ -s /root/panelsar-panel-mysql.secret ]]; then
     PANEL_DB_PASS="$(cat /root/panelsar-panel-mysql.secret)"
   else
     PANEL_DB_PASS="$(openssl rand -hex 16)"
   fi
   MARIADB_CMD=(mariadb)
   command -v mariadb >/dev/null 2>&1 || MARIADB_CMD=(mysql)
-  "${MARIADB_CMD[@]}" -e "CREATE DATABASE IF NOT EXISTS panelsar CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;" || true
-  "${MARIADB_CMD[@]}" -e "CREATE USER IF NOT EXISTS 'panelsar'@'localhost' IDENTIFIED BY '$PANEL_DB_PASS';" || true
-  "${MARIADB_CMD[@]}" -e "ALTER USER 'panelsar'@'localhost' IDENTIFIED BY '$PANEL_DB_PASS';" || true
-  "${MARIADB_CMD[@]}" -e "GRANT ALL PRIVILEGES ON panelsar.* TO 'panelsar'@'localhost'; FLUSH PRIVILEGES;" || true
+  "${MARIADB_CMD[@]}" -e "CREATE DATABASE IF NOT EXISTS hostvim CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;" || true
+  "${MARIADB_CMD[@]}" -e "CREATE USER IF NOT EXISTS 'hostvim'@'localhost' IDENTIFIED BY '$PANEL_DB_PASS';" || true
+  "${MARIADB_CMD[@]}" -e "ALTER USER 'hostvim'@'localhost' IDENTIFIED BY '$PANEL_DB_PASS';" || true
+  "${MARIADB_CMD[@]}" -e "GRANT ALL PRIVILEGES ON hostvim.* TO 'hostvim'@'localhost'; FLUSH PRIVILEGES;" || true
   update_env "DB_CONNECTION" "mysql"
   update_env "DB_HOST" "127.0.0.1"
   update_env "DB_PORT" "3306"
-  update_env "DB_DATABASE" "panelsar"
-  update_env "DB_USERNAME" "panelsar"
+  update_env "DB_DATABASE" "hostvim"
+  update_env "DB_USERNAME" "hostvim"
   update_env "DB_PASSWORD" "$PANEL_DB_PASS"
 
   # Hosting panelinden DB oluşturma için root yerine ayrı bir servis kullanıcısı.
-  if [[ -s /root/panelsar-mysql-provision.secret ]]; then
+  if [[ -s /root/hostvim-mysql-provision.secret ]]; then
+    MYSQL_PROVISION_PASS="$(cat /root/hostvim-mysql-provision.secret)"
+  elif [[ -s /root/panelsar-mysql-provision.secret ]]; then
     MYSQL_PROVISION_PASS="$(cat /root/panelsar-mysql-provision.secret)"
   else
     MYSQL_PROVISION_PASS="$(openssl rand -hex 18)"
   fi
-  "${MARIADB_CMD[@]}" -e "CREATE USER IF NOT EXISTS 'panelsar_provision'@'localhost' IDENTIFIED BY '$MYSQL_PROVISION_PASS';" || true
-  "${MARIADB_CMD[@]}" -e "CREATE USER IF NOT EXISTS 'panelsar_provision'@'127.0.0.1' IDENTIFIED BY '$MYSQL_PROVISION_PASS';" || true
-  "${MARIADB_CMD[@]}" -e "ALTER USER 'panelsar_provision'@'localhost' IDENTIFIED BY '$MYSQL_PROVISION_PASS';" || true
-  "${MARIADB_CMD[@]}" -e "ALTER USER 'panelsar_provision'@'127.0.0.1' IDENTIFIED BY '$MYSQL_PROVISION_PASS';" || true
-  "${MARIADB_CMD[@]}" -e "GRANT ALL PRIVILEGES ON *.* TO 'panelsar_provision'@'localhost' WITH GRANT OPTION;" || true
-  "${MARIADB_CMD[@]}" -e "GRANT ALL PRIVILEGES ON *.* TO 'panelsar_provision'@'127.0.0.1' WITH GRANT OPTION;" || true
+  "${MARIADB_CMD[@]}" -e "CREATE USER IF NOT EXISTS 'hostvim_provision'@'localhost' IDENTIFIED BY '$MYSQL_PROVISION_PASS';" || true
+  "${MARIADB_CMD[@]}" -e "CREATE USER IF NOT EXISTS 'hostvim_provision'@'127.0.0.1' IDENTIFIED BY '$MYSQL_PROVISION_PASS';" || true
+  "${MARIADB_CMD[@]}" -e "ALTER USER 'hostvim_provision'@'localhost' IDENTIFIED BY '$MYSQL_PROVISION_PASS';" || true
+  "${MARIADB_CMD[@]}" -e "ALTER USER 'hostvim_provision'@'127.0.0.1' IDENTIFIED BY '$MYSQL_PROVISION_PASS';" || true
+  "${MARIADB_CMD[@]}" -e "GRANT ALL PRIVILEGES ON *.* TO 'hostvim_provision'@'localhost' WITH GRANT OPTION;" || true
+  "${MARIADB_CMD[@]}" -e "GRANT ALL PRIVILEGES ON *.* TO 'hostvim_provision'@'127.0.0.1' WITH GRANT OPTION;" || true
   "${MARIADB_CMD[@]}" -e "FLUSH PRIVILEGES;" || true
   update_env "MYSQL_PROVISION_ENABLED" "true"
   update_env "MYSQL_PROVISION_HOST" "localhost"
   update_env "MYSQL_PROVISION_PORT" "3306"
-  update_env "MYSQL_PROVISION_USERNAME" "panelsar_provision"
+  update_env "MYSQL_PROVISION_USERNAME" "hostvim_provision"
   update_env "MYSQL_PROVISION_PASSWORD" "$MYSQL_PROVISION_PASS"
-  echo "$MYSQL_PROVISION_PASS" > /root/panelsar-mysql-provision.secret
-  chmod 600 /root/panelsar-mysql-provision.secret
-  echo "MySQL provision şifresi: /root/panelsar-mysql-provision.secret"
+  echo "$MYSQL_PROVISION_PASS" > /root/hostvim-mysql-provision.secret
+  chmod 600 /root/hostvim-mysql-provision.secret
+  echo "MySQL provision şifresi: /root/hostvim-mysql-provision.secret"
 
-  echo "$PANEL_DB_PASS" > /root/panelsar-panel-mysql.secret
-  chmod 600 /root/panelsar-panel-mysql.secret
-  echo "Panel MySQL şifresi: /root/panelsar-panel-mysql.secret"
+  echo "$PANEL_DB_PASS" > /root/hostvim-panel-mysql.secret
+  chmod 600 /root/hostvim-panel-mysql.secret
+  echo "Panel MySQL şifresi: /root/hostvim-panel-mysql.secret"
 fi
 
 # Composer www-data ile çalışır; panel/ yalnızca storage/cache www-data ise vendor/ oluşturulamaz
@@ -513,14 +525,18 @@ if [[ "${SKIP_DB_SEED:-}" != "1" ]]; then
   HOST_FQDN="$(hostname -f 2>/dev/null || hostname || echo hostvim.local)"
   HOST_FQDN="${HOST_FQDN// /}"
   ADMIN_EMAIL="${HOSTVIM_ADMIN_EMAIL:-admin@${HOST_FQDN}}"
-  SEED_DEMO_USERS="${HOSTVIM_SEED_DEMO_USERS:-0}"
+  SEED_DEMO_USERS="${HOSTVIM_SEED_DEMO_USERS:-${PANELSAR_SEED_DEMO_USERS:-0}}"
   USER_COUNT=""
   if [[ "$RESET_DB_MODE" == "0" ]] && { [[ "${WITH_MARIADB}" == "1" ]] || [[ "${WITH_MARIADB}" == "yes" ]]; }; then
     DB_PW=$(grep '^DB_PASSWORD=' "$ENV_FILE" | cut -d= -f2- | tr -d '\r')
     MARIADB_CMD=(mariadb)
     command -v mariadb >/dev/null 2>&1 || MARIADB_CMD=(mysql)
     if [[ -n "$DB_PW" ]]; then
-      USER_COUNT=$(MYSQL_PWD="$DB_PW" "${MARIADB_CMD[@]}" -u panelsar -h 127.0.0.1 panelsar -Nse "SELECT COUNT(*)" 2>/dev/null || echo "")
+      DB_USER_Q="$(grep '^DB_USERNAME=' "$ENV_FILE" 2>/dev/null | cut -d= -f2- | tr -d '\r' | tr -d ' ')"
+      DB_NAME_Q="$(grep '^DB_DATABASE=' "$ENV_FILE" 2>/dev/null | cut -d= -f2- | tr -d '\r' | tr -d ' ')"
+      [[ -n "$DB_USER_Q" ]] || DB_USER_Q="hostvim"
+      [[ -n "$DB_NAME_Q" ]] || DB_NAME_Q="hostvim"
+      USER_COUNT=$(MYSQL_PWD="$DB_PW" "${MARIADB_CMD[@]}" -u "$DB_USER_Q" -h 127.0.0.1 "$DB_NAME_Q" -Nse "SELECT COUNT(*)" 2>/dev/null || echo "")
     fi
   elif [[ "$RESET_DB_MODE" == "0" ]] && grep -q '^DB_CONNECTION=sqlite' "$ENV_FILE" 2>/dev/null && [[ -f "$PANEL_ROOT/database/database.sqlite" ]]; then
     USER_COUNT=$(sqlite3 "$PANEL_ROOT/database/database.sqlite" "SELECT COUNT(*) FROM users;" 2>/dev/null || echo "")
@@ -684,7 +700,7 @@ if [[ "${SKIP_DB_SEED:-}" != "1" ]]; then
     done < /root/hostvim-admin-login.txt
     echo "################################################################"
   elif [[ -f /root/panelsar-admin-login.txt ]]; then
-    echo "#  (Eski yol: /root/panelsar-admin-login.txt)"
+    echo "#  (Eski kurulum: /root/panelsar-admin-login.txt)"
     while IFS= read -r line || [[ -n "$line" ]]; do
       echo "#  $line"
     done < /root/panelsar-admin-login.txt

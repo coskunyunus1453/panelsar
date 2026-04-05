@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/spf13/viper"
 )
@@ -115,18 +116,24 @@ func Load() (*Config, error) {
 	viper.SetConfigName("engine")
 	viper.SetConfigType("yaml")
 
-	configDir := os.Getenv("PANELSAR_CONFIG_DIR")
+	configDir := strings.TrimSpace(os.Getenv("HOSTVIM_CONFIG_DIR"))
 	if configDir == "" {
-		configDir = "/etc/panelsar"
+		configDir = strings.TrimSpace(os.Getenv("PANELSAR_CONFIG_DIR"))
+	}
+	if configDir == "" {
+		configDir = "/etc/hostvim"
 	}
 	viper.AddConfigPath(configDir)
+	viper.AddConfigPath("/etc/hostvim")
+	viper.AddConfigPath("/etc/panelsar")
 	viper.AddConfigPath(filepath.Join(".", "configs"))
 	viper.AddConfigPath(".")
 
 	setDefaults()
 
 	viper.AutomaticEnv()
-	viper.SetEnvPrefix("PANELSAR")
+	viper.SetEnvPrefix("HOSTVIM")
+	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 
 	if err := viper.ReadInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
@@ -148,7 +155,10 @@ func (c *Config) resolvePaths() {
 	if c.Paths.WebRoot != "" {
 		return
 	}
-	home := os.Getenv("PANELSAR_HOME")
+	home := strings.TrimSpace(os.Getenv("HOSTVIM_HOME"))
+	if home == "" {
+		home = strings.TrimSpace(os.Getenv("PANELSAR_HOME"))
+	}
 	if home == "" {
 		if wd, err := os.Getwd(); err == nil {
 			if filepath.Base(wd) == "engine" {
@@ -164,10 +174,10 @@ func (c *Config) resolvePaths() {
 		home = abs
 	}
 	c.Paths.WebRoot = filepath.Join(home, "data", "www")
-	if c.Paths.TempDir == "" || c.Paths.TempDir == "/tmp/panelsar" {
+	if c.Paths.TempDir == "" || c.Paths.TempDir == "/tmp/panelsar" || c.Paths.TempDir == "/tmp/hostvim" {
 		c.Paths.TempDir = filepath.Join(home, "data", "tmp")
 	}
-	if c.Paths.SSLDir == "" || c.Paths.SSLDir == "/etc/panelsar/ssl" {
+	if c.Paths.SSLDir == "" || c.Paths.SSLDir == "/etc/panelsar/ssl" || c.Paths.SSLDir == "/etc/hostvim/ssl" {
 		c.Paths.SSLDir = filepath.Join(home, "data", "ssl")
 	}
 }
@@ -179,12 +189,12 @@ func setDefaults() {
 
 	viper.SetDefault("database.host", "localhost")
 	viper.SetDefault("database.port", 5432)
-	viper.SetDefault("database.name", "panelsar")
-	viper.SetDefault("database.user", "panelsar")
+	viper.SetDefault("database.name", "hostvim")
+	viper.SetDefault("database.user", "hostvim")
 
 	viper.SetDefault("docker.enabled", true)
 	viper.SetDefault("docker.socket_path", "/var/run/docker.sock")
-	viper.SetDefault("docker.network", "panelsar_net")
+	viper.SetDefault("docker.network", "hostvim_net")
 
 	viper.SetDefault("security.token_expiry", 3600)
 	viper.SetDefault("security.max_login_attempts", 5)
@@ -193,10 +203,10 @@ func setDefaults() {
 
 	viper.SetDefault("paths.web_root", "")
 	viper.SetDefault("paths.vhosts_dir", "/etc/nginx/sites-available")
-	viper.SetDefault("paths.ssl_dir", "/etc/panelsar/ssl")
-	viper.SetDefault("paths.backup_dir", "/var/backups/panelsar")
-	viper.SetDefault("paths.log_dir", "/var/log/panelsar")
-	viper.SetDefault("paths.temp_dir", "/tmp/panelsar")
+	viper.SetDefault("paths.ssl_dir", "/etc/hostvim/ssl")
+	viper.SetDefault("paths.backup_dir", "/var/backups/hostvim")
+	viper.SetDefault("paths.log_dir", "/var/log/hostvim")
+	viper.SetDefault("paths.temp_dir", "/tmp/hostvim")
 
 	viper.SetDefault("hosting.nginx_manage_vhosts", false)
 	viper.SetDefault("hosting.nginx_sites_enabled", "/etc/nginx/sites-enabled")

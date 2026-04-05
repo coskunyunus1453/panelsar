@@ -6,8 +6,10 @@ After=network.target
 Type=simple
 User=www-data
 Group=www-data
+Environment=HOSTVIM_HOME=__HOSTVIM_HOME__
+Environment=HOSTVIM_CONFIG_DIR=/etc/hostvim
 Environment=PANELSAR_HOME=__HOSTVIM_HOME__
-Environment=PANELSAR_CONFIG_DIR=/etc/panelsar
+Environment=PANELSAR_CONFIG_DIR=/etc/hostvim
 ExecStart=__ENGINE_BINARY__
 Restart=on-failure
 RestartSec=5

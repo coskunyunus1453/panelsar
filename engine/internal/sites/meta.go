@@ -17,12 +17,23 @@ type SiteMeta struct {
 	Hostname     string   `json:"hostname,omitempty"` // Alt site meta dosyalarında FQDN (silme / vhost için)
 }
 
+const metaDirName = ".hostvim"
+const legacyMetaDirName = ".panelsar"
+
 func metaDir(webRoot, domain string) string {
-	return filepath.Join(webRoot, domain, ".panelsar")
+	return filepath.Join(webRoot, domain, metaDirName)
+}
+
+func legacySiteMetaDir(webRoot, domain string) string {
+	return filepath.Join(webRoot, domain, legacyMetaDirName)
 }
 
 func metaFile(webRoot, domain string) string {
 	return filepath.Join(metaDir(webRoot, domain), "site.json")
+}
+
+func legacyMetaFile(webRoot, domain string) string {
+	return filepath.Join(legacySiteMetaDir(webRoot, domain), "site.json")
 }
 
 // ReadSiteMeta mevcut site meta verisini okur; yoksa nil, nil döner.
@@ -34,9 +45,15 @@ func ReadSiteMeta(webRoot, domain string) (*SiteMeta, error) {
 	b, err := os.ReadFile(p)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil, nil
+			p = legacyMetaFile(webRoot, domain)
+			b, err = os.ReadFile(p)
 		}
-		return nil, err
+		if err != nil {
+			if os.IsNotExist(err) {
+				return nil, nil
+			}
+			return nil, err
+		}
 	}
 	var m SiteMeta
 	if err := json.Unmarshal(b, &m); err != nil {
@@ -45,7 +62,7 @@ func ReadSiteMeta(webRoot, domain string) (*SiteMeta, error) {
 	return &m, nil
 }
 
-// WriteSiteMeta .panelsar/site.json yazar.
+// WriteSiteMeta .hostvim/site.json yazar.
 func WriteSiteMeta(webRoot, domain string, m *SiteMeta) error {
 	if domain == "" || strings.Contains(domain, "..") {
 		return nil

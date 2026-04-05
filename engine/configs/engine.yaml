@@ -7,14 +7,14 @@ server:
 database:
   host: "localhost"
   port: 5432
-  name: "panelsar"
-  user: "panelsar"
+  name: "hostvim"
+  user: "hostvim"
   password: "secret"
 
 docker:
   enabled: true
   socket_path: "/var/run/docker.sock"
-  network: "panelsar_net"
+  network: "hostvim_net"
 
 services:
   nginx:
@@ -36,19 +36,19 @@ services:
 
 security:
   jwt_secret: "change-this-jwt-secret-in-production"
-  internal_api_key: "panelsar-engine-internal-dev"
+  internal_api_key: "hostvim-engine-internal-dev"
   allowed_origins: "http://localhost,http://127.0.0.1"
   token_expiry: 3600
   max_login_attempts: 5
   fail2ban_enabled: true
 
-# web_root boş bırakılırsa PANELSAR_HOME/data/www kullanılır (geliştirme)
+# web_root boş bırakılırsa HOSTVIM_HOME/data/www kullanılır (geliştirme)
 paths:
   web_root: ""
   vhosts_dir: "/etc/nginx/sites-available"
-  ssl_dir: "/etc/panelsar/ssl"
-  backup_dir: "/var/backups/panelsar"
-  log_dir: "/var/log/panelsar"
+  ssl_dir: "/etc/hostvim/ssl"
+  backup_dir: "/var/backups/hostvim"
+  log_dir: "/var/log/hostvim"
   temp_dir: ""
 
 # Faz 1.1 — Linux prod: nginx_manage_vhosts: true (engine root veya yazma yetkisi gerekir)

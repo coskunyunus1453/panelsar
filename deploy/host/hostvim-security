@@ -1,5 +1,5 @@
 #!/bin/bash
-# Panelsar engine (www-data) tarafindan sudo ile cagirilir.
+# Hostvim engine (www-data) tarafından sudo ile çağrılır.
 set -euo pipefail
 
 ACTION="${1:-}"
@@ -76,7 +76,7 @@ maxretry = $M
 [sshd]
 enabled = true
 
-[panelsar-auth]
+[hostvim-auth]
 enabled = true
 EOF
     chmod 644 "$CONF"
@@ -202,7 +202,7 @@ EOF
     else
       a2dismod "$MOD" >/dev/null
     fi
-    apache2ctl configtest >/tmp/panelsar-apache-test.log 2>&1 || { cat /tmp/panelsar-apache-test.log; exit 1; }
+    apache2ctl configtest >/tmp/hostvim-apache-test.log 2>&1 || { cat /tmp/hostvim-apache-test.log; exit 1; }
     systemctl reload apache2 >/dev/null 2>&1 || true
     if a2query -m "$MOD" 2>/dev/null | grep -q "enabled"; then
       echo "enabled"
@@ -229,14 +229,14 @@ EOF
       cp -a "$P" "$BACKUP" || { rm -f "$BACKUP"; echo "backup failed" >&2; exit 1; }
     fi
     install -m 644 "$SRC" "$P"
-    if ! nginx -t >/tmp/panelsar-nginx-test.log 2>&1; then
+    if ! nginx -t >/tmp/hostvim-nginx-test.log 2>&1; then
       if [[ "$HAD_ORIG" -eq 1 ]]; then
         install -m 644 "$BACKUP" "$P"
       else
         rm -f "$P"
       fi
       rm -f "$BACKUP"
-      cat /tmp/panelsar-nginx-test.log >&2
+      cat /tmp/hostvim-nginx-test.log >&2
       exit 1
     fi
     rm -f "$BACKUP"
@@ -264,7 +264,7 @@ EOF
       ufw allow 993/tcp >/dev/null 2>&1 || true
     fi
     echo "[5/6] prepare webmail placeholder vhost"
-    WEBROOT="/var/www/panelsar/webmail-placeholder/${DOMAIN}"
+    WEBROOT="/var/www/hostvim/webmail-placeholder/${DOMAIN}"
     mkdir -p "$WEBROOT"
     cat > "${WEBROOT}/index.html" <<EOF
 <!doctype html>
@@ -287,8 +287,9 @@ server {
   location / { try_files \$uri \$uri/ /index.html; }
 }
 EOF
-    ln -sfn "$NCONF" "/etc/nginx/sites-enabled/panelsar-webmail-${DOMAIN}.conf"
-    nginx -t >/tmp/panelsar-nginx-test.log 2>&1 || { cat /tmp/panelsar-nginx-test.log; exit 1; }
+    ln -sfn "$NCONF" "/etc/nginx/sites-enabled/hostvim-webmail-${DOMAIN}.conf"
+    rm -f "/etc/nginx/sites-enabled/panelsar-webmail-${DOMAIN}.conf" 2>/dev/null || true
+    nginx -t >/tmp/hostvim-nginx-test.log 2>&1 || { cat /tmp/hostvim-nginx-test.log; exit 1; }
     systemctl reload nginx >/dev/null 2>&1 || true
     echo "[6/6] done"
     echo "ok"

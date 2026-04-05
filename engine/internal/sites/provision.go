@@ -117,7 +117,7 @@ func ProvisionSubdomain(webRoot, parentDomain, hostname, pathSegment, phpVersion
 		ServerType:   st,
 		SSLEnabled:   false,
 	}
-	subMetaDir := filepath.Join(webRoot, parentDomain, ".panelsar", "subdomains")
+	subMetaDir := filepath.Join(webRoot, parentDomain, ".hostvim", "subdomains")
 	if err := os.MkdirAll(subMetaDir, 0o750); err != nil {
 		return "", err
 	}
@@ -150,13 +150,19 @@ func ReadSubdomainMeta(webRoot, parentDomain, pathSegment string) (*SiteMeta, er
 	if parentDomain == "" || pathSegment == "" {
 		return nil, nil
 	}
-	metaPath := filepath.Join(webRoot, parentDomain, ".panelsar", "subdomains", pathSegment+".json")
+	metaPath := filepath.Join(webRoot, parentDomain, ".hostvim", "subdomains", pathSegment+".json")
 	b, err := os.ReadFile(metaPath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil, nil
+			leg := filepath.Join(webRoot, parentDomain, ".panelsar", "subdomains", pathSegment+".json")
+			b, err = os.ReadFile(leg)
 		}
-		return nil, err
+		if err != nil {
+			if os.IsNotExist(err) {
+				return nil, nil
+			}
+			return nil, err
+		}
 	}
 	var m SiteMeta
 	if err := json.Unmarshal(b, &m); err != nil {
@@ -175,8 +181,12 @@ func RemoveSubdomain(webRoot, parentDomain, pathSegment string) (hostname string
 	if strings.Contains(pathSegment, "/") || strings.Contains(pathSegment, "..") {
 		return "", fmt.Errorf("invalid path segment")
 	}
-	metaPath := filepath.Join(webRoot, parentDomain, ".panelsar", "subdomains", pathSegment+".json")
+	metaPath := filepath.Join(webRoot, parentDomain, ".hostvim", "subdomains", pathSegment+".json")
+	legacyMetaPath := filepath.Join(webRoot, parentDomain, ".panelsar", "subdomains", pathSegment+".json")
 	b, rerr := os.ReadFile(metaPath)
+	if rerr != nil && os.IsNotExist(rerr) {
+		b, rerr = os.ReadFile(legacyMetaPath)
+	}
 	if rerr == nil {
 		var m SiteMeta
 		if json.Unmarshal(b, &m) == nil && strings.TrimSpace(m.Hostname) != "" {
@@ -188,6 +198,7 @@ func RemoveSubdomain(webRoot, parentDomain, pathSegment string) (hostname string
 		return hostname, err
 	}
 	_ = os.Remove(metaPath)
+	_ = os.Remove(legacyMetaPath)
 	return hostname, nil
 }
 

@@ -1,4 +1,4 @@
-# Hostvim Engine — üretim şablonu (/etc/panelsar/engine.yaml olarak kopyalanır)
+# Hostvim Engine — üretim şablonu (/etc/hostvim/engine.yaml olarak kopyalanır)
 # Kurulum: install-production.sh otomatik doldurur (__INTERNAL_KEY__, __HOSTVIM_HOME__)
 
 server:
@@ -10,14 +10,14 @@ server:
 database:
   host: "127.0.0.1"
   port: 5432
-  name: "panelsar"
-  user: "panelsar"
+  name: "hostvim"
+  user: "hostvim"
   password: "__ENGINE_DB_PASSWORD__"
 
 docker:
   enabled: false
   socket_path: "/var/run/docker.sock"
-  network: "panelsar_net"
+  network: "hostvim_net"
 
 services:
   nginx:

@@ -4,7 +4,7 @@ import path from 'path'
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
-  // Alt klasör (örn. XAMPP: /panelsar/panel/public/) ve kök kurulumda asset 404 olmaması için
+  // Alt klasör (örn. XAMPP: /hostvim/panel/public/) ve kök kurulumda asset 404 olmaması için
   // varsayılan göreli taban. Kökte sabit / istiyorsanız: VITE_BASE_URL=/
   const base = env.VITE_BASE_URL ?? './'
 

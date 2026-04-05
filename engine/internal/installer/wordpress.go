@@ -49,7 +49,7 @@ func installWordPress(cfg *config.Config, domain string, db *DBConfig) error {
 	if err := os.MkdirAll(cfg.Paths.TempDir, 0o755); err != nil {
 		return fmt.Errorf("temp dir: %w", err)
 	}
-	zipFile := filepath.Join(cfg.Paths.TempDir, "panelsar-wordpress-"+domain+".zip")
+	zipFile := filepath.Join(cfg.Paths.TempDir, "hostvim-wordpress-"+domain+".zip")
 	if err := downloadFile(zipURL, zipFile, 15*time.Minute); err != nil {
 		return err
 	}

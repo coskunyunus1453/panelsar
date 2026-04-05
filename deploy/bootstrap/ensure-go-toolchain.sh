@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# Panelsar: engine/go.mod ile uyumlu Go toolchain (resmi go.dev paketi).
+# Hostvim: engine/go.mod ile uyumlu Go toolchain (resmi go.dev paketi).
 # Kaynak: https://go.dev/dl/ — müşteri sunucusunda apt'teki eski golang-go yerine kullanılır.
 #
 # Ortam (isteğe bağlı):
-#   PANELSAR_GO_VERSION=1.22.3   # engine/go.mod "go 1.22" ile uyumlu patch sürümü
+#   HOSTVIM_GO_VERSION=1.22.3   # engine/go.mod ile uyumlu (eski: PANELSAR_GO_VERSION)
 
 ensure_go_toolchain() {
-  local want="${PANELSAR_GO_VERSION:-1.22.3}"
+  local want="${HOSTVIM_GO_VERSION:-${PANELSAR_GO_VERSION:-1.22.3}}"
   local arch tarball url tmp
   case "$(uname -m)" in
     x86_64) arch=amd64 ;;
@@ -38,13 +38,13 @@ ensure_go_toolchain() {
 
   echo "==> Go ${want} kuruluyor (engine derlemesi için; mevcut: ${have:-yok})..."
   if command -v curl >/dev/null 2>&1; then
-    if [[ "${PANELSAR_INSECURE_DOWNLOAD:-0}" == "1" ]]; then
+    if [[ "${HOSTVIM_INSECURE_DOWNLOAD:-${PANELSAR_INSECURE_DOWNLOAD:-0}}" == "1" ]]; then
       curl -fsSLk "$url" -o "$tmp"
     else
       curl -fsSL "$url" -o "$tmp"
     fi
   else
-    if [[ "${PANELSAR_INSECURE_DOWNLOAD:-0}" == "1" ]]; then
+    if [[ "${HOSTVIM_INSECURE_DOWNLOAD:-${PANELSAR_INSECURE_DOWNLOAD:-0}}" == "1" ]]; then
       wget -qO "$tmp" "$url" --no-check-certificate
     else
       wget -qO "$tmp" "$url"

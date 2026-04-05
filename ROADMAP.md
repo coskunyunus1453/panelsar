@@ -23,7 +23,7 @@
 |---|--------|-----------|
 | 1.1 | **Nginx sanal host** | Domain eklenince `sites-available` + `sites-enabled` şablonu; PHP-FPM socket; güvenli `server_name` / `root`; silinince kaldırma. *(Bu sürümde uygulanmaya başlandı — `hosting.nginx_manage_vhosts`)* |
 | 1.2 | **Apache alternatifi** | `server_type=apache` için vhost şablonu + sites-available / sites-enabled sembolik bağ; `hosting.apache_manage_vhosts` |
-| 1.3 | **PHP-FPM havuzları** | Sürüm başına pool, kullanıcı/`open_basedir`, `pm` limitleri, panelden sürüm değişince pool güncelleme *(engine: `php_fpm_manage_pools`, site meta `.panelsar/site.json`, PHP değişiminde eski pool silinir)* |
+| 1.3 | **PHP-FPM havuzları** | Sürüm başına pool, kullanıcı/`open_basedir`, `pm` limitleri, panelden sürüm değişince pool güncelleme *(engine: `php_fpm_manage_pools`, site meta `.hostvim/site.json`, PHP değişiminde eski pool silinir)* |
 | 1.4 | **SSL (Let’s Encrypt)** | HTTP-01 webroot (`certbot certonly`); `hosting.manage_ssl` + PEM yolları; panelde hata durumunda `failed` / engine `postChecked` |
 | 1.5 | **HTTP→HTTPS yönlendirme** | PEM mevcutken nginx/apache 80→443 301; nginx’de HSTS başlığı |
 
