@@ -5,9 +5,9 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 ENGINE_DIR="$ROOT/engine"
 RUN_DIR="$ROOT/.run"
 LOG_DIR="$ROOT/storage/logs"
-PID_FILE="$RUN_DIR/panelsar-engine.pid"
+PID_FILE="$RUN_DIR/hostvim-engine.pid"
 LOCAL_LOG="$LOG_DIR/engine-local.log"
-SERVICE_NAME="panelsar-engine"
+SERVICE_NAME="hostvim-engine"
 
 ACTION="${1:-status}"
 
@@ -44,9 +44,11 @@ local_start() {
 
   (
     cd "$ENGINE_DIR"
+    export HOSTVIM_HOME="$ROOT"
+    export HOSTVIM_CONFIG_DIR="$ENGINE_DIR/configs"
     export PANELSAR_HOME="$ROOT"
     export PANELSAR_CONFIG_DIR="$ENGINE_DIR/configs"
-    nohup go run ./cmd/panelsar-engine >>"$LOCAL_LOG" 2>&1 &
+    nohup go run ./cmd/hostvim-engine >>"$LOCAL_LOG" 2>&1 &
     echo $! >"$PID_FILE"
   )
   sleep 1

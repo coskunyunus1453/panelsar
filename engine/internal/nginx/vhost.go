@@ -57,7 +57,7 @@ func BuildServerNamesLine(primary string, aliases []string) string {
 	return strings.Join(parts, " ")
 }
 
-const vhostTemplateSSL = `# Panelsar — {{.PrimaryLabel}} (HTTPS)
+const vhostTemplateSSL = `# Hostvim — {{.PrimaryLabel}} (HTTPS)
 server {
     listen 80;
     listen [::]:80;
@@ -82,7 +82,7 @@ server {
     ssl_certificate {{.SSLFullChain}};
     ssl_certificate_key {{.SSLPrivKey}};
     ssl_session_timeout 1d;
-    ssl_session_cache shared:PanelsarSSL:10m;
+    ssl_session_cache shared:HostvimSSL:10m;
 
     add_header Strict-Transport-Security "max-age=31536000" always;
 
@@ -108,7 +108,7 @@ server {
 }
 `
 
-const vhostTemplateHTTP = `# Panelsar — {{.PrimaryLabel}}
+const vhostTemplateHTTP = `# Hostvim — {{.PrimaryLabel}}
 server {
     listen 80;
     listen [::]:80;

@@ -56,7 +56,7 @@ Uygulanan kaynaklar:
 
 - Alan adı, veritabanı, e-posta, FTP, cron sayıları  
 - `ssl_enabled` / `backup_enabled` bayrakları  
-- `panelsar.backup.max_backups_per_user` ile yedek adedi üst sınırı  
+- `hostvim.backup.max_backups_per_user` ile yedek adedi üst sınırı  
 
 ## Yedek geri yükleme
 

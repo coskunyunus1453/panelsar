@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Panelsar — yalnızca beyaz listedeki paket demetlerini kurar (www-data sudo ile).
+# Hostvim — yalnızca beyaz listedeki paket demetlerini kurar (www-data sudo ile).
 # Argüman dışı veya bilinmeyen ID reddedilir.
 #
 # Not (rollback): apt-get install yarım kalırsa paketler kısmen kurulu kalabilir; otomatik

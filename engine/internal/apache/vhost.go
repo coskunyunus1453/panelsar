@@ -13,7 +13,7 @@ import (
 	"hostvim/engine/internal/nginx"
 )
 
-const tplHTTP = `# Panelsar — {{.Domain}} (Apache HTTP)
+const tplHTTP = `# Hostvim — {{.Domain}} (Apache HTTP)
 <VirtualHost *:{{.HTTPPort}}>
     ServerName {{.Domain}}
     ServerAlias {{.ServerAliasLine}}
@@ -34,7 +34,7 @@ const tplHTTP = `# Panelsar — {{.Domain}} (Apache HTTP)
 </VirtualHost>
 `
 
-const tplHTTPS = `# Panelsar — {{.Domain}} (Apache HTTPS)
+const tplHTTPS = `# Hostvim — {{.Domain}} (Apache HTTPS)
 <VirtualHost *:{{.HTTPPort}}>
     ServerName {{.Domain}}
     ServerAlias {{.ServerAliasLine}}

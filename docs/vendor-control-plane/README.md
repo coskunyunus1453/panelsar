@@ -1,6 +1,6 @@
 # Vendor Control Plane
 
-Bu klasor, Panelsar'in musteri paneline ek olarak satisa hazir "merkezi yonetim" katmaninin (Vendor Panel) mimarisini ve uygulama planini tutar.
+Bu klasör, Hostvim müşteri paneline ek olarak satışa hazır “merkezi yönetim” katmanının (Vendor Panel) mimarisini ve uygulama planını tutar.
 
 Hedef:
 - Lisans, plan, musteri (tenant), node ve faturalama yonetimini tek merkezden yapmak

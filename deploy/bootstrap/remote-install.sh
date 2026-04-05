@@ -19,7 +19,7 @@ set -euo pipefail
 
 [[ "$(id -u)" -eq 0 ]] || { echo "Root gerekli: sudo bash veya curl ... | sudo bash" >&2; exit 1; }
 
-HOSTVIM_REPO_URL="${HOSTVIM_REPO_URL:-${PANELSAR_REPO_URL:-https://github.com/coskunyunus1453/panelsar.git}}"
+HOSTVIM_REPO_URL="${HOSTVIM_REPO_URL:-${PANELSAR_REPO_URL:-https://github.com/coskunyunus1453/hostvim.git}}"
 HOSTVIM_BRANCH="${HOSTVIM_BRANCH:-${PANELSAR_BRANCH:-main}}"
 HOSTVIM_HOME="${HOSTVIM_HOME:-${PANELSAR_HOME:-/var/www/hostvim}}"
 export PANELSAR_HOME="$HOSTVIM_HOME"

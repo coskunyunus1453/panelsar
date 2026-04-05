@@ -572,6 +572,7 @@ if [[ -f "$FRONTEND_ROOT/package.json" ]]; then
     --exclude index.php \
     --exclude .htaccess \
     "$FRONTEND_ROOT/dist/" "$PANEL_ROOT/public/"
+  # Nginx’te panel `location /admin/ { alias .../public/; }` ise derlemede: VITE_BASE_URL=/admin/ (aksi halde /admin/assets/*.js 404).
 fi
 
 if [[ "${RESET_PANEL_DB:-0}" == "1" ]] || [[ "${RESET_PANEL_DB:-0}" == "yes" ]]; then
@@ -709,7 +710,7 @@ EOF
 systemctl daemon-reload
 systemctl enable --now hostvim-panel-queue.service
 
-# Nginx — eski Panelsar site dosyası default_server ile çakışmasın (duplicate default server hatası)
+# Nginx — eski panelsar.conf site dosyası default_server ile çakışmasın (duplicate default server hatası)
 rm -f /etc/nginx/sites-enabled/panelsar.conf /etc/nginx/sites-enabled/panelsar 2>/dev/null || true
 rm -f /etc/nginx/sites-enabled/default 2>/dev/null || true
 

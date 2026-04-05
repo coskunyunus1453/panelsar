@@ -83,7 +83,7 @@ func (h HostingPoolSettings) poolGroup() string {
 	return h.FPMGroup
 }
 
-const poolTemplate = `; Panelsar — %s — PHP %s
+const poolTemplate = `; Hostvim — %s — PHP %s
 [%s]
 user = %s
 group = %s

@@ -1,4 +1,4 @@
-# Panelsar — Tam ürün yol haritası
+# Hostvim — Tam ürün yol haritası
 
 **Hedef:** Plesk + cPanel yeteneklerinin modern bir birleşimi — daha hızlı arayüz, sıkı güvenlik, API-öncelikli mimari, ileride **AI yardımcısı** (teşhis, öneri, doğal dil komutları).
 

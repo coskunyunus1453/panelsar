@@ -5,7 +5,7 @@ import tailwindcss from '@tailwindcss/vite';
 /**
  * Taban yolu laravel-vite-plugin belirler: ASSET_URL + "build/" (bkz. node_modules/laravel-vite-plugin).
  * ASSET_URL boşken base = "/build/" → chunk preload "/build/assets/..." olur (doğru).
- * Alt klasör (XAMPP): .env içinde ASSET_URL=/panelsar/landing/public → base "/panelsar/landing/public/build/".
+ * Alt klasör (XAMPP): .env içinde ASSET_URL=/hostvim/landing/public → base "/hostvim/landing/public/build/".
  * Burada base vermeyin; aksi halde eklentinin hesabı ezilir ve preload 404 verir.
  */
 export default defineConfig({

@@ -126,7 +126,7 @@ func Load() (*Config, error) {
 
 	configDir := strings.TrimSpace(os.Getenv("HOSTVIM_CONFIG_DIR"))
 	if configDir == "" {
-		configDir = strings.TrimSpace(os.Getenv("PANELSAR_CONFIG_DIR"))
+		configDir = strings.TrimSpace(os.Getenv("PANELSAR_CONFIG_DIR")) // eski kurulumlar
 	}
 	if configDir == "" {
 		configDir = "/etc/hostvim"
@@ -165,7 +165,7 @@ func (c *Config) resolvePaths() {
 	}
 	home := strings.TrimSpace(os.Getenv("HOSTVIM_HOME"))
 	if home == "" {
-		home = strings.TrimSpace(os.Getenv("PANELSAR_HOME"))
+		home = strings.TrimSpace(os.Getenv("PANELSAR_HOME")) // eski kurulumlar
 	}
 	if home == "" {
 		if wd, err := os.Getwd(); err == nil {

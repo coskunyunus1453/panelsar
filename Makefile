@@ -1,4 +1,4 @@
-PROJECT_NAME := panelsar
+PROJECT_NAME := hostvim
 ENGINE_DIR := engine
 PANEL_DIR := panel
 FRONTEND_DIR := frontend
@@ -7,7 +7,7 @@ DOCKER_DIR := docker
 .PHONY: help dev build test clean engine panel frontend docker
 
 help:
-	@echo "Panelsar - Hosting Control Panel"
+	@echo "Hostvim - Hosting Control Panel"
 	@echo "================================"
 	@echo "make dev          - Start all development services"
 	@echo "make build        - Build all components"
@@ -26,14 +26,14 @@ dev: docker-up
 	@echo "Starting all services..."
 	cd $(FRONTEND_DIR) && npm run dev &
 	cd $(PANEL_DIR) && php artisan serve --port=8000 &
-	cd $(ENGINE_DIR) && go run cmd/panelsar-engine/main.go
+	cd $(ENGINE_DIR) && go run cmd/hostvim-engine/main.go
 
 # Engine
 engine:
-	cd $(ENGINE_DIR) && go build -o bin/panelsar-engine cmd/panelsar-engine/main.go
+	cd $(ENGINE_DIR) && go build -o bin/hostvim-engine cmd/hostvim-engine/main.go
 
 engine-dev:
-	cd $(ENGINE_DIR) && go run cmd/panelsar-engine/main.go
+	cd $(ENGINE_DIR) && go run cmd/hostvim-engine/main.go
 
 engine-test:
 	cd $(ENGINE_DIR) && go test ./...

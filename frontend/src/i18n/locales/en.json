@@ -232,7 +232,7 @@
   "terminal": {
     "title": "SSH terminal",
     "subtitle": "Root login shell on the server (via sudo). Admin only; needs Nginx /engine-ws/ proxy and ENGINE_API_SECRET matching engine jwt_secret.",
-    "warning": "Full root access: a wrong command can break the server. Only trusted admins should use this. Set HOSTVIM_TERMINAL_NO_ROOT=1 on the engine service to fall back to the engine user shell (legacy: PANELSAR_TERMINAL_NO_ROOT=1).",
+    "warning": "Full root access: a wrong command can break the server. Only trusted admins should use this. Set HOSTVIM_TERMINAL_NO_ROOT=1 on the engine service to fall back to the engine user shell.",
     "status_online": "Connected",
     "status_connecting": "Connecting…",
     "status_offline": "Offline",

@@ -7,7 +7,7 @@ Bu belge Vendor Control Plane icin operasyonel guvenlik kontrol adimlarini ozetl
 1. `VENDOR_LICENSE_SIGNING_KEY` tanimli olmali.
 2. `VENDOR_BILLING_WEBHOOK_SECRET` tanimli olmali.
 3. Vendor endpointlerine erisen admin hesaplarinda 2FA acik olmali.
-4. `php artisan panelsar:sync-abilities` calistirilmali.
+4. `php artisan hostvim:sync-abilities` çalıştırılmalı.
 
 ## 2) Periyodik Kontroller
 

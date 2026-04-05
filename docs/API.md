@@ -1,4 +1,4 @@
-# Panelsar API Documentation
+# Hostvim API Documentation
 
 ## Base URL
 ```
@@ -14,7 +14,7 @@ POST /api/auth/login
 Content-Type: application/json
 
 {
-  "email": "admin@panelsar.com",
+  "email": "admin@hostvim.com",
   "password": "password"
 }
 
@@ -180,7 +180,7 @@ GET http://localhost:9090/health
 Response:
 {
   "status": "healthy",
-  "engine": "panelsar",
+  "engine": "hostvim",
   "version": "0.1.0"
 }
 ```
@@ -214,7 +214,7 @@ GET /api/v1/system/processes
 ```
 
 ### Panel → Engine internal auth
-Panel, `ENGINE_INTERNAL_KEY` ile `X-Panelsar-Engine-Key` başlığını gönderir (engine `security.internal_api_key` ile aynı olmalı).
+Panel, `ENGINE_INTERNAL_KEY` ile `X-Hostvim-Engine-Key` başlığını gönderir (engine `security.internal_api_key` ile aynı olmalı; eski istemciler `X-Panelsar-Engine-Key` de kabul edilir).
 
 ### Engine ek uçlar (özet)
 ```

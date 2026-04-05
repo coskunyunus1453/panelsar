@@ -232,7 +232,7 @@
   "terminal": {
     "title": "SSH terminal",
     "subtitle": "Sunucuda root login kabuğu (sudo ile). Yalnızca yönetici; Nginx /engine-ws/ ve ENGINE_API_SECRET gerekir.",
-    "warning": "Tam root erişimidir: yanlış komut sunucuyu bozabilir. Yalnızca güvendiğiniz yöneticiler kullanmalı. Eski davranış için engine ortamında HOSTVIM_TERMINAL_NO_ROOT=1 verilebilir (eski: PANELSAR_TERMINAL_NO_ROOT=1).",
+    "warning": "Tam root erişimidir: yanlış komut sunucuyu bozabilir. Yalnızca güvendiğiniz yöneticiler kullanmalı. Eski davranış için engine ortamında HOSTVIM_TERMINAL_NO_ROOT=1 verilebilir.",
     "status_online": "Bağlı",
     "status_connecting": "Bağlanıyor…",
     "status_offline": "Kapalı",

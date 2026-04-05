@@ -28,7 +28,7 @@
   "terminal": {
     "title": "SSH-Terminal",
     "subtitle": "Root login shell (via sudo). Admin only; Nginx /engine-ws/ and ENGINE_API_SECRET required.",
-    "warning": "Full root access. Set HOSTVIM_TERMINAL_NO_ROOT=1 on the engine service for the old engine-user shell (legacy: PANELSAR_TERMINAL_NO_ROOT=1).",
+    "warning": "Full root access. Set HOSTVIM_TERMINAL_NO_ROOT=1 on the engine service for the old engine-user shell.",
     "status_online": "Connected",
     "status_connecting": "Connecting…",
     "status_offline": "Offline",

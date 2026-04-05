@@ -269,7 +269,7 @@ func registerModuleRoutes(cfg *config.Config, d *daemon.Daemon, api *gin.RouterG
 		c.JSON(http.StatusOK, gin.H{
 			"fail2ban": gin.H{
 				"enabled": fail2banOn,
-				"jails":   []string{"sshd", "hostvim-auth", "panelsar-auth"},
+				"jails":   []string{"sshd", "hostvim-auth", "panelsar-auth"}, // panelsar-auth: eski fail2ban jail adı
 				"settings": func() gin.H {
 					b, f, m, e := security.Fail2banJailGet()
 					return gin.H{

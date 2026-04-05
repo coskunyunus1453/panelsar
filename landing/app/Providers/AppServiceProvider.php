@@ -41,7 +41,7 @@ class AppServiceProvider extends ServiceProvider
         View::composer($landingViews, NavMenuComposer::class);
 
         if ($this->app->environment('testing')) {
-            $path = sys_get_temp_dir().'/panelsar-landing-blade';
+            $path = sys_get_temp_dir().'/hostvim-landing-blade';
             if (! is_dir($path)) {
                 @mkdir($path, 0777, true);
             }
