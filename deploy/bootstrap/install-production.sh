@@ -385,7 +385,8 @@ if [[ ! -f "$ENV_FILE" ]]; then
   fi
 fi
 
-php "$PANEL_ROOT/artisan" key:generate --force 2>/dev/null || true
+# APP_KEY: composer install + vendor/autoload sonrası üretilir (aşağıda). Erken key:generate
+# vendor yokken sessizce başarısız olup APP_KEY boş kalıyordu → db:seed "No application encryption key".
 
 # .env üretim ayarları (sed ile idempotent değil; basit grep ile atla)
 update_env() {
@@ -481,6 +482,14 @@ chmod -R ug+rwx "$PANEL_ROOT/storage" "$PANEL_ROOT/bootstrap/cache"
 hostvim_git_safe_directory "$REPO_ROOT"
 
 sudo -u www-data composer --working-dir="$PANEL_ROOT" install --no-dev --optimize-autoloader --no-interaction
+
+if ! grep -qE '^APP_KEY=base64:.+' "$ENV_FILE" 2>/dev/null; then
+  echo "==> Laravel APP_KEY üretiliyor (.env)…"
+  sudo -u www-data php "$PANEL_ROOT/artisan" key:generate --force --no-interaction || {
+    echo "Hata: php artisan key:generate başarısız; .env veya composer kurulumunu kontrol edin." >&2
+    exit 1
+  }
+fi
 
 if grep -q '^DB_CONNECTION=sqlite' "$ENV_FILE" 2>/dev/null; then
   install -d -o www-data -g www-data -m 775 "$PANEL_ROOT/database"
