@@ -53,13 +53,14 @@ mkdir -p "$PKG_ROOT/deploy/meta"
   echo "built_at=$STAMP"
 } > "$PKG_ROOT/deploy/meta/profile-artifact.env"
 
-# Varsayilan profili artifact'e sabitle (deploy script tarafinda override edilebilir).
+# Arayüz her zaman müşteri profili; "vendor" artifact yalnızca tam kod paketi (API dosyaları dahil).
+APP_PROFILE_FOR_ENV="customer"
 if [[ -f "$PKG_ROOT/panel/.env.production.example" ]]; then
   if grep -q "^APP_PROFILE=" "$PKG_ROOT/panel/.env.production.example"; then
-    sed -i.bak "s/^APP_PROFILE=.*/APP_PROFILE=$PROFILE/" "$PKG_ROOT/panel/.env.production.example"
+    sed -i.bak "s/^APP_PROFILE=.*/APP_PROFILE=$APP_PROFILE_FOR_ENV/" "$PKG_ROOT/panel/.env.production.example"
     rm -f "$PKG_ROOT/panel/.env.production.example.bak"
   else
-    printf "\nAPP_PROFILE=%s\n" "$PROFILE" >> "$PKG_ROOT/panel/.env.production.example"
+    printf "\nAPP_PROFILE=%s\n" "$APP_PROFILE_FOR_ENV" >> "$PKG_ROOT/panel/.env.production.example"
   fi
 fi
 

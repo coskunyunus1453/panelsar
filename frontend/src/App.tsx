@@ -1,5 +1,5 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
-import { lazy, Suspense, useEffect } from 'react'
+import { useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useAuthStore } from './store/authStore'
 import { useThemeStore } from './store/themeStore'
@@ -49,10 +49,6 @@ import DocsPage from './pages/DocsPage'
 import DocsDetailPage from './pages/DocsDetailPage'
 import BlogPage from './pages/BlogPage'
 import BlogDetailPage from './pages/BlogDetailPage'
-import { isVendorProfile } from './config/profile'
-
-const AdminVendorControlPage = lazy(() => import('./pages/AdminVendorControlPage'))
-
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
   if (!isAuthenticated) return <Navigate to="/login" replace />
@@ -90,7 +86,6 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
-      {isVendorProfile && <Route path="/vendor/login" element={<LoginPage />} />}
       <Route path="/" element={<PublicMarketingGate />}>
         <Route index element={<PublicLandingPage />} />
         <Route path="pricing" element={<PricingPage />} />
@@ -145,18 +140,6 @@ export default function App() {
           <Route path="docs" element={<AdminCmsDocsPage />} />
           <Route path="blog" element={<AdminCmsBlogPage />} />
         </Route>
-        {isVendorProfile && (
-          <Route
-            path="admin/vendor-control"
-            element={<AdvancedRoute><Suspense fallback={null}><AdminVendorControlPage /></Suspense></AdvancedRoute>}
-          />
-        )}
-        {isVendorProfile && (
-          <Route
-            path="vendor/control"
-            element={<AdvancedRoute><Suspense fallback={null}><AdminVendorControlPage /></Suspense></AdvancedRoute>}
-          />
-        )}
         <Route path="settings" element={<SettingsPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

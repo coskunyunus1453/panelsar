@@ -19,10 +19,10 @@ Müşteri **sizin barındırdığınız** kaynaktan kodu çekecek. Yaygın seçe
 
 ### `kodsar.com/panel` üzerine ne yükleyeceksiniz?
 
-**Sadece bir dosya:** repodaki `deploy/host/install.sh` dosyasını kopyalayıp sunucunuzda `https://kodsar.com/panel/install.sh` (veya aynı içerik, farklı ad) olarak yayınlayın.
+Müşteriye vereceğiniz **iki giriş betiği** (önerilen): `deploy/host/install-community.sh` ve `deploy/host/install-pro.sh`. İsteğe bağlı: ortak motor `install.sh` veya eski adlar (`install-customer.sh`, `install-vendor.sh` — yönlendirme).
 
 - **Tüm projeyi** bu dizine atmanız gerekmez.
-- Dosyanın başındaki `HOSTVIM_REPO_URL` satırını **kendi Git adresinizle** düzenleyin (veya müşteriye env ile verin; eski: `PANELSAR_REPO_URL`).
+- `install.sh` içindeki `HOSTVIM_REPO_URL` satırını **kendi Git adresinizle** düzenleyin (veya müşteriye env ile verin; eski: `PANELSAR_REPO_URL`).
 - Asıl kod **`git clone` ile Git’ten** iner.
 
 aaPanel’in `curl -ksSO` kullanımı **sertifika doğrulamasını kapattığı** için (`-k`) orta düzeyde risklidir. Hostvim örneğinde **doğrulama açık** bırakıldı (daha güvenli).
@@ -35,22 +35,27 @@ Müşteri **root** (veya `sudo`) ile Debian/Ubuntu sunucuda:
 URL="https://kodsar.com/panel/install.sh" && if command -v curl >/dev/null 2>&1; then curl -fsSL "$URL" | sudo bash; else wget -qO- "$URL" | sudo bash; fi
 ```
 
-### Profil bazlı kurulum (önerilen)
+### İki sürüm komutu (önerilen)
 
 Komutu yapıştırırken satır başına `*` veya madde işareti **eklemeyin**; kabukta `*` dosya adlarını genişletir ve komut bozulur (ör. `go hostvim-admin-login.txt` hatası). Sorun yaşarsanız: `cd /tmp && curl … | bash`.
 
 **Plesk/cPanel benzeri davranış:** `install.sh` varsayılanında panel MySQL’i ve `data/www` **silinmez**; aynı komutla tekrar çalıştırmak kod + `migrate` güncellemesidir. Sunucuyu baştan sıfırlamak (fabrika) için bilinçli olarak `HOSTVIM_FRESH_INSTALL=1` veya `RESET_PANEL_DB=1` verin.
 
-- Customer panel (vendor modulleri kapali):
+| Sürüm | Açıklama | Komut (örnek URL) |
+|--------|-----------|-------------------|
+| **Community** | Freemium / barındırma paneli; `APP_PROFILE=customer`, vendor kapalı | `curl -fsSL …/install-community.sh \| sudo bash` |
+| **Pro** | Lisans + tam özellik; `APP_PROFILE=customer`, vendor kapalı. Lisans/SaaS müşterileri merkezi sitede. İsteğe bağlı: `HOSTVIM_LICENSE_KEY=...` | `HOSTVIM_LICENSE_KEY="..." curl -fsSL …/install-pro.sh \| sudo bash` |
+
+Eski dosya adları yönlendirme: `install-customer.sh` → community, `install-vendor.sh` → pro.
 
 ```bash
-curl -fsSL https://kodsar.com/panel/install-customer.sh | sudo bash
-```
+# Community (kodsar.com örneği — dosyayı kendi domain’inize kopyalayın)
+curl -fsSL https://kodsar.com/panel/install-community.sh | sudo bash
 
-- Vendor control plane (vendor modulleri acik):
-
-```bash
-curl -fsSL https://kodsar.com/panel/install-vendor.sh | sudo bash
+# Pro
+curl -fsSL https://kodsar.com/panel/install-pro.sh | sudo bash
+# veya anahtar ile:
+# HOSTVIM_LICENSE_KEY="hv_..." curl -fsSL https://kodsar.com/panel/install-pro.sh | sudo bash
 ```
 
 ## Profil artifact üretimi (güncelleme güvenli)
@@ -59,14 +64,14 @@ Sürekli dosya değişimlerinde manuel ayıklama yapmamak için profile göre ot
 
 ```bash
 cd /var/www/hostvim
-bash deploy/scripts/build-profile-artifact.sh customer
-bash deploy/scripts/build-profile-artifact.sh vendor
+bash deploy/scripts/build-profile-artifact.sh customer   # Community sürüm paketi
+bash deploy/scripts/build-profile-artifact.sh vendor    # Pro / tam kod paketi (artifact içi APP_PROFILE=customer)
 ```
 
 Üretilen paketler `dist-artifacts/` altında oluşur:
 
-- `hostvim-customer-*.tar.gz` (vendor backend dosyalari hariç)
-- `hostvim-vendor-*.tar.gz` (tam paket)
+- `hostvim-customer-*.tar.gz` — Community (vendor backend dosyaları hariç)
+- `hostvim-vendor-*.tar.gz` — Pro (tam paket; panel arayüzü yine müşteri profili)
 
 Exclude listeleri:
 

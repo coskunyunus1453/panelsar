@@ -2,6 +2,11 @@
 
 use App\Http\Controllers\Admin\Auth\LoginController;
 use App\Http\Controllers\Admin\BlogCategoryController;
+use App\Http\Controllers\Admin\SaasCustomerController;
+use App\Http\Controllers\Admin\SaasDashboardController;
+use App\Http\Controllers\Admin\SaasLicenseController;
+use App\Http\Controllers\Admin\SaasLicenseProductController;
+use App\Http\Controllers\Admin\SaasProductModuleController;
 use App\Http\Controllers\Admin\BlogPostController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\DocPageController;
@@ -110,6 +115,17 @@ Route::prefix('admin')->name('admin.')->group(function (): void {
             Route::resource('blog-posts', BlogPostController::class)->except(['show']);
             Route::resource('doc-pages', DocPageController::class)->except(['show']);
             Route::resource('plans', PlanController::class)->except(['show']);
+
+            Route::get('saas', SaasDashboardController::class)->name('saas.dashboard');
+            Route::resource('saas/customers', SaasCustomerController::class)->except(['show']);
+            Route::resource('saas/products', SaasLicenseProductController::class)->except(['show'])
+                ->parameters(['products' => 'saas_license_product']);
+            Route::resource('saas/modules', SaasProductModuleController::class)->except(['show'])
+                ->parameters(['modules' => 'saas_product_module']);
+            Route::resource('saas/licenses', SaasLicenseController::class)->except(['show'])
+                ->parameters(['licenses' => 'saas_license']);
+            Route::post('saas/licenses/{saas_license}/regenerate', [SaasLicenseController::class, 'regenerate'])
+                ->name('saas.licenses.regenerate');
 
             Route::get('nav-menu', [NavMenuItemController::class, 'index'])->name('nav-menu.index');
             Route::get('nav-menu/create', [NavMenuItemController::class, 'create'])->name('nav-menu.create');

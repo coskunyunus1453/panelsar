@@ -7,7 +7,6 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "build:customer": "VITE_APP_PROFILE=customer tsc && VITE_APP_PROFILE=customer vite build",
-    "build:vendor": "VITE_APP_PROFILE=vendor tsc && VITE_APP_PROFILE=vendor vite build",
     "preview": "vite preview",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "test": "vitest"

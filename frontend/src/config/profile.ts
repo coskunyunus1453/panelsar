@@ -1,5 +1,4 @@
-const appProfile = (((import.meta as any).env?.VITE_APP_PROFILE as string) || 'customer').toLowerCase()
-
-export const isVendorProfile = appProfile === 'vendor'
-export const isCustomerProfile = appProfile !== 'vendor'
-export const effectiveLoginPath = isVendorProfile ? '/vendor/login' : '/login'
+/** Yerleşik panel yalnızca müşteri arayüzü; çok kiracılı vendor ekranları merkezi sitede. */
+export const isVendorProfile = false
+export const isCustomerProfile = true
+export const effectiveLoginPath = '/login'

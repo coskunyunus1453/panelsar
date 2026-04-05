@@ -6,6 +6,7 @@ import { useThemeStore } from '../store/themeStore'
 import { useAuthStore } from '../store/authStore'
 import { mustEnrollTwoFactor } from '../lib/authRoles'
 import { useBranding } from '../hooks/useBranding'
+import { safeBrandingImageUrl } from '../lib/urlSafety'
 import api from '../services/api'
 import { Sun, Moon, Globe, User, Lock, Smartphone, ImageIcon } from 'lucide-react'
 import toast from 'react-hot-toast'
@@ -37,6 +38,8 @@ export default function SettingsPage() {
   const showMandatory2faBanner =
     mandatory2faParam || mustEnrollTwoFactor(user, enforceAdmin2fa)
   const { data: branding } = useBranding()
+  const safeCustomerBrandingUrl = safeBrandingImageUrl(branding?.logo_customer_url)
+  const safeAdminBrandingUrl = safeBrandingImageUrl(branding?.logo_admin_url)
   const brandingCfgQ = useQuery({
     queryKey: ['branding-config'],
     enabled: isAdmin,
@@ -267,18 +270,18 @@ export default function SettingsPage() {
               <p className="text-sm text-gray-500 dark:text-gray-400">{t('settings.branding_hint')}</p>
             </div>
           </div>
-          {(branding?.logo_customer_url || branding?.logo_admin_url) && (
+          {(safeCustomerBrandingUrl || safeAdminBrandingUrl) && (
             <div className="flex flex-wrap gap-6 mb-4">
-              {branding?.logo_customer_url && (
+              {safeCustomerBrandingUrl && (
                 <div>
                   <p className="text-xs text-gray-500 mb-1">{t('settings.logo_customer')}</p>
-                  <img src={branding.logo_customer_url} alt="" className="h-12 object-contain" />
+                  <img src={safeCustomerBrandingUrl} alt="" className="h-12 object-contain" />
                 </div>
               )}
-              {branding?.logo_admin_url && (
+              {safeAdminBrandingUrl && (
                 <div>
                   <p className="text-xs text-gray-500 mb-1">{t('settings.logo_admin')}</p>
-                  <img src={branding.logo_admin_url} alt="" className="h-12 object-contain" />
+                  <img src={safeAdminBrandingUrl} alt="" className="h-12 object-contain" />
                 </div>
               )}
             </div>

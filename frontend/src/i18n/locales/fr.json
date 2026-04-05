@@ -23,7 +23,8 @@
     "open_menu": "Ouvrir le menu",
     "close_menu": "Fermer le menu",
     "toggle_sidebar": "Réduire le panneau",
-    "terminal": "Terminal SSH"
+    "terminal": "Terminal SSH",
+    "license": "Licence"
   },
   "terminal": {
     "title": "Terminal SSH",
@@ -114,5 +115,34 @@
     "use_easy": "Utiliser le mode facile",
     "advanced_required_title": "Mode avancé requis",
     "advanced_required_desc": "Cette page contient des paramètres techniques/avancés. Elle est masquée en mode facile."
+  },
+  "license": {
+    "subtitle": "Activez Pro avec la clé de notre site — pas de .env",
+    "status": "État",
+    "key_set": "Défini",
+    "key_unset": "Non défini",
+    "key_storage": "Emplacement",
+    "source_env": "Serveur (.env)",
+    "source_database": "Ce panneau (chiffré en base)",
+    "source_none": "Pas encore défini",
+    "key_preview": "Clé masquée",
+    "hub_label": "Serveur de licence",
+    "hub_yes": "Configuré",
+    "hub_no": "Non configuré",
+    "validation_label": "Dernière vérification",
+    "valid_yes": "Valide",
+    "engine_skip": "Pas de clé locale",
+    "ui_hint": "Collez la clé puis « Activer ». Stockage chiffré (APP_KEY).",
+    "activate_title": "Activer Pro",
+    "activate_hint": "Copiez la clé depuis notre site — pas besoin de modifier .env.",
+    "key_placeholder": "hv_…",
+    "activate": "Activer et enregistrer",
+    "activate_ok": "Licence activée.",
+    "activate_ok_plan": "Licence activée ({{plan}}).",
+    "test_only": "Tester seulement",
+    "clear_stored": "Supprimer la clé enregistrée",
+    "clear_confirm": "Supprimer la clé de licence enregistrée ?",
+    "cleared_ok": "Clé supprimée.",
+    "validate_ok": "Réponse"
   }
 }

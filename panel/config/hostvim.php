@@ -11,9 +11,10 @@ return [
     /** Hosting dosya kökü (engine `paths.web_root` ile aynı olmalı; boşsa proje kökü/data/www) */
     'hosting_web_root' => env('HOSTVIM_HOSTING_WEB_ROOT', env('PANELSAR_HOSTING_WEB_ROOT', dirname($panelRoot).DIRECTORY_SEPARATOR.'data'.DIRECTORY_SEPARATOR.'www')),
 
-    'engine_url' => env('ENGINE_API_URL', 'http://127.0.0.1:9090'),
-    'engine_internal_key' => env('ENGINE_INTERNAL_KEY', ''),
-    'engine_secret' => env('ENGINE_API_SECRET', ''),
+    /** Boşluk/BOM temizliği; eski kurulumlar için PANELSAR_* yedek anahtarları */
+    'engine_url' => rtrim(trim((string) env('ENGINE_API_URL', env('PANELSAR_ENGINE_URL', 'http://127.0.0.1:9090'))), '/'),
+    'engine_internal_key' => trim((string) env('ENGINE_INTERNAL_KEY', env('PANELSAR_ENGINE_INTERNAL_KEY', ''))),
+    'engine_secret' => trim((string) env('ENGINE_API_SECRET', env('PANELSAR_ENGINE_API_SECRET', env('PANELSAR_JWT_SECRET', '')))),
     'vendor_license_signing_key' => env('VENDOR_LICENSE_SIGNING_KEY', ''),
     'vendor_billing_webhook_secret' => env('VENDOR_BILLING_WEBHOOK_SECRET', ''),
     'vendor_request_replay_ttl_seconds' => (int) env('VENDOR_REQUEST_REPLAY_TTL_SECONDS', 300),
@@ -23,7 +24,8 @@ return [
         explode(',', (string) env('VENDOR_PORTAL_HOSTS', ''))
     ))),
     'vendor_enabled' => filter_var(env('VENDOR_ENABLED', env('APP_PROFILE', 'customer') === 'vendor'), FILTER_VALIDATE_BOOLEAN),
-    'enforce_admin_2fa' => filter_var(env('ENFORCE_ADMIN_2FA', true), FILTER_VALIDATE_BOOLEAN),
+    /** false: zorunlu 2FA yok; admin/vendor Ayarlar’dan isteğe bağlı açar. true: 2FA açık hesaplarda yönetici API’leri için OTP ile alınan token gerekir. */
+    'enforce_admin_2fa' => filter_var(env('ENFORCE_ADMIN_2FA', false), FILTER_VALIDATE_BOOLEAN),
 
     /** Maskelemeli audit logları (önerilir: açık) */
     'safe_audit_enabled' => filter_var(env('HOSTVIM_SAFE_AUDIT', env('PANELSAR_SAFE_AUDIT', true)), FILTER_VALIDATE_BOOLEAN),
@@ -38,8 +40,18 @@ return [
     /** Let’s Encrypt: istekte e-posta yoksa engine `hosting.lets_encrypt_email` ile birlikte kullanılır */
     'lets_encrypt_email' => env('HOSTVIM_LETS_ENCRYPT_EMAIL', env('PANELSAR_LETS_ENCRYPT_EMAIL', '')),
 
-    'license_server' => env('LICENSE_SERVER_URL', 'https://license.hostvim.com'),
-    'license_key' => env('LICENSE_KEY', ''),
+    /**
+     * Merkezi lisans doğrulama adresi. .env’de LICENSE_SERVER_URL yoksa varsayılan hub kullanılır;
+     * müşteri kurulumunda ek ayar gerekmez. Özel / hava boşluklu kurulum: LICENSE_SERVER_URL= ile kapatın.
+     */
+    'license_server' => rtrim(trim((string) env(
+        'LICENSE_SERVER_URL',
+        env('HOSTVIM_LICENSE_HUB_URL', 'https://hostvim.com')
+    )), '/'),
+    /** Panel → hub isteğinde Bearer (isteğe bağlı; boşsa yalnızca anahtar + rate limit) */
+    'license_server_api_secret' => trim((string) env('LICENSE_SERVER_API_SECRET', '')),
+    /** Otomasyon / eski kurulum: doluysa veritabanındaki anahtardan önceliklidir */
+    'license_key' => trim((string) env('LICENSE_KEY', '')),
 
     'default_locale' => env('PANEL_DEFAULT_LOCALE', 'en'),
     'available_locales' => explode(',', env('PANEL_AVAILABLE_LOCALES', 'en,tr,de,fr,es,pt,zh,ja,ar,ru')),

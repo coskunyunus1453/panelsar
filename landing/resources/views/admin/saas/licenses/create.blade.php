@@ -1,0 +1,75 @@
+<x-admin.layout title="Yeni lisans">
+    <form method="POST" action="{{ route('admin.saas.licenses.store') }}" class="max-w-2xl space-y-4">
+        @csrf
+        <div>
+            <label class="block text-sm font-medium">Müşteri *</label>
+            <select name="saas_customer_id" required class="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 dark:border-slate-700 dark:bg-slate-900">
+                @foreach ($customers as $c)
+                    <option value="{{ $c->id }}" @selected(old('saas_customer_id') == $c->id)>{{ $c->name }}</option>
+                @endforeach
+            </select>
+        </div>
+        <div>
+            <label class="block text-sm font-medium">Ürün *</label>
+            <select name="saas_license_product_id" required class="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 dark:border-slate-700 dark:bg-slate-900">
+                @foreach ($products as $p)
+                    <option value="{{ $p->id }}" @selected(old('saas_license_product_id') == $p->id)>{{ $p->name }} ({{ $p->code }})</option>
+                @endforeach
+            </select>
+        </div>
+        <div>
+            <label class="block text-sm font-medium">Durum *</label>
+            <select name="status" class="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 dark:border-slate-700 dark:bg-slate-900">
+                @foreach (['active', 'suspended', 'expired', 'revoked'] as $st)
+                    <option value="{{ $st }}" @selected(old('status', 'active') === $st)>{{ $st }}</option>
+                @endforeach
+            </select>
+        </div>
+        <div class="grid gap-4 sm:grid-cols-2">
+            <div>
+                <label class="block text-sm font-medium">Başlangıç</label>
+                <input type="datetime-local" name="starts_at" value="{{ old('starts_at') }}" class="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 dark:border-slate-700 dark:bg-slate-900">
+            </div>
+            <div>
+                <label class="block text-sm font-medium">Bitiş</label>
+                <input type="datetime-local" name="expires_at" value="{{ old('expires_at') }}" class="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 dark:border-slate-700 dark:bg-slate-900">
+            </div>
+        </div>
+        <div>
+            <label class="block text-sm font-medium">Abonelik durumu</label>
+            <select name="subscription_status" class="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 dark:border-slate-700 dark:bg-slate-900">
+                <option value="">—</option>
+                @foreach (['active', 'past_due', 'canceled', 'none'] as $st)
+                    <option value="{{ $st }}" @selected(old('subscription_status') === $st)>{{ $st }}</option>
+                @endforeach
+            </select>
+        </div>
+        <div>
+            <label class="block text-sm font-medium">Yenileme tarihi</label>
+            <input type="datetime-local" name="subscription_renews_at" value="{{ old('subscription_renews_at') }}" class="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 dark:border-slate-700 dark:bg-slate-900">
+        </div>
+        <div class="grid gap-4 sm:grid-cols-2">
+            <div>
+                <label class="block text-sm font-medium">Fatura sağlayıcı</label>
+                <input type="text" name="billing_provider" value="{{ old('billing_provider') }}" placeholder="stripe" class="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 dark:border-slate-700 dark:bg-slate-900">
+            </div>
+            <div>
+                <label class="block text-sm font-medium">Harici referans</label>
+                <input type="text" name="billing_reference" value="{{ old('billing_reference') }}" class="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 dark:border-slate-700 dark:bg-slate-900">
+            </div>
+        </div>
+        <div>
+            <label class="block text-sm font-medium">Limit özelleştirme (JSON)</label>
+            <textarea name="limits_override_raw" rows="3" class="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 font-mono text-xs dark:border-slate-700 dark:bg-slate-900">{{ old('limits_override_raw', '{}') }}</textarea>
+        </div>
+        <div>
+            <label class="block text-sm font-medium">Modül özelleştirme (JSON)</label>
+            <textarea name="modules_override_raw" rows="4" class="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 font-mono text-xs dark:border-slate-700 dark:bg-slate-900">{{ old('modules_override_raw', '{}') }}</textarea>
+        </div>
+        <div>
+            <label class="block text-sm font-medium">Notlar</label>
+            <textarea name="notes" rows="2" class="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 dark:border-slate-700 dark:bg-slate-900">{{ old('notes') }}</textarea>
+        </div>
+        <button type="submit" class="admin-btn-emerald">Oluştur (anahtar otomatik)</button>
+    </form>
+</x-admin.layout>

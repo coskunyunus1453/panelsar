@@ -30,4 +30,6 @@ return [
     'no_data' => 'Veri bulunamadı',
     'success' => 'İşlem başarılı',
     'error' => 'Bir hata oluştu',
+    'engine_auth_missing' => 'Panel .env içinde ENGINE_INTERNAL_KEY (engine security.internal_api_key ile aynı) veya ENGINE_API_SECRET tanımlı değil; motor çağrıları yapılamıyor.',
+    'engine_auth_mismatch' => 'Panel ile motor arası kimlik doğrulama başarısız. Panel .env ENGINE_INTERNAL_KEY değerinin /etc/hostvim/engine.yaml içindeki security.internal_api_key ile birebir aynı olduğundan ve hostvim-engine servisinin çalıştığından emin olun; ardından php artisan config:clear çalıştırın.',
 ];

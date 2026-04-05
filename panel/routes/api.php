@@ -269,7 +269,11 @@ Route::middleware(['auth:sanctum', 'abilities:access:customer-panel'])->group(fu
         Route::post('plugins/{pluginModule}/migrations/start', [PluginStoreController::class, 'startMigration'])->middleware('throttle:plugins-write');
     });
 
-    Route::middleware('role:admin')->post('license/validate', [LicenseController::class, 'validateWithKey']);
+    Route::middleware('role:admin')->group(function (): void {
+        Route::post('license/validate', [LicenseController::class, 'validateWithKey']);
+        Route::post('license/activate', [LicenseController::class, 'activate']);
+        Route::post('license/clear', [LicenseController::class, 'clearStored']);
+    });
 
     Route::middleware('ability:billing:read')->group(function () {
         Route::get('billing/packages', [BillingController::class, 'packages']);

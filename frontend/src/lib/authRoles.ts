@@ -14,7 +14,7 @@ export function isHostingSuperAdmin(user: User | null): boolean {
   return !!user?.roles?.some((r) => r.name === 'admin')
 }
 
-/** enforce_admin_2fa açıkken henüz 2FA kurulmadıysa panelde gezinmeden önce Ayarlar’a yönlendirilir. */
+/** Sunucu ENFORCE_ADMIN_2FA=true iken henüz 2FA kurulmamış admin/vendor operatörleri Ayarlar’a yönlendirilir (varsayılan politika kapalı). */
 export function mustEnrollTwoFactor(user: User | null, enforceAdmin2fa: boolean | null): boolean {
   if (!user || enforceAdmin2fa !== true) return false
   if (user.two_factor_enabled) return false

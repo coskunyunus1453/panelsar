@@ -36,6 +36,9 @@
 #   HOSTVIM_ADMIN_EMAIL=...       # ilk admin e-posta (verilirse her şeyi geçer; önerilir)
 #   HOSTVIM_ADMIN_EMAIL_DOMAIN=…  # örn. ornek.com → admin@ornek.com (açık e-posta yoksa)
 #   HOSTVIM_APP_URL=…             # örn. https://panel.ornek.com — .env APP_URL + e-posta türetimi için
+#   HOSTVIM_PUBLIC_HOST=panel.ornek.com  # nginx server_name + otomatik Let's Encrypt; APP_URL bos ise http://HOST kullanilir
+#   HOSTVIM_RUN_CERTBOT=1         # 0: certbot calistirma (DNS hazir degilken)
+#   HOSTVIM_LICENSE_KEY=…         # İsteğe bağlı; bos birakilabilir (müşteri Admin → Lisans’tan yapistirir)
 #   LETS_ENCRYPT_EMAIL=…          # ACME; HOSTVIM_ADMIN_EMAIL yoksa ilk admin e-postası olarak da kullanılabilir
 #   HOSTVIM_ADMIN_PASSWORD=...       # sabit şifre; verilmezse her çalıştırmada yeni rastgele (DB’de admin güncellenir)
 #   HOSTVIM_PRESERVE_ADMIN_PASSWORD=1  # DB’de kullanıcı varken şifreyi değiştirme / dosyada gösterme (otomasyon güncellemesi için)
@@ -64,12 +67,9 @@ HOSTVIM_HOME="${HOSTVIM_HOME:-${PANELSAR_HOME:-$REPO_ROOT}}"
 SERVER_NAME="${SERVER_NAME:-_}"
 LETS_ENCRYPT_EMAIL="${LETS_ENCRYPT_EMAIL:-admin@localhost}"
 APP_PROFILE="${APP_PROFILE:-customer}"
+# 2FA kurumsal politikada açılacaksa ENFORCE_ADMIN_2FA=true verin; varsayılan kapalı.
 if [[ "${ENFORCE_ADMIN_2FA:-}" == "" ]]; then
-  if [[ "$APP_PROFILE" == "vendor" ]]; then
-    ENFORCE_ADMIN_2FA=true
-  else
-    ENFORCE_ADMIN_2FA=false
-  fi
+  ENFORCE_ADMIN_2FA=false
 fi
 
 if [[ ! -d "$REPO_ROOT/panel" ]] || [[ ! -d "$REPO_ROOT/engine" ]]; then
@@ -93,6 +93,25 @@ detect_php_fpm_sock() {
     fi
   done
   echo "/run/php/php${pv}-fpm.sock"
+}
+
+# http(s)://host[:port]/yol -> host (FQDN). IP / localhost ise bos cikis (hata kodu 1).
+hostvim_url_hostname() {
+  local raw="${1:-}"
+  [[ -n "$raw" ]] || return 1
+  raw="${raw#http://}"
+  raw="${raw#https://}"
+  raw="${raw%%/*}"
+  raw="${raw%%:*}"
+  raw="${raw%%\?*}"
+  [[ -n "$raw" ]] || return 1
+  if [[ "$raw" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    return 1
+  fi
+  case "$raw" in
+    localhost | 127.0.0.1) return 1 ;;
+  esac
+  echo "$raw"
 }
 
 yaml_value_from_block() {
@@ -455,8 +474,16 @@ hostvim_resolve_admin_email() {
 update_env "APP_ENV" "production"
 update_env "APP_DEBUG" "false"
 update_env "APP_PROFILE" "$APP_PROFILE"
+# Çok kiracılı vendor kontrol düzlemi bu kurulumda kullanılmaz; lisans/müşteri merkezi sitede.
+update_env "VENDOR_ENABLED" "false"
 update_env "ENFORCE_ADMIN_2FA" "$ENFORCE_ADMIN_2FA"
+if [[ -n "${HOSTVIM_LICENSE_KEY:-}" ]]; then
+  update_env "LICENSE_KEY" "$HOSTVIM_LICENSE_KEY"
+fi
 _PANEL_APP_URL="${HOSTVIM_APP_URL:-${PANEL_APP_URL:-}}"
+if [[ -z "$_PANEL_APP_URL" && -n "${HOSTVIM_PUBLIC_HOST:-}" ]]; then
+  _PANEL_APP_URL="http://${HOSTVIM_PUBLIC_HOST}"
+fi
 if [[ -z "$_PANEL_APP_URL" ]]; then
   _PANEL_APP_URL="http://$(hostname -I 2>/dev/null | awk '{print $1}' || echo localhost)"
 fi
@@ -714,6 +741,17 @@ systemctl enable --now hostvim-panel-queue.service
 rm -f /etc/nginx/sites-enabled/panelsar.conf /etc/nginx/sites-enabled/panelsar 2>/dev/null || true
 rm -f /etc/nginx/sites-enabled/default 2>/dev/null || true
 
+# Acik alan adi: nginx server_name + (asagida) otomatik Let's Encrypt
+HOSTVIM_EFFECTIVE_PUBLIC_HOST=""
+if [[ -n "${HOSTVIM_PUBLIC_HOST:-}" ]]; then
+  HOSTVIM_EFFECTIVE_PUBLIC_HOST="${HOSTVIM_PUBLIC_HOST}"
+elif [[ -n "${HOSTVIM_APP_URL:-}" ]]; then
+  HOSTVIM_EFFECTIVE_PUBLIC_HOST="$(hostvim_url_hostname "${HOSTVIM_APP_URL}" || true)"
+fi
+if [[ -n "$HOSTVIM_EFFECTIVE_PUBLIC_HOST" ]]; then
+  SERVER_NAME="$HOSTVIM_EFFECTIVE_PUBLIC_HOST"
+fi
+
 # Nginx
 NGX_DST="/etc/nginx/sites-available/hostvim.conf"
 sed \
@@ -742,6 +780,63 @@ if [[ "${SKIP_UFW:-}" != "1" ]] && command -v ufw >/dev/null 2>&1; then
   ufw --force enable || true
 fi
 
+# --- Sonlandirma: PHPMYADMIN_URL senkronu, Let's Encrypt (alan adi verildiyse), Laravel onbellek + saglik kontrolu ---
+HOSTVIM_RUN_CERTBOT="${HOSTVIM_RUN_CERTBOT:-1}"
+refresh_phpmysql_url_in_env() {
+  if [[ ! -f "$ENV_FILE" ]]; then
+    return 0
+  fi
+  if [[ ! -d /usr/share/phpmyadmin ]]; then
+    return 0
+  fi
+  local _au
+  _au="$(grep -E '^APP_URL=' "$ENV_FILE" 2>/dev/null | cut -d= -f2- | tr -d '\r')"
+  _au="${_au#\"}"
+  _au="${_au%\"}"
+  _au="${_au//[[:space:]]/}"
+  [[ -n "$_au" ]] || return 0
+  update_env "PHPMYADMIN_URL" "${_au%/}/phpmyadmin"
+}
+
+run_certbot_if_configured() {
+  if [[ "${HOSTVIM_RUN_CERTBOT:-1}" != "1" ]] && [[ "${HOSTVIM_RUN_CERTBOT:-1}" != "yes" ]]; then
+    return 0
+  fi
+  if ! command -v certbot >/dev/null 2>&1; then
+    echo "==> SSL: certbot yok (WITH_CERTBOT=1 ile kurulur); HTTP ile devam."
+    return 0
+  fi
+  [[ -n "${HOSTVIM_EFFECTIVE_PUBLIC_HOST:-}" ]] || return 0
+
+  local dom="$HOSTVIM_EFFECTIVE_PUBLIC_HOST"
+  local em="${LETS_ENCRYPT_EMAIL:-}"
+  [[ "$em" == *"@"* ]] || em="admin@${dom}"
+
+  echo "==> Let's Encrypt deneniyor: ${dom} (DNS bu sunucuyu gostermeli, 80/tcp acik)"
+  if certbot --nginx -d "$dom" --email "$em" --agree-tos --non-interactive --redirect --no-eff-email; then
+    update_env "APP_URL" "https://${dom}"
+    refresh_phpmysql_url_in_env
+    nginx -t && systemctl reload nginx
+    echo "==> SSL tamam: https://${dom}"
+  else
+    echo "==> Let's Encrypt tamamlanamadi (DNS veya 80 kapali / rate limit). Panel HTTP ile calisir."
+    echo "    DNS hazir oldugunda: ayni betigi tekrar calistirin veya: certbot --nginx -d ${dom} --email ${em} --agree-tos --non-interactive --redirect"
+  fi
+}
+
+refresh_phpmysql_url_in_env
+run_certbot_if_configured
+
+echo "==> Laravel onbellek + kurulum kontrolu (musterinin manuel komut calistirmasi gerekmez)"
+sudo -u www-data php "$PANEL_ROOT/artisan" config:cache
+sudo -u www-data php "$PANEL_ROOT/artisan" route:cache
+sudo -u www-data php "$PANEL_ROOT/artisan" view:cache || true
+if sudo -u www-data php "$PANEL_ROOT/artisan" hostvim:install-check --ping; then
+  echo "==> hostvim:install-check: tamam"
+else
+  echo "==> hostvim:install-check: uyari — yukaridaki ciktiyi inceleyin (kurulum tamamlandi)."
+fi
+
 echo ""
 echo "=== Hostvim kurulum özeti ==="
 echo "  Panel kökü:     $HOSTVIM_HOME"
@@ -764,28 +859,30 @@ fi
 echo ""
 if [[ "${SKIP_DB_SEED:-}" != "1" ]]; then
   echo "################################################################"
-  echo "#  PANEL GİRİŞİ — Tarayıcıda panele böyle girin"
+  echo "#  PANEL GİRİŞİ (şifre terminale yazılmaz — güvenlik)"
   echo "################################################################"
   if [[ -f /root/hostvim-admin-login.txt ]]; then
-    echo "#  (Güncel: /root/hostvim-admin-login.txt)"
-    while IFS= read -r line || [[ -n "$line" ]]; do
-      echo "#  $line"
-    done < /root/hostvim-admin-login.txt
-    echo "################################################################"
+    echo "#  URL, e-posta ve şifre yalnızca root okuyabilir (chmod 600):"
+    echo "#    sudo cat /root/hostvim-admin-login.txt"
+    echo "#  İlk girişten sonra şifreyi değiştirin; dosyayı silin veya:"
+    echo "#    sudo shred -u /root/hostvim-admin-login.txt 2>/dev/null || sudo rm -f /root/hostvim-admin-login.txt"
   elif [[ -f /root/panelsar-admin-login.txt ]]; then
-    echo "#  UYARI: Yalnızca eski panelsar-admin-login.txt bulundu; güvenilir olmayabilir."
-    while IFS= read -r line || [[ -n "$line" ]]; do
-      echo "#  $line"
-    done < /root/panelsar-admin-login.txt
-    echo "################################################################"
+    echo "#  UYARI: Eski panelsar-admin-login.txt — güvenilir olmayabilir."
+    echo "#    sudo cat /root/panelsar-admin-login.txt"
   else
     echo "#  Giriş dosyası yok. Bilinen admin ile girin veya şifre sıfırlayın."
-    echo "################################################################"
   fi
+  echo "################################################################"
   echo ""
 fi
-echo "Sonraki adımlar:"
-echo "  1) DNS ile alan adını bu sunucuya yönlendirin; ücretsiz SSL: sudo certbot --nginx -d ornek.com --email $LETS_ENCRYPT_EMAIL --agree-tos --non-interactive"
-echo "  2) APP_URL ve PHPMYADMIN_URL değerlerini .env içinde gerçek HTTPS URL ile güncelleyin: nano $ENV_FILE"
-echo "  3) sudo -u www-data php $PANEL_ROOT/artisan config:cache && php artisan hostvim:install-check"
+echo "Sonraki adımlar (çoğu kurulumda yalnızca DNS):"
+echo "  1) Alan adınızı bu sunucunun IP adresine yönlendirin (A kaydı). Sağlayıcı panelinden yapılır."
+if [[ -n "${HOSTVIM_EFFECTIVE_PUBLIC_HOST:-}" ]]; then
+  echo "     Bu kurulumda panel alan adı: ${HOSTVIM_EFFECTIVE_PUBLIC_HOST} — DNS yayıldıktan sonra SSL için betiği tekrar çalıştırabilir veya certbot çıktısındaki komutu kullanabilirsiniz."
+else
+  echo "     Ücretsiz SSL ve dogru APP_URL icin yeniden kurulum/guncellemede verin:"
+  echo "       HOSTVIM_PUBLIC_HOST=panel.ornek.com LETS_ENCRYPT_EMAIL=size@ornek.com sudo -E bash deploy/bootstrap/install-production.sh"
+  echo "     (veya HOSTVIM_APP_URL=https://panel.ornek.com — FQDN otomatik algilanir.)"
+fi
+echo "  2) Otomatik yapildi: APP_URL / PHPMYADMIN_URL (phpMyAdmin kuruluysa), config:cache, hostvim:install-check."
 echo ""

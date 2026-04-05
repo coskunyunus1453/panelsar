@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use Illuminate\Http\Client\PendingRequest;
+use Illuminate\Http\Client\Response;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -22,12 +23,46 @@ class EngineApiService
         $this->jwtSecret = (string) config('hostvim.engine_secret', '');
     }
 
-    private function client(): PendingRequest
+    private function engineAuthConfigured(): bool
     {
-        $req = Http::timeout(45)->acceptJson();
+        return $this->internalKey !== '' || $this->jwtSecret !== '';
+    }
 
+    /**
+     * @return array{error: string}
+     */
+    private function missingEngineCredentialsPayload(): array
+    {
+        return ['error' => (string) __('messages.engine_auth_missing')];
+    }
+
+    /**
+     * @param  array<string, mixed>  $json
+     */
+    private function formatEngineHttpError(Response $response, array $json): string
+    {
+        $msg = is_string($json['error'] ?? null)
+            ? (string) $json['error']
+            : (string) ($response->body() ?: 'HTTP '.$response->status());
+        $status = $response->status();
+        if (($status === 401 || $status === 403) && (
+            str_contains($msg, 'Authorization header required')
+            || str_contains($msg, 'Invalid token')
+            || str_contains($msg, 'Invalid authorization format')
+        )) {
+            return (string) __('messages.engine_auth_mismatch');
+        }
+
+        return $msg;
+    }
+
+    private function withEngineAuth(PendingRequest $req): PendingRequest
+    {
         if ($this->internalKey !== '') {
-            return $req->withHeaders(['X-Hostvim-Engine-Key' => $this->internalKey]);
+            return $req->withHeaders([
+                'X-Hostvim-Engine-Key' => $this->internalKey,
+                'X-Panelsar-Engine-Key' => $this->internalKey,
+            ]);
         }
 
         if ($this->jwtSecret !== '') {
@@ -37,19 +72,14 @@ class EngineApiService
         return $req;
     }
 
+    private function client(): PendingRequest
+    {
+        return $this->withEngineAuth(Http::timeout(45)->acceptJson());
+    }
+
     private function clientLong(int $timeout = 600): PendingRequest
     {
-        $req = Http::timeout($timeout)->acceptJson();
-
-        if ($this->internalKey !== '') {
-            return $req->withHeaders(['X-Hostvim-Engine-Key' => $this->internalKey]);
-        }
-
-        if ($this->jwtSecret !== '') {
-            return $req->withToken($this->generateLegacyToken());
-        }
-
-        return $req;
+        return $this->withEngineAuth(Http::timeout($timeout)->acceptJson());
     }
 
     public function getSystemStats(): array
@@ -762,13 +792,17 @@ class EngineApiService
 
     private function postLongChecked(string $path, array $data = [], int $timeout = 600): array
     {
+        if (! $this->engineAuthConfigured()) {
+            return $this->missingEngineCredentialsPayload();
+        }
+
         $attempts = 2;
         for ($i = 0; $i < $attempts; $i++) {
             try {
                 $response = $this->clientLong($timeout)->post($this->baseUrl.$path, $data);
                 $json = $response->json() ?? [];
                 if (! $response->successful()) {
-                    $msg = is_string($json['error'] ?? null) ? $json['error'] : ($response->body() ?: 'HTTP '.$response->status());
+                    $msg = $this->formatEngineHttpError($response, $json);
 
                     return ['error' => $msg, 'output' => is_string($json['output'] ?? null) ? $json['output'] : null];
                 }
@@ -795,13 +829,15 @@ class EngineApiService
 
     private function deleteChecked(string $path): array
     {
+        if (! $this->engineAuthConfigured()) {
+            return $this->missingEngineCredentialsPayload();
+        }
+
         try {
             $response = $this->client()->delete($this->baseUrl.$path);
             $json = $response->json() ?? [];
             if (! $response->successful()) {
-                $msg = is_string($json['error'] ?? null) ? $json['error'] : ($response->body() ?: 'HTTP '.$response->status());
-
-                return ['error' => $msg];
+                return ['error' => $this->formatEngineHttpError($response, $json)];
             }
 
             return $json;
@@ -818,15 +854,17 @@ class EngineApiService
      */
     private function deleteJsonChecked(string $path, array $data): array
     {
+        if (! $this->engineAuthConfigured()) {
+            return $this->missingEngineCredentialsPayload();
+        }
+
         try {
             $response = $this->client()
                 ->withBody(json_encode($data, JSON_THROW_ON_ERROR), 'application/json')
                 ->delete($this->baseUrl.$path);
             $json = $response->json() ?? [];
             if (! $response->successful()) {
-                $msg = is_string($json['error'] ?? null) ? $json['error'] : ($response->body() ?: 'HTTP '.$response->status());
-
-                return ['error' => $msg];
+                return ['error' => $this->formatEngineHttpError($response, $json)];
             }
 
             return $json;
@@ -856,13 +894,15 @@ class EngineApiService
      */
     private function postEngineJsonChecked(string $path, array $data): array
     {
+        if (! $this->engineAuthConfigured()) {
+            return $this->missingEngineCredentialsPayload();
+        }
+
         try {
             $response = $this->client()->post($this->baseUrl.$path, $data);
             $json = $response->json() ?? [];
             if (! $response->successful()) {
-                $msg = is_string($json['error'] ?? null) ? $json['error'] : ($response->body() ?: 'HTTP '.$response->status());
-
-                return ['error' => $msg];
+                return ['error' => $this->formatEngineHttpError($response, $json)];
             }
 
             return $json;
@@ -905,13 +945,15 @@ class EngineApiService
      */
     private function patchJson(string $path, array $data): array
     {
+        if (! $this->engineAuthConfigured()) {
+            return $this->missingEngineCredentialsPayload();
+        }
+
         try {
             $response = $this->client()->patch($this->baseUrl.$path, $data);
             $json = $response->json() ?? [];
             if (! $response->successful()) {
-                $msg = is_string($json['error'] ?? null) ? $json['error'] : ($response->body() ?: 'HTTP '.$response->status());
-
-                return ['error' => $msg];
+                return ['error' => $this->formatEngineHttpError($response, $json)];
             }
 
             return $json;

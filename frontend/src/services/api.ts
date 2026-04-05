@@ -1,7 +1,7 @@
 import axios from 'axios'
 import { useAuthStore } from '../store/authStore'
 import { useNotificationsStore } from '../store/notificationsStore'
-import { effectiveLoginPath, isVendorProfile } from '../config/profile'
+import { effectiveLoginPath } from '../config/profile'
 import { inferPublicPathPrefix } from '../lib/publicPath'
 import i18n from '../i18n'
 
@@ -52,9 +52,8 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      const portal = useAuthStore.getState().portal || 'customer'
       useAuthStore.getState().logout()
-      const loginPath = portal === 'vendor' && isVendorProfile ? '/vendor/login' : effectiveLoginPath
+      const loginPath = effectiveLoginPath
       const prefix = inferPublicPathPrefix().replace(/\/+$/, '')
       window.location.href = `${window.location.origin}${prefix}${loginPath}`
     } else {

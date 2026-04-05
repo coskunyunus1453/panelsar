@@ -1,11 +1,13 @@
 import { Link, NavLink, Outlet } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useBranding } from '../../hooks/useBranding'
+import { safeBrandingImageUrl } from '../../lib/urlSafety'
 import { Server } from 'lucide-react'
 
 export default function MarketingLayout() {
   const { t } = useTranslation()
   const { data: branding } = useBranding()
+  const marketingLogoUrl = safeBrandingImageUrl(branding?.logo_customer_url)
 
   const navClass = ({ isActive }: { isActive: boolean }) =>
     `text-sm font-medium transition-colors ${
@@ -17,8 +19,8 @@ export default function MarketingLayout() {
       <header className="border-b border-gray-200 bg-white/90 backdrop-blur dark:border-gray-800 dark:bg-gray-900/90">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-4 py-4">
           <Link to="/" className="flex items-center gap-2">
-            {branding?.logo_customer_url ? (
-              <img src={branding.logo_customer_url} alt="" className="h-9 max-w-[160px] object-contain" />
+            {marketingLogoUrl ? (
+              <img src={marketingLogoUrl} alt="" className="h-9 max-w-[160px] object-contain" />
             ) : (
               <>
                 <Server className="h-8 w-8 text-primary-600" />

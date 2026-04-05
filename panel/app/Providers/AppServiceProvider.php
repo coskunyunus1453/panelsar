@@ -96,8 +96,9 @@ class AppServiceProvider extends ServiceProvider
             if (config('app.debug')) {
                 Log::warning('Hostvim: APP_DEBUG is enabled in production.');
             }
-            if ((string) config('hostvim.engine_internal_key', '') === '') {
-                Log::warning('Hostvim: ENGINE_INTERNAL_KEY is empty; engine integration will fail.');
+            if ((string) config('hostvim.engine_internal_key', '') === ''
+                && (string) config('hostvim.engine_secret', '') === '') {
+                Log::warning('Hostvim: ENGINE_INTERNAL_KEY ve ENGINE_API_SECRET bos; motor entegrasyonu calismaz (eski PANELSAR_* anahtarlari config/hostvim.php uzerinden okunur).');
             }
         }
     }

@@ -10,7 +10,7 @@ class RequireTwoFactorForAdmin
 {
     public function handle(Request $request, Closure $next): Response
     {
-        if (! (bool) config('hostvim.enforce_admin_2fa', true)) {
+        if (! (bool) config('hostvim.enforce_admin_2fa', false)) {
             return $next($request);
         }
 

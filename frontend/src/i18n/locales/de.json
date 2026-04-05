@@ -23,7 +23,8 @@
     "open_menu": "Menü öffnen",
     "close_menu": "Menü schließen",
     "toggle_sidebar": "Seitenleiste einklappen",
-    "terminal": "SSH-Terminal"
+    "terminal": "SSH-Terminal",
+    "license": "Lizenz"
   },
   "terminal": {
     "title": "SSH-Terminal",
@@ -131,5 +132,34 @@
     "use_easy": "Einfachen Modus verwenden",
     "advanced_required_title": "Erweiterter Modus erforderlich",
     "advanced_required_desc": "Diese Seite enthält technische/erweiterte Einstellungen. Im einfachen Modus ist sie ausgeblendet."
+  },
+  "license": {
+    "subtitle": "Pro mit Schlüssel von unserer Website aktivieren — kein .env nötig",
+    "status": "Status",
+    "key_set": "Gesetzt",
+    "key_unset": "Nicht gesetzt",
+    "key_storage": "Speicherort",
+    "source_env": "Server (.env)",
+    "source_database": "Dieses Panel (verschlüsselt in der DB)",
+    "source_none": "Noch nicht gesetzt",
+    "key_preview": "Maskierter Schlüssel",
+    "hub_label": "Lizenz-Server",
+    "hub_yes": "Konfiguriert",
+    "hub_no": "Nicht konfiguriert",
+    "validation_label": "Letzte Prüfung",
+    "valid_yes": "Gültig",
+    "engine_skip": "Kein lokaler Schlüssel",
+    "ui_hint": "Schlüssel einfügen und «Aktivieren» wählen. Gespeichert verschlüsselt (APP_KEY).",
+    "activate_title": "Pro aktivieren",
+    "activate_hint": "Schlüssel von unserer Website kopieren — keine .env-Änderung nötig.",
+    "key_placeholder": "hv_…",
+    "activate": "Aktivieren & speichern",
+    "activate_ok": "Lizenz aktiviert.",
+    "activate_ok_plan": "Lizenz aktiviert ({{plan}}).",
+    "test_only": "Nur testen",
+    "clear_stored": "Gespeicherten Schlüssel entfernen",
+    "clear_confirm": "Gespeicherten Lizenzschlüssel löschen?",
+    "cleared_ok": "Schlüssel entfernt.",
+    "validate_ok": "Antwort"
   }
 }

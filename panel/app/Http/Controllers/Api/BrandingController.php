@@ -315,26 +315,40 @@ class BrandingController extends Controller
 
     private function normalizeBrandingUrl(mixed $value): ?string
     {
-        if (! is_string($value) || $value === '') {
+        if (! is_string($value) || trim($value) === '') {
             return null;
         }
 
-        $basename = null;
-        if (preg_match('#/(?:storage/branding|api/branding/files)/([^/?\#]+)$#', $value, $m)) {
-            $basename = $m[1];
+        $basename = $this->extractBrandingBasename(trim($value));
+        if ($basename === null || ! preg_match('/^[A-Za-z0-9._-]+$/', $basename)) {
+            return null;
         }
 
-        if ($basename !== null && preg_match('/^[A-Za-z0-9._-]+$/', $basename)) {
-            try {
-                if (Storage::disk('public')->exists('branding/'.$basename)) {
-                    return $this->brandingFilePublicPath($basename);
-                }
-            } catch (Throwable) {
-                // disk kökü veya izin sorununda ham değeri döndür
+        try {
+            if (Storage::disk('public')->exists('branding/'.$basename)) {
+                return $this->brandingFilePublicPath($basename);
             }
+        } catch (Throwable) {
         }
 
-        return $value;
+        return null;
+    }
+
+    private function extractBrandingBasename(string $value): ?string
+    {
+        if (preg_match('#^/?api/branding/files/([A-Za-z0-9._-]+)$#', $value, $m)) {
+            return $m[1];
+        }
+        if (preg_match('#/(?:storage/branding|api/branding/files)/([A-Za-z0-9._-]+)(?:[?\#]|$)#', $value, $m)) {
+            return $m[1];
+        }
+        if (preg_match('#^https?://#i', $value)) {
+            $path = (string) (parse_url($value, PHP_URL_PATH) ?? '');
+
+            return $this->extractBrandingBasename($path);
+        }
+
+        return null;
     }
 
     private function brandingFilePublicPath(string $basename): string

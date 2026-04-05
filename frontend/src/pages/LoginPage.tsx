@@ -1,22 +1,20 @@
 import { useEffect, useState } from 'react'
-import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useAuthStore } from '../store/authStore'
 import { authService } from '../services/authService'
 import { useBranding } from '../hooks/useBranding'
 import { Server, Eye, EyeOff } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { isVendorProfile } from '../config/profile'
 import { mustEnrollTwoFactor } from '../lib/authRoles'
+import { safeBrandingImageUrl } from '../lib/urlSafety'
 
 export default function LoginPage() {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
-  const location = useLocation()
   const setAuth = useAuthStore((s) => s.setAuth)
-  const portal: 'customer' | 'vendor' =
-    isVendorProfile && location.pathname.startsWith('/vendor') ? 'vendor' : 'customer'
+  const portal: 'customer' | 'vendor' = 'customer'
 
   const [step, setStep] = useState<'password' | 'twofa'>('password')
   const [otp, setOtp] = useState('')
@@ -28,6 +26,7 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const { data: branding } = useBranding()
+  const customerLogoUrl = safeBrandingImageUrl(branding?.logo_customer_url)
 
   useEffect(() => {
     const pid = searchParams.get('package_id')
@@ -49,10 +48,6 @@ export default function LoginPage() {
   const navigateAfterLogin = () => {
     if (sessionStorage.getItem('pendingCheckout')) {
       navigate('/billing?autoCheckout=1')
-      return
-    }
-    if (portal === 'vendor') {
-      navigate('/admin/vendor-control')
       return
     }
     navigate('/dashboard')
@@ -124,9 +119,9 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 via-blue-950 to-gray-900 px-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          {branding?.logo_customer_url ? (
+          {customerLogoUrl ? (
             <div className="flex justify-center mb-4">
-              <img src={branding.logo_customer_url} alt="" className="max-h-20 object-contain" />
+              <img src={customerLogoUrl} alt="" className="max-h-20 object-contain" />
             </div>
           ) : (
             <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary-600 mb-4">
@@ -141,12 +136,6 @@ export default function LoginPage() {
           <h2 className="text-xl font-semibold text-white mb-6">
             {t('auth.login_title')}
           </h2>
-          {portal === 'vendor' && (
-            <p className="mb-4 rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-3 py-2 text-xs text-cyan-100">
-              Vendor girisi: yalnizca yazilim sahibi hesaplari.
-            </p>
-          )}
-
           <form onSubmit={handleSubmit} className="space-y-5">
             {step === 'password' ? (
               <>

@@ -49,6 +49,22 @@
                     <span class="h-1.5 w-1.5 rounded-full bg-orange-500"></span>
                     Özet
                 </a>
+                <div class="px-3 pt-2 text-[10px] font-semibold uppercase tracking-wider text-slate-400">Hostvim SaaS</div>
+                <a href="{{ route('admin.saas.dashboard') }}" class="flex items-center gap-2 rounded-xl px-3 py-2 {{ request()->routeIs('admin.saas.dashboard') ? 'bg-orange-500/15 font-medium text-orange-800 ring-1 ring-orange-500/30 dark:text-orange-200' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-900/80' }}">
+                    Lisans özeti
+                </a>
+                <a href="{{ route('admin.saas.customers.index') }}" class="flex items-center gap-2 rounded-xl px-3 py-2 {{ request()->routeIs('admin.saas.customers.*') ? 'bg-orange-500/15 font-medium text-orange-800 ring-1 ring-orange-500/30 dark:text-orange-200' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-900/80' }}">
+                    Müşteriler
+                </a>
+                <a href="{{ route('admin.saas.licenses.index') }}" class="flex items-center gap-2 rounded-xl px-3 py-2 {{ request()->routeIs('admin.saas.licenses.*') ? 'bg-orange-500/15 font-medium text-orange-800 ring-1 ring-orange-500/30 dark:text-orange-200' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-900/80' }}">
+                    Lisanslar
+                </a>
+                <a href="{{ route('admin.saas.products.index') }}" class="flex items-center gap-2 rounded-xl px-3 py-2 {{ request()->routeIs('admin.saas.products.*') ? 'bg-orange-500/15 font-medium text-orange-800 ring-1 ring-orange-500/30 dark:text-orange-200' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-900/80' }}">
+                    Ürünler (tier)
+                </a>
+                <a href="{{ route('admin.saas.modules.index') }}" class="flex items-center gap-2 rounded-xl px-3 py-2 {{ request()->routeIs('admin.saas.modules.*') ? 'bg-orange-500/15 font-medium text-orange-800 ring-1 ring-orange-500/30 dark:text-orange-200' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-900/80' }}">
+                    Modüller
+                </a>
                 <a href="{{ route('admin.site-settings.edit') }}" class="flex items-center gap-2 rounded-xl px-3 py-2 {{ request()->routeIs('admin.site-settings.*') ? 'bg-orange-500/15 font-medium text-orange-800 ring-1 ring-orange-500/30 dark:text-orange-200' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-900/80' }}">
                     Site ayarları
                 </a>
@@ -157,6 +173,12 @@
             </div>
             <nav class="space-y-1 p-3 text-sm">
                 <a href="{{ route('admin.dashboard') }}" class="block rounded-xl px-3 py-2 text-slate-700 hover:bg-orange-50 dark:text-slate-200 dark:hover:bg-slate-900/80">Özet</a>
+                <div class="px-3 pt-2 text-[10px] font-semibold uppercase text-slate-400">SaaS</div>
+                <a href="{{ route('admin.saas.dashboard') }}" class="block rounded-xl px-3 py-2 text-slate-700 hover:bg-orange-50 dark:text-slate-200 dark:hover:bg-slate-900/80">Lisans özeti</a>
+                <a href="{{ route('admin.saas.customers.index') }}" class="block rounded-xl px-3 py-2 text-slate-700 hover:bg-orange-50 dark:text-slate-200 dark:hover:bg-slate-900/80">Müşteriler</a>
+                <a href="{{ route('admin.saas.licenses.index') }}" class="block rounded-xl px-3 py-2 text-slate-700 hover:bg-orange-50 dark:text-slate-200 dark:hover:bg-slate-900/80">Lisanslar</a>
+                <a href="{{ route('admin.saas.products.index') }}" class="block rounded-xl px-3 py-2 text-slate-700 hover:bg-orange-50 dark:text-slate-200 dark:hover:bg-slate-900/80">Ürünler</a>
+                <a href="{{ route('admin.saas.modules.index') }}" class="block rounded-xl px-3 py-2 text-slate-700 hover:bg-orange-50 dark:text-slate-200 dark:hover:bg-slate-900/80">Modüller</a>
                 <a href="{{ route('admin.site-settings.edit') }}" class="block rounded-xl px-3 py-2 text-slate-700 hover:bg-orange-50 dark:text-slate-200 dark:hover:bg-slate-900/80">Site ayarları</a>
                 <a href="{{ route('admin.locale-settings.edit') }}" class="block rounded-xl px-3 py-2 text-slate-700 hover:bg-orange-50 dark:text-slate-200 dark:hover:bg-slate-900/80">Dil ayarları</a>
                 <a href="{{ route('admin.translations.index') }}" class="block rounded-xl px-3 py-2 text-slate-700 hover:bg-orange-50 dark:text-slate-200 dark:hover:bg-slate-900/80">Çeviriler</a>

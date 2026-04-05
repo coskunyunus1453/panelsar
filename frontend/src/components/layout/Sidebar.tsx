@@ -6,7 +6,7 @@ import { useUiModeStore } from '../../store/uiModeStore'
 import { useAuthStore } from '../../store/authStore'
 import { tokenHasAbility } from '../../lib/abilities'
 import { useBranding } from '../../hooks/useBranding'
-import { isVendorProfile } from '../../config/profile'
+import { safeBrandingImageUrl } from '../../lib/urlSafety'
 import {
   LayoutDashboard,
   Globe,
@@ -42,7 +42,6 @@ import {
   Rocket,
   Sparkles,
   Store,
-  Building2,
 } from 'lucide-react'
 
 type NavLeaf = {
@@ -71,17 +70,17 @@ export default function Sidebar() {
   const mode = useUiModeStore((s) => s.mode)
   const abilities = user?.abilities
   const isAdmin = user?.roles?.some((r) => r.name === 'admin')
-  const isVendorAdmin = user?.roles?.some((r) => ['vendor_admin', 'vendor_support', 'vendor_finance', 'vendor_devops'].includes(r.name))
   const canWebserverSettings =
     tokenHasAbility(abilities, 'webserver:read') || tokenHasAbility(abilities, 'webserver:write')
   const canPhpSettings =
     tokenHasAbility(abilities, 'php:read') || tokenHasAbility(abilities, 'php:write')
   const { data: branding } = useBranding()
   const isAdminSection = location.pathname.startsWith('/admin')
-  const headerLogo =
+  const headerLogoRaw =
     isAdminSection && branding?.logo_admin_url
       ? branding.logo_admin_url
       : branding?.logo_customer_url || branding?.logo_admin_url
+  const headerLogo = safeBrandingImageUrl(headerLogoRaw)
 
   const navOk = (ability: string | null, path: string) => {
     if (path === '/reseller') {
@@ -163,7 +162,6 @@ export default function Sidebar() {
         { path: '/admin/packages', icon: Package, label: 'nav.packages', allow: isAdmin },
         { path: '/admin/cms', icon: BookMarked, label: 'nav.cms', allow: isAdmin },
         { path: '/admin/license', icon: KeyRound, label: 'nav.license', allow: isAdmin },
-        { path: '/admin/vendor-control', icon: Building2, label: 'nav.vendor_control', allow: isVendorProfile && (isVendorAdmin || isAdmin) },
       ],
     },
   ]
@@ -204,7 +202,7 @@ export default function Sidebar() {
         .map((m) => ({ ...m, items: m.items.filter((i) => i.allow) }))
         .map((m) => ({ ...m, items: mode === 'easy' ? [] : m.items }))
         .filter((m) => m.items.length > 0),
-    [isAdmin, isVendorAdmin, canWebserverSettings, canPhpSettings, mode],
+    [isAdmin, canWebserverSettings, canPhpSettings, mode],
   )
 
   useEffect(() => {

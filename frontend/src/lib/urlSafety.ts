@@ -1,3 +1,29 @@
+/**
+ * Panel branding API’sinden gelen logo adresi: yalnızca mevcut site kökeni ve http(s).
+ * `javascript:`, `data:`, harici host veya şema enjeksiyonunu img src için engeller.
+ */
+export function safeBrandingImageUrl(raw: string | null | undefined): string | undefined {
+  if (typeof window === 'undefined') {
+    return undefined
+  }
+  const v = String(raw || '').trim()
+  if (!v) {
+    return undefined
+  }
+  try {
+    const resolved = new URL(v, window.location.href)
+    if (resolved.protocol !== 'http:' && resolved.protocol !== 'https:') {
+      return undefined
+    }
+    if (resolved.origin !== window.location.origin) {
+      return undefined
+    }
+    return resolved.toString()
+  } catch {
+    return undefined
+  }
+}
+
 export function safeExternalHttpUrl(raw: string): string | null {
   const v = String(raw || '').trim()
   if (!v) return null
