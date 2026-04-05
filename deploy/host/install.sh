@@ -29,6 +29,8 @@
 # Diğer varsayılanlar:
 #   HOSTVIM_SEED_DEMO_USERS=0 — demo kullanıcı seed etme (eski: PANELSAR_SEED_DEMO_USERS)
 #   İlk kurulumda kullanıcı yoksa db:seed admin üretir; HOSTVIM_ADMIN_PASSWORD verilmezse rastgele şifre
+#   Üretim önerisi: HOSTVIM_ADMIN_EMAIL=yonetici@alanadin.com ve/veya HOSTVIM_APP_URL=https://panel.alanadin.com
+#   (verilmezse sırayla LETS_ENCRYPT_EMAIL, APP_URL ana makinesi, son çare admin@sunucu-FQDN kullanılır)
 #
 # Zorunlu proxy/kırık sertifika (ÖNERİLMEZ): yalnızca geçici tanı veya iç ağda:
 #   HOSTVIM_INSECURE_DOWNLOAD=1 curl -fsSL ...  → betik içinde curl -k kullanılır (eski: PANELSAR_INSECURE_DOWNLOAD)

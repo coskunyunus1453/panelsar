@@ -33,8 +33,11 @@
 #   HOSTVIM_FRESH_INSTALL=1     # RESET_PANEL_DB=1 ile aynı (fabrika / boş lab sunucusu; müşteri “onarım”unda kullanmayın)
 #   HOSTVIM_SEED_DEMO_USERS=1  # Demo reseller/user hesaplarını da seed et (varsayılan: 0)
 #   (engine systemd drop-in) HOSTVIM_TERMINAL_NO_ROOT=1  # web terminali www-data kabuğunda (varsayılan: root sudo)
-#   HOSTVIM_ADMIN_EMAIL=...    # ilk admin e-posta (varsayılan: admin@<sunucu-hostname>)
-#   HOSTVIM_ADMIN_PASSWORD=... # sabit şifre; verilmezse kurulumda rastgele üretilir
+#   HOSTVIM_ADMIN_EMAIL=...       # ilk admin e-posta (verilirse her şeyi geçer; önerilir)
+#   HOSTVIM_ADMIN_EMAIL_DOMAIN=…  # örn. ornek.com → admin@ornek.com (açık e-posta yoksa)
+#   HOSTVIM_APP_URL=…             # örn. https://panel.ornek.com — .env APP_URL + e-posta türetimi için
+#   LETS_ENCRYPT_EMAIL=…          # ACME; HOSTVIM_ADMIN_EMAIL yoksa ilk admin e-postası olarak da kullanılabilir
+#   HOSTVIM_ADMIN_PASSWORD=...    # sabit şifre; verilmezse kurulumda rastgele üretilir
 #
 set -euo pipefail
 
@@ -398,11 +401,65 @@ update_env() {
   fi
 }
 
+# İlk yönetici e-postası (Plesk benzeri: mümkünse gerçek alan / iletişim adresi).
+# Sıra: HOSTVIM_ADMIN_EMAIL > PANELSAR_… > HOSTVIM_ADMIN_EMAIL_DOMAIN > LETS_ENCRYPT_EMAIL >
+#       APP_URL ana makinesi (IP/localhost değilse → admin@host) > admin@<hostname -f>
+hostvim_resolve_admin_email() {
+  local explicit domain le app_url host fqdn
+  explicit="${HOSTVIM_ADMIN_EMAIL:-${PANELSAR_ADMIN_EMAIL:-}}"
+  explicit="${explicit//[[:space:]]/}"
+  if [[ -n "$explicit" ]]; then
+    echo "$explicit"
+    return 0
+  fi
+  domain="${HOSTVIM_ADMIN_EMAIL_DOMAIN:-${PANELSAR_ADMIN_EMAIL_DOMAIN:-}}"
+  domain="${domain//[[:space:]]/}"
+  if [[ -n "$domain" && "$domain" == *.* && "$domain" != *"@"* ]]; then
+    echo "admin@${domain}"
+    return 0
+  fi
+  le="${LETS_ENCRYPT_EMAIL:-}"
+  le="${le//[[:space:]]/}"
+  if [[ -n "$le" && "$le" == *"@"* ]]; then
+    echo "$le"
+    return 0
+  fi
+  app_url="$(grep -E '^APP_URL=' "$ENV_FILE" 2>/dev/null | cut -d= -f2- | tr -d '\r')"
+  app_url="${app_url#\"}"
+  app_url="${app_url%\"}"
+  app_url="${app_url//[[:space:]]/}"
+  host="${app_url#*://}"
+  host="${host%%/*}"
+  host="${host%%\?*}"
+  if [[ "$host" == \[*\]* ]]; then
+    host=""
+  elif [[ "$host" =~ ^([^:]+):[0-9]+$ ]]; then
+    host="${BASH_REMATCH[1]}"
+  fi
+  if [[ -n "$host" && "$host" != "localhost" && "$host" != "127.0.0.1" ]]; then
+    if [[ "$host" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+      :
+    elif [[ "$host" == *:* ]]; then
+      :
+    else
+      echo "admin@${host}"
+      return 0
+    fi
+  fi
+  fqdn="$(hostname -f 2>/dev/null || hostname || echo hostvim.local)"
+  fqdn="${fqdn// /}"
+  echo "admin@${fqdn}"
+}
+
 update_env "APP_ENV" "production"
 update_env "APP_DEBUG" "false"
 update_env "APP_PROFILE" "$APP_PROFILE"
 update_env "ENFORCE_ADMIN_2FA" "$ENFORCE_ADMIN_2FA"
-update_env "APP_URL" "http://$(hostname -I 2>/dev/null | awk '{print $1}' || echo localhost)"
+_PANEL_APP_URL="${HOSTVIM_APP_URL:-${PANEL_APP_URL:-}}"
+if [[ -z "$_PANEL_APP_URL" ]]; then
+  _PANEL_APP_URL="http://$(hostname -I 2>/dev/null | awk '{print $1}' || echo localhost)"
+fi
+update_env "APP_URL" "$_PANEL_APP_URL"
 update_env "ENGINE_API_URL" "http://127.0.0.1:9090"
 update_env "ENGINE_INTERNAL_KEY" "$INTERNAL_KEY"
 update_env "ENGINE_API_SECRET" "$ENGINE_JWT"
@@ -533,7 +590,7 @@ if [[ "${SKIP_DB_SEED:-}" != "1" ]]; then
 
   HOST_FQDN="$(hostname -f 2>/dev/null || hostname || echo hostvim.local)"
   HOST_FQDN="${HOST_FQDN// /}"
-  ADMIN_EMAIL="${HOSTVIM_ADMIN_EMAIL:-admin@${HOST_FQDN}}"
+  ADMIN_EMAIL="$(hostvim_resolve_admin_email)"
   SEED_DEMO_USERS="${HOSTVIM_SEED_DEMO_USERS:-${PANELSAR_SEED_DEMO_USERS:-0}}"
   USER_COUNT=""
   if [[ "$RESET_DB_MODE" == "0" ]] && { [[ "${WITH_MARIADB}" == "1" ]] || [[ "${WITH_MARIADB}" == "yes" ]]; }; then
@@ -682,6 +739,13 @@ fi
 echo ""
 echo "=== Hostvim kurulum özeti ==="
 echo "  Panel kökü:     $HOSTVIM_HOME"
+if [[ "${SKIP_DB_SEED:-}" != "1" ]] && [[ -n "${ADMIN_EMAIL:-}" ]]; then
+  case "$ADMIN_EMAIL" in
+    admin@*contaboserver*|admin@vmi*)
+      echo "  İpucu: İlk admin e-postası sunucu FQDN. Üretimde: HOSTVIM_ADMIN_EMAIL=... veya HOSTVIM_APP_URL=https://panel.alanadin.com"
+      ;;
+  esac
+fi
 echo "  Engine API:     http://127.0.0.1:9090 (yalnızca sunucu içi — dışarıya açmayın)"
 echo "  ENGINE_INTERNAL_KEY panel .env ile eşleşiyor."
 echo "  Nginx site:     $NGX_DST"
