@@ -2,6 +2,7 @@ import { useTranslation } from 'react-i18next'
 import { Navigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '../store/authStore'
+import { isServerAdminUI } from '../lib/authRoles'
 import api from '../services/api'
 import {
   Server,
@@ -78,7 +79,7 @@ export default function AdminSystemPage() {
   const { t } = useTranslation()
   const qc = useQueryClient()
   const user = useAuthStore((s) => s.user)
-  const isAdmin = user?.roles?.some((r) => r.name === 'admin')
+  const canServer = isServerAdminUI(user)
 
   const statsQ = useQuery({
     queryKey: ['admin-system-stats'],
@@ -86,7 +87,7 @@ export default function AdminSystemPage() {
       const { data } = await api.get('/system/stats')
       return (data?.stats ?? {}) as SystemStats
     },
-    enabled: !!isAdmin,
+    enabled: !!canServer,
     refetchInterval: 12_000,
   })
 
@@ -96,7 +97,7 @@ export default function AdminSystemPage() {
       const { data } = await api.get('/system/services')
       return (data?.services ?? []) as ServiceRow[]
     },
-    enabled: !!isAdmin,
+    enabled: !!canServer,
     refetchInterval: 15_000,
   })
   const processesQ = useQuery({
@@ -105,7 +106,7 @@ export default function AdminSystemPage() {
       const { data } = await api.get('/system/processes')
       return (data?.processes ?? []) as ProcessRow[]
     },
-    enabled: !!isAdmin,
+    enabled: !!canServer,
     refetchInterval: 20_000,
   })
 
@@ -144,7 +145,7 @@ export default function AdminSystemPage() {
     },
   })
 
-  if (!isAdmin) {
+  if (!canServer) {
     return <Navigate to="/dashboard" replace />
   }
 

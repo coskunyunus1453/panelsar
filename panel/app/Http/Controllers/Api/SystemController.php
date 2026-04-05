@@ -90,6 +90,8 @@ class SystemController extends Controller
         if ($user->isAdmin()) {
             $data['total_users'] = User::count();
             $data['total_domains'] = Domain::count();
+        }
+        if ($user->isAdmin() || $user->isVendorOperator()) {
             $data['system_stats'] = $this->engineApi->getSystemStats();
         }
 

@@ -4,6 +4,7 @@ import { useMutation, useQuery } from '@tanstack/react-query'
 import { useAuthStore } from '../store/authStore'
 import api from '../services/api'
 import type { DashboardData } from '../types'
+import { isHostingSuperAdmin, isServerAdminUI } from '../lib/authRoles'
 import { Globe, Database, Mail, HardDrive, Plus, Users, Power, RefreshCcw } from 'lucide-react'
 import toast from 'react-hot-toast'
 import ResourceChartsSection from '../components/dashboard/ResourceChartsSection'
@@ -11,12 +12,13 @@ import ResourceChartsSection from '../components/dashboard/ResourceChartsSection
 export default function DashboardPage() {
   const { t } = useTranslation()
   const user = useAuthStore((s) => s.user)
-  const isAdmin = user?.roles?.some((r) => r.name === 'admin')
+  const isSuper = isHostingSuperAdmin(user)
+  const serverUI = isServerAdminUI(user)
 
   const dashQ = useQuery({
     queryKey: ['dashboard'],
     queryFn: async () => (await api.get('/dashboard')).data.dashboard as DashboardData,
-    refetchInterval: isAdmin ? 8_000 : false,
+    refetchInterval: serverUI ? 8_000 : false,
   })
 
   const d = dashQ.data
@@ -75,7 +77,7 @@ export default function DashboardPage() {
     },
   ]
 
-  const adminExtras = isAdmin && d
+  const adminExtras = isSuper && d
     ? [
         {
           label: t('nav.users'),
@@ -111,7 +113,7 @@ export default function DashboardPage() {
             {t('dashboard.welcome')}, {user?.name}
           </p>
         </div>
-        {isAdmin && (
+        {isSuper && (
           <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
@@ -174,7 +176,7 @@ export default function DashboardPage() {
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
             {t('dashboard.system_status')}
           </h3>
-          {!isAdmin ? (
+          {!serverUI ? (
             <p className="text-sm text-gray-500 dark:text-gray-400">
               {t('dashboard.system_admin_only')}
             </p>

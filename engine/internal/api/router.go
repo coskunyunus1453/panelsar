@@ -16,6 +16,7 @@ import (
 	"hostvim/engine/internal/nginx"
 	"hostvim/engine/internal/phpfpm"
 	"hostvim/engine/internal/sites"
+	"hostvim/engine/internal/metrics"
 	"hostvim/engine/internal/ssl"
 	"hostvim/engine/internal/terminal"
 	"github.com/sirupsen/logrus"
@@ -39,6 +40,15 @@ func NewRouter(cfg *config.Config, d *daemon.Daemon, log *logrus.Logger) *gin.En
 			"running": d.IsRunning(),
 		})
 	})
+
+	promPath := strings.TrimSpace(cfg.Server.PrometheusPath)
+	if promPath == "" {
+		promPath = "/metrics"
+	}
+	if cfg.Server.PrometheusEnabled {
+		metrics.Init()
+		r.GET(promPath, metrics.Handler())
+	}
 
 	r.GET("/ws/terminal", terminal.HandleWS(cfg, log))
 

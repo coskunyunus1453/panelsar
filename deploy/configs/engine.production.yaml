@@ -6,6 +6,9 @@ server:
   host: "127.0.0.1"
   debug: false
   secret_key: "__ENGINE_SECRET_KEY__"
+  # Faz 9 — Prometheus (127.0.0.1’de dinliyorsanız yerel scrape veya SSH tüneli)
+  prometheus_enabled: true
+  prometheus_path: "/metrics"
 
 database:
   host: "127.0.0.1"
@@ -80,3 +83,8 @@ hosting:
   npm_path: "/usr/bin/npm"
   tools_max_seconds: 600
   wordpress_zip_url: "https://wordpress.org/latest.zip"
+  # Faz 6 — site dizini tar.gz (panel yedeği); restore varsayılan kapalı (üzerine yazar)
+  execute_backups: true
+  backup_tar_path: "tar"
+  backup_max_seconds: 7200
+  execute_backup_restore: false

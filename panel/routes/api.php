@@ -277,9 +277,9 @@ Route::middleware(['auth:sanctum', 'abilities:access:customer-panel'])->group(fu
     });
     Route::middleware('ability:billing:write')->post('billing/checkout', [BillingController::class, 'checkout']);
 
-    Route::middleware(['role:admin', 'require_admin_2fa'])->post('terminal/session', [TerminalController::class, 'session']);
+    Route::middleware(['role:admin|vendor_admin|vendor_support|vendor_finance|vendor_devops', 'require_admin_2fa'])->post('terminal/session', [TerminalController::class, 'session']);
 
-    Route::middleware(['role:admin', 'require_admin_2fa'])->prefix('system')->group(function () {
+    Route::middleware(['role:admin|vendor_admin|vendor_support|vendor_finance|vendor_devops', 'require_admin_2fa'])->prefix('system')->group(function () {
         Route::get('stats', [SystemController::class, 'stats']);
         Route::get('services', [SystemController::class, 'services']);
         Route::get('processes', [SystemController::class, 'processes']);

@@ -904,6 +904,7 @@
     "profile": "Profile",
     "change_password": "Change Password",
     "two_factor": "Two-Factor Authentication",
+    "mandatory_2fa_banner": "Your role requires two-factor authentication. Complete setup below before using the rest of the panel.",
     "branding": "Branding",
     "branding_hint": "Separate logos for customer UI vs admin area. Sidebar picks admin logo on /admin routes and customer logo elsewhere; login uses the customer logo.",
     "logo_customer": "Customer panel logo",

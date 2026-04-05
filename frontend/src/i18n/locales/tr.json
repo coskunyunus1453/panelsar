@@ -904,6 +904,7 @@
     "profile": "Profil",
     "change_password": "Şifre Değiştir",
     "two_factor": "İki Faktörlü Doğrulama",
+    "mandatory_2fa_banner": "Rolünüz için iki aşamalı doğrulama zorunludur. Panelin geri kalanını kullanmadan önce aşağıdaki kurulumu tamamlayın.",
     "branding": "Marka görselleri",
     "branding_hint": "Müşteri paneli ile yönetici bölümü için ayrı logolar. Kenar çubukunda yol (/admin) hangi logo ile eşleşiyorsa o gösterilir; giriş ekranında müşteri logosu kullanılır.",
     "logo_customer": "Müşteri paneli logosu",

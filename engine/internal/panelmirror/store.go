@@ -1,6 +1,7 @@
 package panelmirror
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -10,6 +11,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"hostvim/engine/internal/backup"
 	"hostvim/engine/internal/config"
 	"hostvim/engine/internal/sites"
 )
@@ -222,33 +224,156 @@ func BackupQueue(cfg *config.Config, domain, typ string, panelID float64) (gin.H
 	if typ == "" {
 		typ = "full"
 	}
-	mu.Lock()
-	defer mu.Unlock()
-	path := filepath.Join(dir(cfg), "backups.json")
-	rows, err := readSlice(path)
-	if err != nil {
+	backupDir := filepath.Join(dir(cfg), "backup-files")
+	if err := os.MkdirAll(backupDir, 0o750); err != nil {
 		return nil, err
 	}
 	id := fmt.Sprintf("bk_%d", time.Now().UnixNano())
+	outPath := filepath.Join(backupDir, id+".tar.gz")
+	now := time.Now().UTC().Format(time.RFC3339)
+
+	path := filepath.Join(dir(cfg), "backups.json")
+	mu.Lock()
+	rows, err := readSlice(path)
+	if err != nil {
+		mu.Unlock()
+		return nil, err
+	}
 	entry := map[string]interface{}{
 		"id":              id,
 		"domain":          d,
 		"type":            typ,
-		"status":          "completed",
 		"panel_backup_id": panelID,
-		"queued_at":       time.Now().UTC().Format(time.RFC3339),
-		"path":            filepath.Join(dir(cfg), "backup-files", id+".tar.gz"),
+		"queued_at":       now,
+		"path":            outPath,
 	}
+
+	if !cfg.Hosting.ExecuteBackups {
+		entry["status"] = "completed"
+		entry["completed_at"] = now
+		entry["size_bytes"] = float64(0)
+		rows = append(rows, entry)
+		err = writeSlice(path, rows)
+		mu.Unlock()
+		if err != nil {
+			return nil, err
+		}
+		return gin.H{
+			"message": "backup recorded (execute_backups=false; no archive on disk)",
+			"id":      id,
+			"path":    outPath,
+			"status":  "completed",
+		}, nil
+	}
+
+	entry["status"] = "running"
 	rows = append(rows, entry)
+	if err := writeSlice(path, rows); err != nil {
+		mu.Unlock()
+		return nil, err
+	}
+	mu.Unlock()
+
+	maxSec := cfg.Hosting.BackupMaxSeconds
+	if maxSec <= 0 {
+		maxSec = 3600
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(maxSec)*time.Second)
+	defer cancel()
+
+	runErr := backup.ArchiveDomain(ctx, cfg, d, outPath, backupDir)
+
+	mu.Lock()
+	defer mu.Unlock()
+	rows, err = readSlice(path)
+	if err != nil {
+		return nil, err
+	}
+	completedAt := time.Now().UTC().Format(time.RFC3339)
+	var sizeBytes int64
+	if runErr == nil {
+		if st, e := os.Stat(outPath); e == nil {
+			sizeBytes = st.Size()
+		}
+	}
+	for i := range rows {
+		if idStr(rows[i]["id"]) != id {
+			continue
+		}
+		if runErr != nil {
+			rows[i]["status"] = "failed"
+			rows[i]["error"] = runErr.Error()
+			_ = os.Remove(outPath)
+		} else {
+			rows[i]["status"] = "completed"
+			rows[i]["size_bytes"] = float64(sizeBytes)
+		}
+		rows[i]["completed_at"] = completedAt
+		break
+	}
 	if err := writeSlice(path, rows); err != nil {
 		return nil, err
 	}
+
+	if runErr != nil {
+		return gin.H{
+			"id":     id,
+			"path":   outPath,
+			"status": "failed",
+			"error":  runErr.Error(),
+		}, nil
+	}
 	return gin.H{
-		"message": "backup recorded",
-		"id":      id,
-		"path":    entry["path"],
-		"status":  "completed",
+		"message":    "backup completed",
+		"id":         id,
+		"path":       outPath,
+		"status":     "completed",
+		"size_bytes": sizeBytes,
 	}, nil
+}
+
+// BackupRestore extracts a completed backup archive into web root (dangerous; hosting.execute_backup_restore).
+func BackupRestore(cfg *config.Config, backupID string) (gin.H, error) {
+	backupID = strings.TrimSpace(backupID)
+	if backupID == "" {
+		return nil, fmt.Errorf("invalid backup id")
+	}
+	if !cfg.Hosting.ExecuteBackupRestore {
+		return gin.H{"message": "restore not executed (hosting.execute_backup_restore=false)"}, nil
+	}
+	path := filepath.Join(dir(cfg), "backups.json")
+	mu.Lock()
+	rows, err := readSlice(path)
+	if err != nil {
+		mu.Unlock()
+		return nil, err
+	}
+	var arcPath string
+	for _, r := range rows {
+		if idStr(r["id"]) == backupID {
+			if strings.ToLower(strings.TrimSpace(fmt.Sprint(r["status"]))) != "completed" {
+				mu.Unlock()
+				return nil, fmt.Errorf("backup is not completed")
+			}
+			arcPath = strings.TrimSpace(fmt.Sprint(r["path"]))
+			break
+		}
+	}
+	mu.Unlock()
+	if arcPath == "" {
+		return nil, fmt.Errorf("backup not found")
+	}
+	backupDir := filepath.Join(dir(cfg), "backup-files")
+	maxSec := cfg.Hosting.BackupMaxSeconds
+	if maxSec <= 0 {
+		maxSec = 3600
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(maxSec)*time.Second)
+	defer cancel()
+	if err := backup.RestoreDomain(ctx, cfg, arcPath, backupDir); err != nil {
+		return nil, err
+	}
+	return gin.H{"message": "restore completed", "id": backupID}, nil
 }
 
 type cronJob struct {

@@ -102,7 +102,12 @@ func registerModuleRoutes(cfg *config.Config, d *daemon.Daemon, api *gin.RouterG
 		c.JSON(http.StatusAccepted, entry)
 	})
 	api.POST("/backups/:id/restore", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{"message": "restore started", "id": c.Param("id")})
+		res, err := panelmirror.BackupRestore(cfg, c.Param("id"))
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, res)
 	})
 
 	api.GET("/dns/:domain", func(c *gin.Context) {

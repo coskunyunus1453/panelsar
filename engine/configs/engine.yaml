@@ -3,6 +3,8 @@ server:
   host: "0.0.0.0"
   debug: false
   secret_key: "change-me-in-production"
+  prometheus_enabled: false
+  prometheus_path: "/metrics"
 
 database:
   host: "localhost"
@@ -85,3 +87,8 @@ hosting:
   # İsteğe bağlı: çekirdek/yol değişiminde yeniden derlemeden betik konumu
   # nginx_vhost_helper: "/usr/local/sbin/hostvim-nginx-vhost"
   # stack_install_script: "/usr/local/sbin/hostvim-stack-install"
+  # Faz 6 — gerçek tar.gz yedeği (geliştirmede false)
+  execute_backups: false
+  backup_tar_path: "tar"
+  backup_max_seconds: 3600
+  execute_backup_restore: false

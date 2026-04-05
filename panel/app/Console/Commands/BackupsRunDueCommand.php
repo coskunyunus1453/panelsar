@@ -52,12 +52,23 @@ class BackupsRunDueCommand extends Command
                     'error' => $res['error'],
                 ]);
             } else {
-                $backup->update([
-                    'status' => 'running',
+                $engineStatus = is_string($res['status'] ?? null) ? (string) $res['status'] : '';
+                $panelStatus = $engineStatus === 'completed' || $engineStatus === 'failed' ? $engineStatus : 'running';
+                $upd = [
+                    'status' => $panelStatus,
                     'file_path' => $res['path'] ?? null,
                     'engine_backup_id' => isset($res['id']) ? (string) $res['id'] : null,
-                ]);
-                $controller->syncToDestination($backup);
+                ];
+                if (! empty($res['size_bytes'])) {
+                    $upd['size_mb'] = round(((float) $res['size_bytes']) / 1048576, 4);
+                }
+                if ($panelStatus === 'completed') {
+                    $upd['completed_at'] = now();
+                }
+                $backup->update($upd);
+                if ($panelStatus === 'completed') {
+                    $controller->syncToDestination($backup);
+                }
                 $s->last_run_at = $now;
                 $s->next_run_at = $now->copy()->addDay();
                 $s->save();

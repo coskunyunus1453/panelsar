@@ -20,10 +20,12 @@ type Config struct {
 }
 
 type ServerConfig struct {
-	Port      int    `mapstructure:"port"`
-	Host      string `mapstructure:"host"`
-	SecretKey string `mapstructure:"secret_key"`
-	Debug     bool   `mapstructure:"debug"`
+	Port               int    `mapstructure:"port"`
+	Host               string `mapstructure:"host"`
+	SecretKey          string `mapstructure:"secret_key"`
+	Debug              bool   `mapstructure:"debug"`
+	PrometheusEnabled  bool   `mapstructure:"prometheus_enabled"`
+	PrometheusPath     string `mapstructure:"prometheus_path"`
 }
 
 type DatabaseConfig struct {
@@ -110,6 +112,12 @@ type HostingConfig struct {
 	NginxVhostHelper string `mapstructure:"nginx_vhost_helper"`
 	// StackInstallScript — panel stack demetleri için sudo betiği (varsayılan: /usr/local/sbin/hostvim-stack-install).
 	StackInstallScript string `mapstructure:"stack_install_script"`
+
+	// Faz 6 — gerçek dosya yedeği (Linux prod: execute_backups true; XAMPP’te false bırakın)
+	ExecuteBackups       bool   `mapstructure:"execute_backups"`
+	BackupTarPath        string `mapstructure:"backup_tar_path"`
+	BackupMaxSeconds     int    `mapstructure:"backup_max_seconds"`
+	ExecuteBackupRestore bool   `mapstructure:"execute_backup_restore"`
 }
 
 func Load() (*Config, error) {
@@ -186,6 +194,8 @@ func setDefaults() {
 	viper.SetDefault("server.port", 9090)
 	viper.SetDefault("server.host", "0.0.0.0")
 	viper.SetDefault("server.debug", false)
+	viper.SetDefault("server.prometheus_enabled", false)
+	viper.SetDefault("server.prometheus_path", "/metrics")
 
 	viper.SetDefault("database.host", "localhost")
 	viper.SetDefault("database.port", 5432)
@@ -239,4 +249,9 @@ func setDefaults() {
 	viper.SetDefault("hosting.wordpress_zip_url", "https://wordpress.org/latest.zip")
 	viper.SetDefault("hosting.nginx_vhost_helper", "/usr/local/sbin/hostvim-nginx-vhost")
 	viper.SetDefault("hosting.stack_install_script", "/usr/local/sbin/hostvim-stack-install")
+
+	viper.SetDefault("hosting.execute_backups", false)
+	viper.SetDefault("hosting.backup_tar_path", "tar")
+	viper.SetDefault("hosting.backup_max_seconds", 3600)
+	viper.SetDefault("hosting.execute_backup_restore", false)
 }

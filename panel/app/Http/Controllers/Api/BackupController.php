@@ -78,11 +78,30 @@ class BackupController extends Controller
         }
 
         $engineId = isset($engine['id']) ? (string) $engine['id'] : null;
-        $backup->update([
-            'status' => 'running',
+        $engineStatus = is_string($engine['status'] ?? null) ? (string) $engine['status'] : '';
+        $panelStatus = $engineStatus === 'completed' || $engineStatus === 'failed' ? $engineStatus : 'running';
+        $update = [
+            'status' => $panelStatus,
             'file_path' => $engine['path'] ?? null,
             'engine_backup_id' => $engineId,
-        ]);
+        ];
+        if (! empty($engine['size_bytes'])) {
+            $update['size_mb'] = round(((float) $engine['size_bytes']) / 1048576, 4);
+        }
+        if ($panelStatus === 'completed') {
+            $update['completed_at'] = now();
+        }
+        $backup->update($update);
+        $backup = $backup->fresh();
+        if ($panelStatus === 'completed' && $backup->destination_id) {
+            $sync = $this->syncToDestination($backup);
+            if (empty($sync['ok'])) {
+                $this->audit($request, 'backup_queue_sync', false, (string) ($sync['error'] ?? 'sync failed'), [
+                    'domain_id' => $domain->id,
+                    'backup_id' => $backup->id,
+                ]);
+            }
+        }
         $this->audit($request, 'backup_queue', true, null, [
             'domain_id' => $domain->id,
             'backup_id' => $backup->id,

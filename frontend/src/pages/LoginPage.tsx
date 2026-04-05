@@ -7,6 +7,7 @@ import { useBranding } from '../hooks/useBranding'
 import { Server, Eye, EyeOff } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { isVendorProfile } from '../config/profile'
+import { mustEnrollTwoFactor } from '../lib/authRoles'
 
 export default function LoginPage() {
   const { t } = useTranslation()
@@ -46,15 +47,26 @@ export default function LoginPage() {
   }, [searchParams])
 
   const navigateAfterLogin = () => {
-    if (portal === 'vendor') {
-      navigate('/admin/vendor-control')
-      return
-    }
     if (sessionStorage.getItem('pendingCheckout')) {
       navigate('/billing?autoCheckout=1')
       return
     }
+    if (portal === 'vendor') {
+      navigate('/admin/vendor-control')
+      return
+    }
     navigate('/dashboard')
+  }
+
+  const finishLogin = (data: Awaited<ReturnType<typeof authService.login>>) => {
+    setAuth(data.user, data.token, portal, { enforce_admin_2fa: data.enforce_admin_2fa })
+    toast.success(t('dashboard.welcome'))
+    const enforce = data.enforce_admin_2fa ?? null
+    if (mustEnrollTwoFactor(data.user, enforce)) {
+      navigate('/settings?mandatory2fa=1')
+      return
+    }
+    navigateAfterLogin()
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -65,9 +77,7 @@ export default function LoginPage() {
     try {
       if (step === 'password') {
         const data = await authService.login(email.trim(), password, portal)
-        setAuth(data.user, data.token, portal)
-        toast.success(t('dashboard.welcome'))
-        navigateAfterLogin()
+        finishLogin(data)
         return
       }
 
@@ -79,9 +89,7 @@ export default function LoginPage() {
         }
 
         const data = await authService.login(email.trim(), password, portal, { otp: code })
-        setAuth(data.user, data.token, portal)
-        toast.success(t('dashboard.welcome'))
-        navigateAfterLogin()
+        finishLogin(data)
         return
       }
 
@@ -92,9 +100,7 @@ export default function LoginPage() {
       }
 
       const data = await authService.login(email.trim(), password, portal, { backupCode: bc })
-      setAuth(data.user, data.token, portal)
-      toast.success(t('dashboard.welcome'))
-      navigateAfterLogin()
+      finishLogin(data)
     } catch (err: unknown) {
       const error = err as { response?: { data?: { message?: string; code?: string } } }
       const code = error.response?.data?.code

@@ -23,18 +23,16 @@ class RequireTwoFactorForAdmin
             return $next($request);
         }
 
+        // 2FA henüz kurulmadı: panel-token ile ayarlar / ilk kurulum mümkün olsun (423 kilitlenmesi olmasın).
         if (! (bool) $user->two_factor_enabled) {
-            return response()->json([
-                'message' => 'Vendor islemleri icin admin 2FA zorunludur.',
-                'code' => 'admin_2fa_required',
-            ], 423);
+            return $next($request);
         }
 
-        // 2FA ile üretilmiş token adı olmadan admin/vendor uçları çalışmaz.
+        // 2FA açıkken yalnızca OTP ile verilen token (girişte doğrulama sonrası) kabul edilir.
         $token = $user->currentAccessToken();
         if (! $token || $token->name !== 'panel-token-2fa') {
             return response()->json([
-                'message' => 'Vendor islemleri icin admin 2FA zorunludur.',
+                'message' => '2FA acik: bu islemler icin cikis yapip giris sirasinda dogrulama kodunu girin.',
                 'code' => 'admin_2fa_required',
             ], 423);
         }

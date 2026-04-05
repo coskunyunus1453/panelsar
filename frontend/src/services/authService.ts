@@ -5,6 +5,7 @@ interface LoginResponse {
   user: User
   token: string
   expires_at: string
+  enforce_admin_2fa?: boolean
 }
 
 interface LoginOptions {
@@ -31,7 +32,7 @@ export const authService = {
     await api.post('/auth/logout')
   },
 
-  me: async (): Promise<{ user: User }> => {
+  me: async (): Promise<{ user: User; enforce_admin_2fa?: boolean }> => {
     const { data } = await api.get('/auth/me')
     return data
   },

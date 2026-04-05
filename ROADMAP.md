@@ -135,7 +135,12 @@
 2. Paralel olabilecekler: Faz 9’un bir kısmı (metrik) + Faz 7.3 audit log.  
 3. AI (Faz 10), en az **Faz 1 + 7.1/7.4** ile birlikte planlanmalı (yetki sınırları net olmalı).
 
-**İlerleme:** Faz **1** tamam. Faz **2.1–2.4** uygulandı: MySQL + PostgreSQL provizyon, WordPress otomatik kurulum (engine), kısıtlı composer/npm (engine + panel Site tools). Kuyruk işi (2.4) istenirse `ShouldQueue` job ile genişletilebilir. **Paket kotası:** barındırma paketindeki `max_*`, SSL/yedek bayrakları ve yedek adedi üst sınırı panel API’de uygulanır (admin muaf). Tam Plesk/cPanel eşliği için Faz 3–6’daki gerçek servis entegrasyonları gerekir; ayrıntı için `docs/DEPLOYMENT.md`.
+**İlerleme:** Faz **1** tamam. Faz **2.1–2.4** uygulandı: MySQL + PostgreSQL provizyon, WordPress otomatik kurulum (engine), kısıtlı composer/npm (engine + panel Site tools). Kuyruk işi (2.4) istenirse `ShouldQueue` job ile genişletilebilir. **Paket kotası:** barındırma paketindeki `max_*`, SSL/yedek bayrakları ve yedek adedi üst sınırı panel API’de uygulanır (admin muaf).
+
+- **Faz 6 (kısmi):** Engine’de `hosting.execute_backups: true` iken panel yedeği için `paths.web_root/<domain>` dizini `tar.gz` olarak `engine-state/backup-files/` altına yazılır; panel yedek kaydı `completed` + `size_mb` ile kapanır. `hosting.execute_backup_restore` ile aynı arşiv `tar -xzf` ile web köküne açılır (tehlikeli; prod’da dikkatli). Uzak S3 vb. hâlâ açık iş.
+- **Faz 9.1 (kısmi):** Engine `server.prometheus_enabled: true` olduğunda kimlik doğrulamasız `GET /metrics` (Go + process collector); ağ erişimini firewall ile kısıtlayın.
+
+Tam Plesk/cPanel eşliği için Faz **3–5** ve Faz **6**’nın kalanı (uzak hedef, geri yükleme sihirbazı), **7–8**, **9.2+**, **10** için gerçek servis / LLM entegrasyonları gerekir; ayrıntı için `docs/DEPLOYMENT.md`.
 
 ---
 

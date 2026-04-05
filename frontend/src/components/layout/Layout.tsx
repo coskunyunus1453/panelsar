@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { Outlet } from 'react-router-dom'
+import { Navigate, Outlet, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import Sidebar from './Sidebar'
 import Header from './Header'
@@ -7,6 +7,7 @@ import { useThemeStore } from '../../store/themeStore'
 import { useUiModeStore } from '../../store/uiModeStore'
 import { useAuthStore } from '../../store/authStore'
 import { authService } from '../../services/authService'
+import { mustEnrollTwoFactor } from '../../lib/authRoles'
 
 export default function Layout() {
   const { t } = useTranslation()
@@ -14,7 +15,11 @@ export default function Layout() {
   const mobileSidebarOpen = useThemeStore((s) => s.mobileSidebarOpen)
   const closeMobileSidebar = useThemeStore((s) => s.closeMobileSidebar)
   const token = useAuthStore((s) => s.token)
+  const user = useAuthStore((s) => s.user)
+  const enforceAdmin2fa = useAuthStore((s) => s.enforceAdmin2fa)
   const updateUser = useAuthStore((s) => s.updateUser)
+  const setEnforceAdmin2fa = useAuthStore((s) => s.setEnforceAdmin2fa)
+  const location = useLocation()
   const onboardingSeen = useUiModeStore((s) => s.onboardingSeen)
   const setMode = useUiModeStore((s) => s.setMode)
   const markOnboardingSeen = useUiModeStore((s) => s.markOnboardingSeen)
@@ -23,8 +28,16 @@ export default function Layout() {
     if (!token) {
       return
     }
-    authService.me().then((d) => updateUser(d.user)).catch(() => {})
-  }, [token, updateUser])
+    authService
+      .me()
+      .then((d) => {
+        updateUser(d.user)
+        if (typeof d.enforce_admin_2fa === 'boolean') {
+          setEnforceAdmin2fa(d.enforce_admin_2fa)
+        }
+      })
+      .catch(() => {})
+  }, [token, updateUser, setEnforceAdmin2fa])
 
   useEffect(() => {
     if (!mobileSidebarOpen) {
@@ -43,6 +56,10 @@ export default function Layout() {
       document.body.style.overflow = prevOverflow
     }
   }, [mobileSidebarOpen, closeMobileSidebar])
+
+  if (user && mustEnrollTwoFactor(user, enforceAdmin2fa) && !location.pathname.startsWith('/settings')) {
+    return <Navigate to="/settings?mandatory2fa=1" replace />
+  }
 
   return (
     <div className="flex h-screen overflow-hidden bg-gray-50 dark:bg-panel-bg">

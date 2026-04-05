@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useThemeStore } from '../store/themeStore'
 import { useAuthStore } from '../store/authStore'
+import { mustEnrollTwoFactor } from '../lib/authRoles'
 import { useBranding } from '../hooks/useBranding'
 import api from '../services/api'
 import { Sun, Moon, Globe, User, Lock, Smartphone, ImageIcon } from 'lucide-react'
@@ -24,11 +26,16 @@ const languages = [
 
 export default function SettingsPage() {
   const { t, i18n } = useTranslation()
+  const [searchParams] = useSearchParams()
   const { isDark, toggleTheme } = useThemeStore()
   const qc = useQueryClient()
   const user = useAuthStore((s) => s.user)
+  const enforceAdmin2fa = useAuthStore((s) => s.enforceAdmin2fa)
   const updateUser = useAuthStore((s) => s.updateUser)
   const isAdmin = user?.roles?.some((r) => r.name === 'admin')
+  const mandatory2faParam = searchParams.get('mandatory2fa') === '1'
+  const showMandatory2faBanner =
+    mandatory2faParam || mustEnrollTwoFactor(user, enforceAdmin2fa)
   const { data: branding } = useBranding()
   const brandingCfgQ = useQuery({
     queryKey: ['branding-config'],
@@ -154,6 +161,7 @@ export default function SettingsPage() {
       setTwofaOtp('')
       setTwofaSetup(null)
       toast.success('2FA aktifleştirildi.')
+      updateUser({ two_factor_enabled: true })
       qc.invalidateQueries({ queryKey: ['twofa-status'] })
     },
     onError: (err: unknown) => {
@@ -225,11 +233,28 @@ export default function SettingsPage() {
     },
   })
 
+  useEffect(() => {
+    if (!mandatory2faParam && !showMandatory2faBanner) return
+    const id = requestAnimationFrame(() => {
+      document.getElementById('settings-twofa')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    })
+    return () => cancelAnimationFrame(id)
+  }, [mandatory2faParam, showMandatory2faBanner])
+
   return (
     <div className="space-y-6 max-w-3xl">
       <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
         {t('settings.title')}
       </h1>
+
+      {showMandatory2faBanner && (
+        <div
+          role="alert"
+          className="rounded-xl border border-amber-400/70 bg-amber-50 dark:bg-amber-950/35 p-4 text-sm text-amber-950 dark:text-amber-100"
+        >
+          {t('settings.mandatory_2fa_banner')}
+        </div>
+      )}
 
       {isAdmin && (
         <div className="card p-6">
@@ -466,7 +491,7 @@ export default function SettingsPage() {
         </form>
       </div>
 
-      <div className="card p-6">
+      <div id="settings-twofa" className="card p-6 scroll-mt-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Smartphone className="h-5 w-5 text-gray-500" />

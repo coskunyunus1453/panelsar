@@ -10,6 +10,7 @@ export interface User {
   hosting_package?: HostingPackage
   /** Admin panelden paket atanırsa true; otomatik fatura senkronu bu kullanıcıda paketi güncellemez. */
   hosting_package_manual_override?: boolean
+  two_factor_enabled?: boolean
   created_at: string
 }
 
