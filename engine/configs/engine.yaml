@@ -71,6 +71,11 @@ hosting:
   apache_sites_available: "/etc/apache2/sites-available"
   apache_sites_enabled: "/etc/apache2/sites-enabled"
   apache_reload_after_vhost: false
+  # OpenLiteSpeed (server_type: openlitespeed); prod: manage true + httpd_config içine include satırları (paket başlık yorumlarına bakın)
+  openlitespeed_manage_vhosts: false
+  openlitespeed_conf_root: "/usr/local/lsws"
+  openlitespeed_reload_after_vhost: false
+  openlitespeed_ctrl_path: ""
   # Let’s Encrypt (certbot webroot); Linux prod: manage_ssl true + certbot kurulu
   manage_ssl: false
   certbot_path: ""

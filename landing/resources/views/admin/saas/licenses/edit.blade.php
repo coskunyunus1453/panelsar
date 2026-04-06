@@ -56,16 +56,6 @@
             <label class="block text-sm font-medium">Yenileme tarihi</label>
             <input type="datetime-local" name="subscription_renews_at" value="{{ old('subscription_renews_at', optional($license->subscription_renews_at)->format('Y-m-d\TH:i')) }}" class="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 dark:border-slate-700 dark:bg-slate-900">
         </div>
-        <div class="grid gap-4 sm:grid-cols-2">
-            <div>
-                <label class="block text-sm font-medium">Fatura sağlayıcı</label>
-                <input type="text" name="billing_provider" value="{{ old('billing_provider', $license->billing_provider) }}" class="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 dark:border-slate-700 dark:bg-slate-900">
-            </div>
-            <div>
-                <label class="block text-sm font-medium">Harici referans</label>
-                <input type="text" name="billing_reference" value="{{ old('billing_reference', $license->billing_reference) }}" class="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 dark:border-slate-700 dark:bg-slate-900">
-            </div>
-        </div>
         <div>
             <label class="block text-sm font-medium">Limit özelleştirme (JSON)</label>
             <textarea name="limits_override_raw" rows="3" class="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 font-mono text-xs dark:border-slate-700 dark:bg-slate-900">{{ $limits_override_raw }}</textarea>

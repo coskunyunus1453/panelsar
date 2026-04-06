@@ -33,22 +33,10 @@ import AdminMailSettingsPage from './pages/AdminMailSettingsPage'
 import AdminRolesPage from './pages/AdminRolesPage'
 import AdminWebServerSettingsPage from './pages/AdminWebServerSettingsPage'
 import AdminPhpSettingsPage from './pages/AdminPhpSettingsPage'
-import AdminCmsLayout from './pages/AdminCmsLayout'
-import AdminCmsLandingPage from './pages/AdminCmsLandingPage'
-import AdminCmsInstallPage from './pages/AdminCmsInstallPage'
-import AdminCmsDocsPage from './pages/AdminCmsDocsPage'
-import AdminCmsBlogPage from './pages/AdminCmsBlogPage'
 import ResellerPage from './pages/ResellerPage'
 import AiAdvisorPage from './pages/AiAdvisorPage'
 import PluginsStorePage from './pages/PluginsStorePage'
-import PublicMarketingGate from './pages/PublicMarketingGate'
-import PublicLandingPage from './pages/PublicLandingPage'
-import PricingPage from './pages/PricingPage'
-import InstallPage from './pages/InstallPage'
-import DocsPage from './pages/DocsPage'
-import DocsDetailPage from './pages/DocsDetailPage'
-import BlogPage from './pages/BlogPage'
-import BlogDetailPage from './pages/BlogDetailPage'
+
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
   if (!isAuthenticated) return <Navigate to="/login" replace />
@@ -72,6 +60,11 @@ function AdvancedRoute({ children }: { children: React.ReactNode }) {
   )
 }
 
+function UnknownRoute() {
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
+  return <Navigate to={isAuthenticated ? '/dashboard' : '/login'} replace />
+}
+
 export default function App() {
   const isDark = useThemeStore((s) => s.isDark)
 
@@ -86,15 +79,6 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
-      <Route path="/" element={<PublicMarketingGate />}>
-        <Route index element={<PublicLandingPage />} />
-        <Route path="pricing" element={<PricingPage />} />
-        <Route path="install" element={<InstallPage />} />
-        <Route path="docs" element={<DocsPage />} />
-        <Route path="docs/:slug" element={<DocsDetailPage />} />
-        <Route path="blog" element={<BlogPage />} />
-        <Route path="blog/:slug" element={<BlogDetailPage />} />
-      </Route>
       <Route
         path="/"
         element={
@@ -133,16 +117,9 @@ export default function App() {
         <Route path="admin/mail-settings" element={<AdvancedRoute><AdminMailSettingsPage /></AdvancedRoute>} />
         <Route path="admin/webserver" element={<AdvancedRoute><AdminWebServerSettingsPage /></AdvancedRoute>} />
         <Route path="admin/php-settings" element={<AdvancedRoute><AdminPhpSettingsPage /></AdvancedRoute>} />
-        <Route path="admin/cms" element={<AdvancedRoute><AdminCmsLayout /></AdvancedRoute>}>
-          <Route index element={<Navigate to="landing" replace />} />
-          <Route path="landing" element={<AdminCmsLandingPage />} />
-          <Route path="install" element={<AdminCmsInstallPage />} />
-          <Route path="docs" element={<AdminCmsDocsPage />} />
-          <Route path="blog" element={<AdminCmsBlogPage />} />
-        </Route>
         <Route path="settings" element={<SettingsPage />} />
       </Route>
-      <Route path="*" element={<Navigate to="/" replace />} />
+      <Route path="*" element={<UnknownRoute />} />
     </Routes>
   )
 }

@@ -5,6 +5,7 @@ namespace App\Providers;
 use App\View\Composers\LandingAppearanceComposer;
 use App\View\Composers\NavMenuComposer;
 use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
@@ -24,8 +25,20 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        RateLimiter::for('api', function (Request $request) {
+            return Limit::perMinute(120)->by($request->ip());
+        });
+
         RateLimiter::for('license-validate', function () {
             return Limit::perMinute(120)->by(request()->ip());
+        });
+
+        RateLimiter::for('licensing-checkout', function () {
+            return Limit::perMinute(15)->by(request()->ip());
+        });
+
+        RateLimiter::for('licensing-order', function () {
+            return Limit::perMinute(30)->by(request()->ip());
         });
 
         $landingViews = [
@@ -37,6 +50,8 @@ class AppServiceProvider extends ServiceProvider
             'landing.home',
             'site.page',
             'site.pricing',
+            'site.license-success',
+            'site.license-cancel',
             'site.blog.index',
             'site.blog.show',
             'site.docs.index',

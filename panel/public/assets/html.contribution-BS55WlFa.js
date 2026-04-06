@@ -1,0 +1,2 @@
+const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["./html-CpR-oTP9.js","./_.contribution-B157lprA.js","./_-D3TGwE_G.css"])))=>i.map(i=>d[i]);
+import{_ as t}from"./index-DkzoSXH1.js";import{r as m}from"./_.contribution-B157lprA.js";m({id:"html",extensions:[".html",".htm",".shtml",".xhtml",".mdoc",".jsp",".asp",".aspx",".jshtm"],aliases:["HTML","htm","html","xhtml"],mimetypes:["text/html","text/x-jshtm","text/template","text/ng-template"],loader:()=>t(()=>import("./html-CpR-oTP9.js"),__vite__mapDeps([0,1,2]),import.meta.url)});

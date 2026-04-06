@@ -343,6 +343,7 @@ export default function DomainsPage() {
                 <select name="server_type" className="input w-full" defaultValue="nginx">
                   <option value="nginx">nginx</option>
                   <option value="apache">Apache</option>
+                  <option value="openlitespeed">{t('domains.server_openlitespeed')}</option>
                 </select>
               </div>
               <div className="flex justify-end gap-2 pt-2">
@@ -558,13 +559,18 @@ export default function DomainsPage() {
 
                       <td className="px-6 py-4">
                         <select
-                          className="input w-[130px]"
+                          className="input min-w-[150px] max-w-[200px]"
                           value={domain.server_type}
                           disabled={!!b.server}
                           onChange={(e) => {
                             const next = e.target.value
                             if (next === domain.server_type) return
-                            const nextLabel = next === 'apache' ? 'Apache' : 'Nginx'
+                            const nextLabel =
+                              next === 'apache'
+                                ? 'Apache'
+                                : next === 'openlitespeed'
+                                  ? t('domains.server_openlitespeed')
+                                  : 'Nginx'
                             if (
                               !window.confirm(
                                 t('domains.confirm_server_change', { server: nextLabel }),
@@ -577,6 +583,7 @@ export default function DomainsPage() {
                         >
                           <option value="nginx">nginx</option>
                           <option value="apache">Apache</option>
+                          <option value="openlitespeed">{t('domains.server_openlitespeed')}</option>
                         </select>
                       </td>
 

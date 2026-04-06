@@ -1,12 +1,8 @@
 <?php
 
 use App\Http\Controllers\Admin\Auth\LoginController;
+use App\Http\Controllers\Admin\BillingSettingsController;
 use App\Http\Controllers\Admin\BlogCategoryController;
-use App\Http\Controllers\Admin\SaasCustomerController;
-use App\Http\Controllers\Admin\SaasDashboardController;
-use App\Http\Controllers\Admin\SaasLicenseController;
-use App\Http\Controllers\Admin\SaasLicenseProductController;
-use App\Http\Controllers\Admin\SaasProductModuleController;
 use App\Http\Controllers\Admin\BlogPostController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\DocPageController;
@@ -15,6 +11,11 @@ use App\Http\Controllers\Admin\LocaleSettingsController;
 use App\Http\Controllers\Admin\NavMenuItemController;
 use App\Http\Controllers\Admin\PlanController;
 use App\Http\Controllers\Admin\PublicHomeContentController;
+use App\Http\Controllers\Admin\SaasCustomerController;
+use App\Http\Controllers\Admin\SaasDashboardController;
+use App\Http\Controllers\Admin\SaasLicenseController;
+use App\Http\Controllers\Admin\SaasLicenseProductController;
+use App\Http\Controllers\Admin\SaasProductModuleController;
 use App\Http\Controllers\Admin\SitePageController as AdminSitePageController;
 use App\Http\Controllers\Admin\SiteSettingsController;
 use App\Http\Controllers\Admin\ThemeSettingsController;
@@ -84,6 +85,9 @@ Route::get('/docs/{slug}', [DocController::class, 'show'])->name('docs.show');
 
 Route::get('/p/{slug}', [SitePageController::class, 'show'])->name('site.page');
 
+Route::view('/license/success', 'site.license-success')->name('license.success');
+Route::view('/license/cancel', 'site.license-cancel')->name('license.cancel');
+
 Route::prefix('admin')->name('admin.')->group(function (): void {
     Route::get('login', [LoginController::class, 'create'])->name('login');
     Route::post('login', [LoginController::class, 'store'])
@@ -117,13 +121,31 @@ Route::prefix('admin')->name('admin.')->group(function (): void {
             Route::resource('plans', PlanController::class)->except(['show']);
 
             Route::get('saas', SaasDashboardController::class)->name('saas.dashboard');
-            Route::resource('saas/customers', SaasCustomerController::class)->except(['show']);
-            Route::resource('saas/products', SaasLicenseProductController::class)->except(['show'])
-                ->parameters(['products' => 'saas_license_product']);
-            Route::resource('saas/modules', SaasProductModuleController::class)->except(['show'])
-                ->parameters(['modules' => 'saas_product_module']);
-            Route::resource('saas/licenses', SaasLicenseController::class)->except(['show'])
-                ->parameters(['licenses' => 'saas_license']);
+            Route::get('billing-settings', [BillingSettingsController::class, 'edit'])->name('billing-settings.edit');
+            Route::put('billing-settings', [BillingSettingsController::class, 'update'])->name('billing-settings.update');
+            $saasResourceNames = static fn (string $segment): array => [
+                'index' => "saas.{$segment}.index",
+                'create' => "saas.{$segment}.create",
+                'store' => "saas.{$segment}.store",
+                'edit' => "saas.{$segment}.edit",
+                'update' => "saas.{$segment}.update",
+                'destroy' => "saas.{$segment}.destroy",
+            ];
+            Route::resource('saas/customers', SaasCustomerController::class)
+                ->except(['show'])
+                ->names($saasResourceNames('customers'));
+            Route::resource('saas/products', SaasLicenseProductController::class)
+                ->except(['show'])
+                ->parameters(['products' => 'saas_license_product'])
+                ->names($saasResourceNames('products'));
+            Route::resource('saas/modules', SaasProductModuleController::class)
+                ->except(['show'])
+                ->parameters(['modules' => 'saas_product_module'])
+                ->names($saasResourceNames('modules'));
+            Route::resource('saas/licenses', SaasLicenseController::class)
+                ->except(['show'])
+                ->parameters(['licenses' => 'saas_license'])
+                ->names($saasResourceNames('licenses'));
             Route::post('saas/licenses/{saas_license}/regenerate', [SaasLicenseController::class, 'regenerate'])
                 ->name('saas.licenses.regenerate');
 

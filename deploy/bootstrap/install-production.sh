@@ -21,7 +21,7 @@
 #   WITH_MARIADB=1         # MariaDB kur ve panel veritabanını oluştur (önerilir)
 #   WITH_POSTGRES=1        # Engine için PostgreSQL (isteğe bağlı)
 #   WITH_NODE_REPO=1       # NodeSource 20.x ekle (frontend build için önerilir)
-#   HOSTVIM_GO_VERSION=1.22.3  # engine/go.mod ile uyumlu (varsayılan; go.dev'den kurulur)
+#   HOSTVIM_GO_VERSION=1.23.4  # engine/go.mod ile uyumlu (varsayılan; go.dev'den kurulur)
 #   HOSTVIM_PHP_VERSION=8.4    # panel/composer.lock (Ondrej/Sury); Symfony 8 için 8.4 önerilir
 #   HOSTVIM_EXTRA_PHP_FPM_VERSIONS="8.3 8.2"  # ek FPM (boş = yalnız ana sürüm)
 #   WITH_PHPMYADMIN=1           # apt phpMyAdmin + Nginx /phpmyadmin + PHPMYADMIN_URL

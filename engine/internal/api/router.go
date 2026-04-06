@@ -224,7 +224,7 @@ func handleCreateSite(cfg *config.Config, d *daemon.Daemon) gin.HandlerFunc {
 
 		st := "nginx"
 		if metaNow != nil && metaNow.ServerType != "" {
-			st = metaNow.ServerType
+			st = sites.NormalizeServerType(metaNow.ServerType)
 		}
 
 		c.JSON(http.StatusCreated, gin.H{
@@ -235,6 +235,7 @@ func handleCreateSite(cfg *config.Config, d *daemon.Daemon) gin.HandlerFunc {
 			"server_type":          st,
 			"nginx_vhost":          cfg.Hosting.NginxManageVhosts,
 			"apache_vhost":         cfg.Hosting.ApacheManageVhosts,
+			"openlitespeed_vhost":  cfg.Hosting.OLSManageVhosts,
 			"php_fpm_manage_pools": cfg.Hosting.PHPFPMmanagePools,
 			"php_fpm_socket":       phpSocket,
 		})
@@ -591,9 +592,9 @@ func handleAddSubdomain(cfg *config.Config, d *daemon.Daemon) gin.HandlerFunc {
 		if phpV == "" {
 			phpV = "8.2"
 		}
-		st := "nginx"
+		st := sites.NormalizeServerType("")
 		if parentMeta != nil && parentMeta.ServerType != "" {
-			st = strings.ToLower(parentMeta.ServerType)
+			st = sites.NormalizeServerType(parentMeta.ServerType)
 		}
 		docRoot, err := sites.ProvisionSubdomain(cfg.Paths.WebRoot, parent, req.Hostname, req.PathSegment, phpV, st)
 		if err != nil {

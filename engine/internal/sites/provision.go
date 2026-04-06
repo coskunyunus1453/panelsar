@@ -24,9 +24,7 @@ func Provision(webRoot, domain, phpVersion, serverType string) (documentRoot str
 	if st == "" && oldMeta != nil && oldMeta.ServerType != "" {
 		st = strings.ToLower(strings.TrimSpace(oldMeta.ServerType))
 	}
-	if st != "apache" {
-		st = "nginx"
-	}
+	st = NormalizeServerType(st)
 	sslEn := false
 	if oldMeta != nil {
 		sslEn = oldMeta.SSLEnabled
@@ -93,10 +91,7 @@ func ProvisionSubdomain(webRoot, parentDomain, hostname, pathSegment, phpVersion
 	if phpVersion == "" {
 		phpVersion = "8.2"
 	}
-	st := strings.ToLower(strings.TrimSpace(serverType))
-	if st != "apache" {
-		st = "nginx"
-	}
+	st := NormalizeServerType(serverType)
 	base := filepath.Join(webRoot, parentDomain, pathSegment)
 	docRoot := filepath.Join(base, "public_html")
 	if err := os.MkdirAll(docRoot, 0o755); err != nil {

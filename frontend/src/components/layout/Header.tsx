@@ -16,7 +16,9 @@ import {
   User,
   Menu,
   SlidersHorizontal,
+  LayoutGrid,
 } from 'lucide-react'
+import clsx from 'clsx'
 import { useEffect, useState } from 'react'
 
 const languages = [
@@ -85,6 +87,7 @@ export default function Header() {
 
       <div className="relative z-10 flex min-w-0 flex-1 flex-nowrap items-center justify-end gap-1 overflow-x-auto py-0 [scrollbar-width:none] md:flex-initial md:gap-3 md:overflow-visible [&::-webkit-scrollbar]:hidden">
         <button
+          type="button"
           onClick={() => {
             const next = mode === 'easy' ? 'advanced' : 'easy'
             setMode(next)
@@ -92,17 +95,21 @@ export default function Header() {
               setShowAdvancedTips(false)
             }
           }}
-          className="relative z-0 shrink-0 px-2 py-1.5 sm:px-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-300 text-xs font-semibold inline-flex items-center gap-1.5 border border-gray-200 dark:border-gray-700"
+          className={clsx(
+            'relative z-0 shrink-0 rounded-xl border p-2 transition-colors',
+            mode === 'easy'
+              ? 'border-emerald-400/70 bg-emerald-50 text-emerald-700 shadow-sm shadow-emerald-500/10 hover:bg-emerald-100/90 dark:border-emerald-600/50 dark:bg-emerald-950/35 dark:text-emerald-300 dark:hover:bg-emerald-950/55'
+              : 'border-blue-400/70 bg-blue-50 text-blue-700 shadow-sm shadow-blue-500/10 hover:bg-blue-100/90 dark:border-blue-600/50 dark:bg-blue-950/35 dark:text-blue-300 dark:hover:bg-blue-950/55',
+          )}
           title={mode === 'easy' ? t('ui_mode.switch_to_advanced') : t('ui_mode.switch_to_easy')}
+          aria-label={mode === 'easy' ? t('ui_mode.easy') : t('ui_mode.advanced')}
         >
-          <SlidersHorizontal className="h-3.5 w-3.5 shrink-0" />
-          <span className="max-[380px]:hidden">{mode === 'easy' ? t('ui_mode.easy') : t('ui_mode.advanced')}</span>
+          {mode === 'easy' ? (
+            <LayoutGrid className="h-5 w-5 shrink-0" strokeWidth={2.2} />
+          ) : (
+            <SlidersHorizontal className="h-5 w-5 shrink-0" strokeWidth={2.2} />
+          )}
         </button>
-        {mode === 'easy' && (
-          <span className="hidden shrink-0 px-2 py-1 rounded-full text-[10px] font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300 sm:inline-flex">
-            {t('ui_mode.simple_active')}
-          </span>
-        )}
         {showAdvancedTips && (
           <>
             <div className="hidden md:block absolute right-4 top-16 z-50 w-80 rounded-xl border border-primary-200 dark:border-primary-900/40 bg-white dark:bg-gray-900 shadow-lg p-3">

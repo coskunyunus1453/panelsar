@@ -96,6 +96,12 @@ type HostingConfig struct {
 	// ApacheHTTPPort — Nginx panel 80 kullanırken 8080 (çakışmasız). 0 veya yoksa 80.
 	ApacheHTTPPort int `mapstructure:"apache_http_port"`
 
+	// OpenLiteSpeed (server_type: openlitespeed) — conf.d parçaları + listener map dosyaları.
+	OLSManageVhosts       bool   `mapstructure:"openlitespeed_manage_vhosts"`
+	OLSConfRoot           string `mapstructure:"openlitespeed_conf_root"`
+	OLSReloadAfterVhost   bool   `mapstructure:"openlitespeed_reload_after_vhost"`
+	OLSCtrlPath           string `mapstructure:"openlitespeed_ctrl_path"`
+
 	ManageSSL               bool   `mapstructure:"manage_ssl"`
 	CertbotPath             string `mapstructure:"certbot_path"`
 	LetsEncryptEmail        string `mapstructure:"lets_encrypt_email"`
@@ -235,6 +241,11 @@ func setDefaults() {
 	viper.SetDefault("hosting.apache_sites_enabled", "/etc/apache2/sites-enabled")
 	viper.SetDefault("hosting.apache_reload_after_vhost", false)
 	viper.SetDefault("hosting.apache_http_port", 80)
+
+	viper.SetDefault("hosting.openlitespeed_manage_vhosts", false)
+	viper.SetDefault("hosting.openlitespeed_conf_root", "/usr/local/lsws")
+	viper.SetDefault("hosting.openlitespeed_reload_after_vhost", false)
+	viper.SetDefault("hosting.openlitespeed_ctrl_path", "")
 
 	viper.SetDefault("hosting.manage_ssl", false)
 	viper.SetDefault("hosting.certbot_path", "")

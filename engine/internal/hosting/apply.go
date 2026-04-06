@@ -8,6 +8,7 @@ import (
 	"hostvim/engine/internal/apache"
 	"hostvim/engine/internal/config"
 	"hostvim/engine/internal/nginx"
+	"hostvim/engine/internal/openlitespeed"
 	"hostvim/engine/internal/phpfpm"
 	"hostvim/engine/internal/sites"
 	"hostvim/engine/internal/ssl"
@@ -58,9 +59,19 @@ func sslPathsIfEnabled(cfg *config.Config, domain string, meta *sites.SiteMeta) 
 	return chain, key
 }
 
-// ApplyWebServer site meta’sına göre nginx veya apache sanal host yazar; SSL PEM varsa HTTPS + 301.
+// ApplyWebServer site meta’sına göre nginx, apache veya openlitespeed sanal host yazar; SSL PEM varsa HTTPS + 301 (nginx/ols).
 func ApplyWebServer(cfg *config.Config, domain, docRoot string, meta *sites.SiteMeta, phpSocket string) error {
 	st := serverTypeOf(meta)
+	if st != "nginx" {
+		nginx.RemoveVhostBestEffort(cfg, domain)
+	}
+	if st != "apache" {
+		apache.RemoveVhostBestEffort(cfg, domain)
+	}
+	if st != "openlitespeed" {
+		openlitespeed.RemoveVhostBestEffort(cfg, domain)
+	}
+
 	sock := resolvePHPSocket(cfg, domain, meta, phpSocket)
 	chain, key := sslPathsIfEnabled(cfg, domain, meta)
 
@@ -78,6 +89,12 @@ func ApplyWebServer(cfg *config.Config, domain, docRoot string, meta *sites.Site
 		}
 		sn := nginx.BuildServerNamesLine(domain, extras)
 		return nginx.ApplyVhost(cfg, domain, docRoot, sock, chain, key, sn)
+	case "openlitespeed":
+		var aliases []string
+		if meta != nil {
+			aliases = append([]string(nil), meta.Aliases...)
+		}
+		return openlitespeed.ApplyVhost(cfg, domain, docRoot, sock, chain, key, aliases)
 	}
 }
 
@@ -89,6 +106,10 @@ func ApplySubdomainVhost(cfg *config.Config, parentPrimary, hostname, docRoot st
 	if st == "apache" {
 		return apache.ApplyVhost(cfg, hostname, docRoot, sock, "", "", nil)
 	}
+	if st == "openlitespeed" {
+		h := strings.ToLower(strings.TrimSpace(hostname))
+		return openlitespeed.ApplyVhost(cfg, h, docRoot, sock, "", "", nil)
+	}
 	h := strings.ToLower(strings.TrimSpace(hostname))
 	return nginx.ApplyVhost(cfg, h, docRoot, sock, "", "", h)
 }
@@ -98,6 +119,8 @@ func RemoveWebServer(cfg *config.Config, domain string, meta *sites.SiteMeta) er
 	switch serverTypeOf(meta) {
 	case "apache":
 		return apache.RemoveVhost(cfg, domain)
+	case "openlitespeed":
+		return openlitespeed.RemoveVhost(cfg, domain)
 	default:
 		return nginx.RemoveVhost(cfg, domain)
 	}
@@ -116,13 +139,14 @@ func removePanelSiteLogs(cfg *config.Config, domain string) {
 	_ = os.Remove(base + "_error.log")
 }
 
-// RemoveWebServerForSiteDeletion ana siteyi sunucudan kaldırırken nginx ve apache kalıntılarını (yönetim bayrakları kapalı olsa bile) ve nginx log dosyalarını temizler.
+// RemoveWebServerForSiteDeletion ana siteyi sunucudan kaldırırken nginx, apache ve openlitespeed kalıntılarını (yönetim bayrakları kapalı olsa bile) ve nginx log dosyalarını temizler.
 func RemoveWebServerForSiteDeletion(cfg *config.Config, domain string) {
 	if domain == "" || strings.Contains(domain, "..") {
 		return
 	}
 	nginx.RemoveVhostBestEffort(cfg, domain)
 	apache.RemoveVhostBestEffort(cfg, domain)
+	openlitespeed.RemoveVhostBestEffort(cfg, domain)
 	removePanelSiteLogs(cfg, domain)
 }
 
@@ -135,6 +159,8 @@ func RemoveSubdomainVhost(cfg *config.Config, hostname string, meta *sites.SiteM
 	switch serverTypeOf(meta) {
 	case "apache":
 		apache.RemoveVhostBestEffort(cfg, h)
+	case "openlitespeed":
+		openlitespeed.RemoveVhostBestEffort(cfg, h)
 	default:
 		nginx.RemoveVhostBestEffort(cfg, h)
 	}

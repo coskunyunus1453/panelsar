@@ -10,9 +10,11 @@ import {
   ChevronDown,
   ChevronRight,
   FileCode,
+  FilePenLine,
   FileText,
   Folder,
   FolderOpen,
+  Home,
   LayoutGrid,
   List as ListIcon,
   RefreshCw,
@@ -21,6 +23,7 @@ import {
   Trash2,
   Unlock,
   Upload,
+  UploadCloud,
   FilePlus,
   X,
 } from 'lucide-react'
@@ -1126,7 +1129,7 @@ export default function FileManagerPage() {
     <div
       {...getRootProps({
         className: clsx(
-          'space-y-4 min-h-[min(85vh,56rem)] rounded-xl p-1 -m-1 outline-none transition-colors',
+          'space-y-2 min-h-[min(85vh,56rem)] rounded-xl p-0.5 -m-0.5 outline-none transition-colors sm:space-y-3',
           domainId !== '' && 'border-2 border-dashed border-transparent',
           isDragActive &&
             'border-primary-400 bg-primary-50/25 ring-2 ring-primary-500/35 dark:border-primary-500/60 dark:bg-primary-950/20',
@@ -1134,22 +1137,53 @@ export default function FileManagerPage() {
       })}
     >
       <input {...getInputProps()} />
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <FolderOpen className="h-8 w-8 text-primary-500" />
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{t('nav.files')}</h1>
-            <p className="text-gray-500 dark:text-gray-400 text-sm">{t('files.subtitle')}</p>
-          </div>
-        </div>
-      </div>
 
       <div className="card overflow-hidden border border-gray-200 dark:border-gray-700">
-        <div className="flex flex-wrap items-end gap-3 border-b border-gray-100 dark:border-gray-800 px-4 py-3">
-          <div>
-            <label className="label text-xs">{t('domains.name')}</label>
+        <div className="flex flex-col gap-2 border-b border-gray-100 bg-gray-50/60 px-2 py-2 dark:border-gray-800 dark:bg-gray-900/40 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3 sm:px-3">
+          <div className="flex shrink-0 items-center gap-1 border-gray-200 dark:border-gray-700 sm:border-r sm:pr-2">
+            <span
+              className="inline-flex items-center rounded-lg p-1.5 text-primary-600 dark:text-primary-400"
+              title={t('nav.files')}
+            >
+              <FolderOpen className="h-5 w-5" aria-hidden />
+            </span>
+            <div
+              className="flex items-center gap-0.5"
+              role="group"
+              aria-label={t('files.subtitle')}
+            >
+              <span
+                className="inline-flex cursor-help rounded-md p-1.5 text-gray-500 hover:bg-white hover:text-gray-800 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100"
+                title={t('files.tip_root')}
+              >
+                <Home className="h-4 w-4" />
+              </span>
+              <span
+                className="inline-flex cursor-help rounded-md p-1.5 text-gray-500 hover:bg-white hover:text-gray-800 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100"
+                title={t('files.tip_drop')}
+              >
+                <UploadCloud className="h-4 w-4" />
+              </span>
+              <span
+                className="inline-flex cursor-help rounded-md p-1.5 text-gray-500 hover:bg-white hover:text-gray-800 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100"
+                title={t('files.tip_dblclick')}
+              >
+                <FilePenLine className="h-4 w-4" />
+              </span>
+              <span
+                className="inline-flex cursor-help rounded-md p-1.5 text-gray-500 hover:bg-white hover:text-gray-800 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100"
+                title={t('files.tip_search')}
+              >
+                <Search className="h-4 w-4" />
+              </span>
+            </div>
+          </div>
+          <div className="flex min-w-0 flex-1 flex-col gap-1 sm:max-w-md">
+            <label className="text-[11px] font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+              {t('domains.name')}
+            </label>
             <select
-              className="input min-w-[200px] text-sm"
+              className="input w-full min-w-0 text-sm sm:min-w-[200px]"
               value={domainId}
               onChange={(e) => {
                 onDomainSelectChange(e.target.value)
@@ -1167,22 +1201,17 @@ export default function FileManagerPage() {
           </div>
           <button
             type="button"
-            className="btn-secondary inline-flex items-center gap-2 text-sm"
+            className="btn-secondary inline-flex shrink-0 items-center justify-center self-start p-2 sm:self-center"
             onClick={() => {
               void domainsQ.refetch()
               void filesQ.refetch()
             }}
+            title={t('common.refresh')}
           >
             <RefreshCw className="h-4 w-4" />
-            {t('common.refresh')}
+            <span className="sr-only">{t('common.refresh')}</span>
           </button>
         </div>
-
-        {domainId !== '' && (
-          <p className="border-b border-gray-100 px-4 py-1.5 text-xs text-gray-500 dark:border-gray-800 dark:text-gray-400">
-            {t('files.upload_drop_hint')}
-          </p>
-        )}
 
         {domainId === '' && (
           <p className="p-8 text-center text-sm text-gray-500 dark:text-gray-400">
@@ -1192,7 +1221,7 @@ export default function FileManagerPage() {
 
         {domainId !== '' && (
           <>
-            <div className="flex flex-wrap items-center gap-2 border-b border-gray-100 dark:border-gray-800 px-3 py-2 text-sm">
+            <div className="flex flex-wrap items-center gap-2 border-b border-gray-100 dark:border-gray-800 px-2 py-1.5 text-sm sm:px-3 sm:py-2">
               <button
                 type="button"
                 className="rounded-md p-1.5 text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800 disabled:opacity-40"
@@ -1272,7 +1301,7 @@ export default function FileManagerPage() {
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2 border-b border-gray-100 dark:border-gray-800 px-3 py-2">
+            <div className="flex flex-wrap items-center gap-2 border-b border-gray-100 dark:border-gray-800 px-2 py-1.5 sm:px-3 sm:py-2">
               <div className="relative" ref={fileOpsRef}>
                 <button
                   type="button"

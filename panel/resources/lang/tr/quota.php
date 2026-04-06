@@ -9,4 +9,5 @@ return [
     'max_backups' => 'Yedek kotası doldu (:max). Eski yedekleri silin veya destek isteyin.',
     'backups_disabled' => 'Paketinizde yedekleme özelliği yok.',
     'ssl_disabled' => 'Paketinizde SSL / Let\'s Encrypt kapalı.',
+    'disk_quota_exceeded' => 'Disk kotası aşıldı. Kullanılan: yaklaşık :used_mb MB, paket sınırı: :limit_mb MB.',
 ];

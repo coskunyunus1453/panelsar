@@ -38,7 +38,7 @@ export default function DomainQuickSettingsModal({ domain, open, onClose }: Prop
   const qc = useQueryClient()
   const navigate = useNavigate()
   const [php, setPhp] = useState('')
-  const [server, setServer] = useState<'nginx' | 'apache'>('nginx')
+  const [server, setServer] = useState<'nginx' | 'apache' | 'openlitespeed'>('nginx')
   const [showDelete, setShowDelete] = useState(false)
   const [sslPhase, setSslPhase] = useState<'idle' | 'running' | 'done' | 'error'>('idle')
   const [sslStep, setSslStep] = useState(0)
@@ -47,7 +47,13 @@ export default function DomainQuickSettingsModal({ domain, open, onClose }: Prop
   useEffect(() => {
     if (domain) {
       setPhp(domain.php_version)
-      setServer((domain.server_type === 'apache' ? 'apache' : 'nginx') as 'nginx' | 'apache')
+      setServer(
+        (domain.server_type === 'apache'
+          ? 'apache'
+          : domain.server_type === 'openlitespeed'
+            ? 'openlitespeed'
+            : 'nginx') as 'nginx' | 'apache' | 'openlitespeed',
+      )
       setShowDelete(false)
       setSslPhase('idle')
       setSslStep(0)
@@ -269,10 +275,13 @@ export default function DomainQuickSettingsModal({ domain, open, onClose }: Prop
               <select
                 className="input flex-1 min-w-[140px]"
                 value={server}
-                onChange={(e) => setServer(e.target.value as 'nginx' | 'apache')}
+                onChange={(e) =>
+                  setServer(e.target.value as 'nginx' | 'apache' | 'openlitespeed')
+                }
               >
                 <option value="nginx">nginx</option>
                 <option value="apache">Apache</option>
+                <option value="openlitespeed">{t('domains.server_openlitespeed')}</option>
               </select>
               <button
                 type="button"

@@ -567,6 +567,88 @@ class EngineApiService
         return $this->post('/api/v1/backups/'.rawurlencode($id).'/restore');
     }
 
+    /**
+     * Multipart: archive (tar.gz). Uzak yedek indirildikten sonra engine üzerinde extract edilir.
+     *
+     * @return array<string, mixed>
+     */
+    /**
+     * @return array{bytes?: int, exists?: bool, error?: string}
+     */
+    public function getSiteDiskUsage(string $domain): array
+    {
+        if (! $this->engineAuthConfigured()) {
+            return ['error' => (string) __('messages.engine_auth_missing'), 'bytes' => 0, 'exists' => false];
+        }
+        try {
+            $response = $this->client()->get($this->baseUrl.'/api/v1/sites/'.rawurlencode($domain).'/disk-usage');
+            $json = $response->json() ?? [];
+            if (! $response->successful()) {
+                return [
+                    'error' => $this->formatEngineHttpError($response, $json),
+                    'bytes' => 0,
+                    'exists' => false,
+                ];
+            }
+
+            return [
+                'bytes' => (int) ($json['bytes'] ?? 0),
+                'exists' => (bool) ($json['exists'] ?? true),
+            ];
+        } catch (\Exception $e) {
+            Log::error('Engine API GET /sites/disk-usage failed: '.$e->getMessage());
+
+            return ['error' => $e->getMessage(), 'bytes' => 0, 'exists' => false];
+        }
+    }
+
+    public function restoreBackupUpload(string $localPath, ?string $filename = null): array
+    {
+        if (! $this->engineAuthConfigured()) {
+            return $this->missingEngineCredentialsPayload();
+        }
+        if (! is_readable($localPath)) {
+            return ['error' => 'Archive file is not readable'];
+        }
+        $timeout = (int) config('hostvim.engine_restore_upload_timeout', 7200);
+        if ($timeout < 120) {
+            $timeout = 7200;
+        }
+        $uploadName = $filename !== null && $filename !== '' ? $filename : basename($localPath);
+        $stream = null;
+        try {
+            $req = Http::timeout($timeout)->acceptJson();
+            if ($this->internalKey !== '') {
+                $req = $req->withHeaders([
+                    'X-Hostvim-Engine-Key' => $this->internalKey,
+                    'X-Panelsar-Engine-Key' => $this->internalKey,
+                ]);
+            } elseif ($this->jwtSecret !== '') {
+                $req = $req->withToken($this->generateLegacyToken());
+            }
+            $stream = fopen($localPath, 'rb');
+            if ($stream === false) {
+                return ['error' => 'Could not open archive'];
+            }
+            $response = $req->attach('archive', $stream, $uploadName)
+                ->post($this->baseUrl.'/api/v1/backups/restore-upload');
+            $json = $response->json() ?? [];
+            if (! $response->successful()) {
+                return ['error' => $this->formatEngineHttpError($response, $json)];
+            }
+
+            return $json;
+        } catch (\Exception $e) {
+            Log::error('Engine API backup restore-upload failed: '.$e->getMessage());
+
+            return ['error' => $e->getMessage()];
+        } finally {
+            if (is_resource($stream ?? null)) {
+                fclose($stream);
+            }
+        }
+    }
+
     public function dnsList(string $domain): array
     {
         return $this->get('/api/v1/dns/'.rawurlencode($domain))['records'] ?? [];

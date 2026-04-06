@@ -48,7 +48,7 @@ class SiteController extends Controller
         $validated = $request->validate([
             'domain' => 'required|string|max:253',
             'php_version' => 'nullable|string|in:7.4,8.0,8.1,8.2,8.3,8.4',
-            'server_type' => 'nullable|string|in:nginx,apache',
+            'server_type' => 'nullable|string|in:nginx,apache,openlitespeed',
             'issue_lets_encrypt' => 'nullable|boolean',
             'lets_encrypt_email' => 'nullable|email',
         ]);

@@ -6,6 +6,7 @@ use App\Http\Controllers\Concerns\AuthorizesUserDomain;
 use App\Http\Controllers\Controller;
 use App\Models\Domain;
 use App\Services\EngineApiService;
+use App\Services\HostingQuotaService;
 use App\Services\SafeAuditLogger;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -23,6 +24,7 @@ class FileManagerController extends Controller
 
     public function __construct(
         private EngineApiService $engine,
+        private HostingQuotaService $quota,
     ) {}
 
     /**
@@ -411,6 +413,7 @@ class FileManagerController extends Controller
 
         $from = $validated['path'];
         $engineFrom = $this->panelRelToEngineRel($domain, $from);
+        $this->quota->ensureDiskHeadroom($request->user(), strlen((string) ($validated['content'] ?? '')));
         try {
             $result = $this->engine->writeFile($domain->name, $engineFrom, $validated['content'] ?? '');
             if (! empty($result['error'])) {
@@ -440,6 +443,7 @@ class FileManagerController extends Controller
 
         $from = $validated['path'];
         $engineFrom = $this->panelRelToEngineRel($domain, $from);
+        $this->quota->ensureDiskHeadroom($request->user(), strlen((string) ($validated['content'] ?? '')));
         try {
             $result = $this->engine->createFile($domain->name, $engineFrom, $validated['content'] ?? '');
             if (! empty($result['error'])) {
@@ -469,8 +473,10 @@ class FileManagerController extends Controller
         ]);
         $relPath = (string) ($validated['path'] ?? '');
         $engineRelPath = $this->panelRelToEngineRel($domain, $relPath);
+        $up = $request->file('file');
+        $this->quota->ensureDiskHeadroom($request->user(), (int) $up->getSize());
         try {
-            $result = $this->engine->uploadFile($domain->name, $engineRelPath, $request->file('file'));
+            $result = $this->engine->uploadFile($domain->name, $engineRelPath, $up);
             $ok = empty($result['error']);
             $this->logFileAction($request, $domain, 'upload', $relPath, null, $ok, $result['error'] ?? null);
 
@@ -558,6 +564,7 @@ class FileManagerController extends Controller
         $to = $validated['to'];
         $engineFrom = $this->panelRelToEngineRel($domain, $from);
         $engineTo = $this->panelRelToEngineRel($domain, $to);
+        $this->quota->ensureDiskHeadroom($request->user(), $this->quota->engineFileSizeBytes($domain->name, $engineFrom));
         $result = $this->engine->copyFile($domain->name, $engineFrom, $engineTo);
         if (! empty($result['error'])) {
             $this->logFileAction($request, $domain, 'copy', $from, $to, false, $result['error']);
@@ -652,9 +659,11 @@ class FileManagerController extends Controller
         ]);
         $archive = $validated['archive'];
         $targetDir = $validated['target_dir'];
+        $engineArchive = $this->panelRelToEngineRel($domain, $archive);
+        $this->quota->ensureDiskHeadroom($request->user(), $this->quota->estimatedUnzipHeadroomBytes($domain->name, $engineArchive));
         $result = $this->engine->unzipPath(
             $domain->name,
-            $this->panelRelToEngineRel($domain, $archive),
+            $engineArchive,
             $this->panelRelToEngineRel($domain, $targetDir)
         );
         if (! empty($result['error'])) {

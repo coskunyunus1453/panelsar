@@ -220,8 +220,6 @@ class DatabaseSeeder extends Seeder
         // Production default: only admin user.
         // Demo accounts are opt-in via HOSTVIM_SEED_DEMO_USERS=1 (veya eski PANELSAR_SEED_DEMO_USERS).
         $seedDemoUsers = filter_var((string) env('HOSTVIM_SEED_DEMO_USERS', env('PANELSAR_SEED_DEMO_USERS', false)), FILTER_VALIDATE_BOOLEAN);
-        $this->call(CmsDeploymentDocSeeder::class);
-
         if ($seedDemoUsers) {
             $reseller = User::firstOrCreate(
                 ['email' => 'reseller@hostvim.com'],

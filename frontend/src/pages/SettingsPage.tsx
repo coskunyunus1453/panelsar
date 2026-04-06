@@ -148,7 +148,7 @@ export default function SettingsPage() {
       setTwofaSetup({ otpauth_url: res.otpauth_url, secret: res.secret })
       setTwofaOtp('')
       setTwofaBackupCodes(null)
-      toast.success('2FA kurulum hazır.')
+      toast.success(t('settings.two_factor_setup_ready_toast'))
       qc.invalidateQueries({ queryKey: ['twofa-status'] })
     },
     onError: (err: unknown) => {
@@ -163,7 +163,7 @@ export default function SettingsPage() {
       setTwofaBackupCodes(res.backup_codes)
       setTwofaOtp('')
       setTwofaSetup(null)
-      toast.success('2FA aktifleştirildi.')
+      toast.success(t('settings.two_factor_enabled_toast'))
       updateUser({ two_factor_enabled: true })
       qc.invalidateQueries({ queryKey: ['twofa-status'] })
     },
@@ -183,7 +183,7 @@ export default function SettingsPage() {
       },
     onSuccess: (res) => {
       setTwofaBackupCodes(res.backup_codes)
-      toast.success('Yeni yedek kodlar üretildi.')
+      toast.success(t('settings.two_factor_backup_regen_toast'))
     },
     onError: (err: unknown) => {
       const ax = err as { response?: { data?: { message?: string } } }
@@ -503,7 +503,9 @@ export default function SettingsPage() {
                 {t('settings.two_factor')}
               </h2>
               <p className="text-sm text-gray-500 dark:text-gray-400">
-                {twoFaStatusQ.data?.two_factor_enabled ? '2FA aktif durumda' : 'TOTP ile iki aşamalı doğrulama'}
+                {twoFaStatusQ.data?.two_factor_enabled
+                  ? t('settings.two_factor_sub_on')
+                  : t('settings.two_factor_sub_off')}
               </p>
             </div>
           </div>
@@ -513,26 +515,26 @@ export default function SettingsPage() {
           {!twoFaStatusQ.isLoading && !twoFaStatusQ.data?.two_factor_enabled && (
             <>
               <button type="button" className="btn-primary" disabled={setupM.isPending} onClick={() => setupM.mutate()}>
-                Kurulum Başlat (QR)
+                {t('settings.two_factor_start_setup')}
               </button>
 
               {twofaSetup && (
                 <div className="rounded-xl border border-white/10 bg-white/5 p-4">
                   <div className="flex flex-col sm:flex-row gap-5 sm:items-start">
                     <div>
-                      <p className="text-sm text-gray-300 mb-2">QR Kodu</p>
+                      <p className="text-sm text-gray-300 mb-2">{t('settings.two_factor_qr_label')}</p>
                       <div className="w-[220px] h-[220px] bg-black/20 rounded-lg flex items-center justify-center">
                         {twofaQrDataUrl ? (
-                          <img src={twofaQrDataUrl} alt="QR" className="w-[220px] h-[220px] object-contain" />
+                          <img src={twofaQrDataUrl} alt="" className="w-[220px] h-[220px] object-contain" />
                         ) : (
-                          <span className="text-xs text-gray-500">QR oluşturuluyor...</span>
+                          <span className="text-xs text-gray-500">{t('settings.two_factor_qr_loading')}</span>
                         )}
                       </div>
                     </div>
 
                     <div className="flex-1 space-y-3">
                       <div>
-                        <p className="text-sm text-gray-300 mb-1">Secret (manuel ekleme için)</p>
+                        <p className="text-sm text-gray-300 mb-1">{t('settings.two_factor_secret_label')}</p>
                         <div className="flex items-center gap-2">
                           <input
                             value={twofaSetup.secret}
@@ -545,25 +547,27 @@ export default function SettingsPage() {
                             onClick={async () => {
                               try {
                                 await navigator.clipboard.writeText(twofaSetup.secret)
-                                toast.success('Secret kopyalandı.')
+                                toast.success(t('settings.two_factor_secret_copied'))
                               } catch {
-                                toast.error('Secret kopyalanamadı.')
+                                toast.error(t('settings.two_factor_secret_copy_fail'))
                               }
                             }}
                           >
-                            Kopyala
+                            {t('settings.two_factor_copy')}
                           </button>
                         </div>
                       </div>
 
                       <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-1.5">OTP Kodu (6 hane)</label>
+                        <label className="block text-sm font-medium text-gray-300 mb-1.5">
+                          {t('settings.two_factor_otp_label')}
+                        </label>
                         <input
                           value={twofaOtp}
                           onChange={(e) => setTwofaOtp(e.target.value)}
                           inputMode="numeric"
                           className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
-                          placeholder="123456"
+                          placeholder={t('settings.two_factor_otp_placeholder')}
                         />
                       </div>
 
@@ -575,13 +579,13 @@ export default function SettingsPage() {
                           onClick={() => {
                             const code = twofaOtp.trim()
                             if (!/^\d{6}$/.test(code)) {
-                              toast.error('OTP 6 hane olmalı (örn: 123456).')
+                              toast.error(t('settings.two_factor_otp_invalid'))
                               return
                             }
                             verifyM.mutate(code)
                           }}
                         >
-                          Aktifleştir
+                          {t('settings.two_factor_activate')}
                         </button>
                         <button
                           type="button"
@@ -591,12 +595,14 @@ export default function SettingsPage() {
                             setTwofaOtp('')
                           }}
                         >
-                          Vazgeç
+                          {t('settings.two_factor_cancel')}
                         </button>
                       </div>
 
                       <p className="text-xs text-gray-500">
-                        2FA aktif edildikten sonra admin/vendor işlemleri için ikinci doğrulama gerekir.
+                        {enforceAdmin2fa === true
+                          ? t('settings.two_factor_hint_enforced')
+                          : t('settings.two_factor_hint_optional')}
                       </p>
                     </div>
                   </div>
@@ -608,10 +614,8 @@ export default function SettingsPage() {
           {!!twoFaStatusQ.data?.two_factor_enabled && (
             <div className="space-y-3">
               <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-                <p className="text-sm text-gray-300">2FA Aktif</p>
-                <p className="text-xs text-gray-500 mt-1">
-                  OTP’ye erişemezseniz girişte yedek kod kullanabilirsiniz.
-                </p>
+                <p className="text-sm text-gray-300">{t('settings.two_factor_active_title')}</p>
+                <p className="text-xs text-gray-500 mt-1">{t('settings.two_factor_active_backup_hint')}</p>
               </div>
               <button
                 type="button"
@@ -619,7 +623,7 @@ export default function SettingsPage() {
                 disabled={regenBackupM.isPending}
                 onClick={() => regenBackupM.mutate()}
               >
-                Yedek Kodları Yenile
+                {t('settings.two_factor_regen_backup')}
               </button>
               <button
                 type="button"
@@ -627,14 +631,14 @@ export default function SettingsPage() {
                 disabled={setupM.isPending}
                 onClick={() => setupM.mutate()}
               >
-                TOTP Kurulumunu Yeniden Başlat (QR/Secret)
+                {t('settings.two_factor_restart_setup')}
               </button>
             </div>
           )}
 
           {twofaBackupCodes && twofaBackupCodes.length > 0 && (
             <div className="rounded-xl border border-primary-500/30 bg-primary-500/10 p-4">
-              <p className="text-sm font-semibold text-white mb-2">Yedek Kodlar (1 kez kullanılır)</p>
+              <p className="text-sm font-semibold text-white mb-2">{t('settings.two_factor_backup_title')}</p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {twofaBackupCodes.map((c) => (
                   <div key={c} className="rounded-lg bg-black/20 border border-white/10 px-3 py-2 text-xs text-gray-100">
@@ -642,9 +646,7 @@ export default function SettingsPage() {
                   </div>
                 ))}
               </div>
-              <p className="text-xs text-gray-300 mt-3">
-                Bu kodları kaydedin. Bir kod kullanıldıktan sonra otomatik olarak geçersiz olur.
-              </p>
+              <p className="text-xs text-gray-300 mt-3">{t('settings.two_factor_backup_footer')}</p>
             </div>
           )}
         </div>

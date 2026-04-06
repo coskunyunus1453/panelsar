@@ -43,64 +43,7 @@
     "group_account": "Account",
     "admin_server": "Server management",
     "admin_access": "Access & management",
-    "vendor_control": "Vendor control center",
-    "cms": "CMS & marketing"
-  },
-  "cms_admin": {
-    "title": "CMS & marketing",
-    "subtitle": "Manage landing, install guide, documentation, and blog content (Markdown).",
-    "tab_landing": "Landing",
-    "tab_install": "Install",
-    "tab_docs": "Docs",
-    "tab_blog": "Blog",
-    "locale": "Language",
-    "slug": "Slug",
-    "title": "Title",
-    "title_placeholder": "Page title",
-    "markdown": "Markdown",
-    "preview": "Preview",
-    "save_draft": "Save draft",
-    "publish": "Publish",
-    "saved": "Saved.",
-    "deleted": "Deleted.",
-    "status_draft": "Draft",
-    "status_published": "Published",
-    "landing_heading": "Landing page",
-    "install_heading": "Install page",
-    "docs_heading": "Documentation pages",
-    "blog_heading": "Blog posts",
-    "new_page": "New page",
-    "new_post": "New post",
-    "new_doc": "New documentation page",
-    "edit_doc": "Edit documentation",
-    "new_blog": "New blog post",
-    "edit_blog": "Edit blog post",
-    "slug_required": "Slug is required."
-  },
-  "marketing": {
-    "nav_home": "Home",
-    "nav_pricing": "Pricing",
-    "nav_install": "Install",
-    "nav_docs": "Docs",
-    "nav_blog": "Blog",
-    "nav_login": "Log in",
-    "landing_title": "Welcome",
-    "landing_placeholder": "Content will appear here once published in the admin CMS.",
-    "install_title": "Installation",
-    "install_placeholder": "Installation guide will appear here once published in the admin CMS.",
-    "pricing_title": "Pricing",
-    "pricing_subtitle": "Choose a plan that fits your hosting needs.",
-    "price_monthly": "Monthly",
-    "price_yearly": "Yearly",
-    "cta_monthly": "Subscribe monthly",
-    "cta_yearly": "Subscribe yearly",
-    "docs_title": "Documentation",
-    "blog_title": "Blog",
-    "not_found": "Page not found.",
-    "invalid_slug": "Invalid address.",
-    "back_docs": "Back to docs",
-    "back_blog": "Back to blog",
-    "empty_body": "No content."
+    "vendor_control": "Vendor control center"
   },
   "roles": {
     "title": "Roles & permissions",
@@ -342,6 +285,7 @@
     "created": "Domain created successfully",
     "deleted": "Domain deleted successfully",
     "server_type": "Web server",
+    "server_openlitespeed": "OpenLiteSpeed",
     "document_root": "Document Root",
     "quick_settings": "Quick settings",
     "apply": "Apply",
@@ -459,6 +403,10 @@
   },
   "files": {
     "subtitle": "Full path, drag-and-drop, double-click edit, and content search",
+    "tip_root": "Start at site root; use the breadcrumb trail to open folders.",
+    "tip_drop": "Drag files or folders anywhere on this page to upload into the current folder.",
+    "tip_dblclick": "Double-click supported text or code files to open them in the editor.",
+    "tip_search": "Use the search box below (min. 2 characters); tick subfolders to search deeper.",
     "path": "Path",
     "name": "Name",
     "type": "Type",
@@ -830,7 +778,156 @@
     "used_pct": "Used",
     "total": "Total"
   },
-  "security": { "subtitle": "Firewall, Fail2ban, WAF, malware scan" },
+  "security": {
+    "subtitle": "Firewall, SSH, server hardening, WAF, and attack prevention layers",
+    "refresh": "Refresh",
+    "overview_error": "Could not load overview.",
+    "tabs": {
+      "firewall": "Firewall",
+      "ssh": "SSH",
+      "server": "Server security",
+      "website": "Website security",
+      "brute": "Brute-force protection",
+      "compiler": "Compiler access",
+      "attack": "Attack prevention"
+    },
+    "toast": {
+      "rule_sent": "Rule submitted",
+      "setting_updated": "Security setting updated",
+      "install_done": "Package installation finished",
+      "scan_done": "ClamAV scan finished",
+      "jail_updated": "Fail2ban settings updated",
+      "mail_dry_done": "Dry-run completed",
+      "mail_clean_done": "Orphan mail cleanup completed",
+      "admin_only": "Administrators only"
+    },
+    "install": {
+      "started": "{{name}} installation started.",
+      "step_apt": "Updating APT package lists...",
+      "step_service": "Installing packages and enabling services...",
+      "done_log": "Installation finished and service check passed.",
+      "modal_fail2ban": "Install Fail2ban",
+      "modal_modsec": "Install ModSecurity",
+      "status": "Status",
+      "running": "Running",
+      "success": "Done",
+      "error": "Error",
+      "idle": "Idle"
+    },
+    "status": {
+      "on": "On",
+      "off": "Off",
+      "label": "Status"
+    },
+    "action": {
+      "enable": "Enable",
+      "disable": "Disable",
+      "install_fail2ban": "Install Fail2ban (APT)",
+      "install_modsec": "Install ModSecurity (APT)"
+    },
+    "firewall": {
+      "backend": "Firewall backend",
+      "default_policy": "Default policy:",
+      "quick_stats": "Rule snapshot",
+      "quick_stats_hint": "Allow/deny counts from recent recorded rules",
+      "allow_rules": "Allow",
+      "deny_rules": "Deny",
+      "recent_rules": "Recent firewall rules",
+      "add_rule": "Add firewall rule"
+    },
+    "form": {
+      "action": "Action",
+      "protocol": "Protocol",
+      "port": "Port",
+      "source": "Source",
+      "apply": "Apply"
+    },
+    "table": {
+      "action": "Action",
+      "protocol": "Protocol",
+      "port": "Port",
+      "source": "Source",
+      "time": "Time"
+    },
+    "charts": {
+      "coverage": "Security coverage",
+      "actions_protocols": "Action & protocol distribution"
+    },
+    "ssh": {
+      "intro": "SSH access policy and session hardening. The controls below will be managed centrally in Hostvim Pro.",
+      "port_title": "SSH port & bind interface",
+      "port_desc": "Custom port instead of 22, listen on internal networks only, align with firewall rules.",
+      "root_title": "Root login",
+      "root_desc": "PermitRootLogin and privileged key policy; optional 2FA pairing (planned).",
+      "password_title": "Password authentication",
+      "password_desc": "Disable passwords in favour of keys; tune lockout thresholds.",
+      "keys_title": "Authorized keys management",
+      "keys_desc": "Per-server keys, time-bound access, and audit trail."
+    },
+    "server": {
+      "brute_hint": "Details under Brute-force tab",
+      "waf_hint": "Details under Website security tab",
+      "kernel_title": "Kernel & automated security patches",
+      "kernel_desc": "KSplice / unattended-upgrades style flows and reboot windows (Pro).",
+      "audit_title": "Audit & compliance report",
+      "audit_desc": "CIS-style checklist with exportable summary (Pro)."
+    },
+    "website": {
+      "modsec_intro": "ModSecurity with OWASP CRS for Apache filters requests and bodies. On nginx-fronted stacks Apache must run as backend for this module.",
+      "toggle_hint": "When you enable, if packages are missing the server will try to install libapache2-mod-security2 first, then turn the rule engine on.",
+      "per_site_title": "Per-site WAF rules",
+      "per_site_desc": "Per-virtualhost exceptions, sensitive paths, and custom CRS fragments (Pro).",
+      "crs_title": "CRS version & learning mode",
+      "crs_desc": "False-positive tuning, custom rule bundles, and audit-only mode (Pro)."
+    },
+    "brute": {
+      "intro": "Fail2ban watches SSH and panel login attempts and temporarily bans IPs after too many failures.",
+      "toggle_hint": "Enable: if the package is missing, Fail2ban is installed via APT and the service is started.",
+      "jail_title": "Fail2ban jail parameters",
+      "bantime": "Ban time (sec)",
+      "findtime": "Window (sec)",
+      "maxretry": "Max retries",
+      "jail_hint": "Suggested: bantime 3600, findtime 600, maxretry 5",
+      "apply": "Apply Fail2ban settings",
+      "captcha_title": "Login CAPTCHA & rate limits",
+      "captcha_desc": "Extra panel login protection and geo risk scoring (Pro)."
+    },
+    "compiler": {
+      "intro": "Disabling compilers on shared hosting makes post-exploit payload builds harder.",
+      "gcc_title": "GCC / build toolchain lock",
+      "gcc_desc": "Disable gcc, make, etc.; allow only in maintenance windows (Pro).",
+      "per_user_title": "Per-user compiler permission",
+      "per_user_desc": "Grant compile rights to selected system users (Pro)."
+    },
+    "attack": {
+      "intro": "Defence in depth across network, application, and session. Advanced items below are planned for Hostvim Pro.",
+      "layers_title": "Layers available today",
+      "layer_fw": "Firewall (iptables) — port and source policy",
+      "layer_f2b": "Fail2ban — brute-force and repeated failures",
+      "layer_modsec": "ModSecurity — web application firewall",
+      "rate_title": "Nginx / HTTP rate limiting",
+      "rate_desc": "Per-request and per-IP limits, bursts, and location rules (Pro).",
+      "ddos_title": "Connection flood & half-open protection",
+      "ddos_desc": "SYN handling, conntrack tuning, and kernel guidance (Pro).",
+      "bot_title": "Bot & client verification",
+      "bot_desc": "Flag suspicious automation and allow-list good bots (Pro).",
+      "geo_title": "Geo block & allow lists",
+      "geo_desc": "Country/ASN rules and real IP behind CDNs (Pro)."
+    },
+    "mail_cleanup": {
+      "title": "Mail state cleanup",
+      "warning": "Removes engine mail records for domains not present in the panel. Run dry-run first.",
+      "dry": "Run dry-run report",
+      "confirm": "Confirm and clean"
+    },
+    "clamav": {
+      "scan_title": "ClamAV scan",
+      "target": "Target directory (absolute path)",
+      "run": "Start scan",
+      "no_output": "No scan output yet",
+      "no_scan": "no record"
+    }
+  },
   "installer": {
     "subtitle": "One-click applications",
     "install": "Install",
@@ -921,7 +1018,32 @@
     "profile": "Profile",
     "change_password": "Change Password",
     "two_factor": "Two-Factor Authentication",
-    "mandatory_2fa_banner": "Your role requires two-factor authentication. Complete setup below before using the rest of the panel.",
+    "two_factor_sub_off": "Off by default — enable below if you want extra protection on login.",
+    "two_factor_sub_on": "Enabled — you will be asked for an app code when signing in.",
+    "two_factor_start_setup": "Start setup (QR)",
+    "two_factor_qr_label": "QR code",
+    "two_factor_qr_loading": "Generating QR…",
+    "two_factor_secret_label": "Secret (manual entry)",
+    "two_factor_copy": "Copy",
+    "two_factor_secret_copied": "Secret copied.",
+    "two_factor_secret_copy_fail": "Could not copy secret.",
+    "two_factor_otp_label": "OTP code (6 digits)",
+    "two_factor_otp_placeholder": "123456",
+    "two_factor_activate": "Activate",
+    "two_factor_cancel": "Cancel",
+    "two_factor_otp_invalid": "OTP must be 6 digits (e.g. 123456).",
+    "two_factor_hint_optional": "If you enable 2FA, sign-in will ask for an app code. This is optional unless your host turns on a strict server policy (ENFORCE_ADMIN_2FA).",
+    "two_factor_hint_enforced": "Your host requires 2FA for privileged actions. After you enable 2FA below, use the code at sign-in; some admin APIs need the post-login verified session.",
+    "two_factor_active_title": "2FA is on",
+    "two_factor_active_backup_hint": "If you lose your authenticator, use a backup code at sign-in.",
+    "two_factor_regen_backup": "Regenerate backup codes",
+    "two_factor_restart_setup": "Restart TOTP setup (QR / secret)",
+    "two_factor_backup_title": "Backup codes (one-time use)",
+    "two_factor_setup_ready_toast": "2FA setup ready.",
+    "two_factor_enabled_toast": "2FA enabled.",
+    "two_factor_backup_regen_toast": "New backup codes generated.",
+    "two_factor_backup_footer": "Save these codes. Each one works only once.",
+    "mandatory_2fa_banner": "Your host requires two-factor authentication for your role. Complete setup below before using the rest of the panel.",
     "branding": "Branding",
     "branding_hint": "Separate logos for customer UI vs admin area. Sidebar picks admin logo on /admin routes and customer logo elsewhere; login uses the customer logo.",
     "logo_customer": "Customer panel logo",
@@ -943,6 +1065,7 @@
 
     "nginx": "Nginx",
     "apache": "Apache",
+    "openlitespeed": "OpenLiteSpeed",
     "php_fpm": "PHP-FPM",
 
     "manage_vhosts": "VHost management",
@@ -957,7 +1080,12 @@
     "php_fpm_pool_user": "Pool user",
     "php_fpm_pool_group": "Pool group",
 
-    "save_hint": "Changes are applied in the engine; existing vhost/pool may not be updated immediately."
+    "save_hint": "Changes are applied in the engine; existing vhost/pool may not be updated immediately.",
+
+    "ols_conf_root": "OpenLiteSpeed root ($SERVER_ROOT)",
+    "ols_ctrl_path": "lswsctrl path (optional)",
+    "ols_include_hint": "Add once to httpd_config.conf: include conf/conf.d/hostvim-ols-vhosts.conf; inside HTTP/HTTPS listener blocks include hostvim-ols-http-maps.conf and hostvim-ols-https-maps.conf (see engine openlitespeed package comment).",
+    "ols_not_installed_hint": "OpenLiteSpeed does not appear installed. VHost files can still be generated if you enable management."
   },
   "php_settings": {
     "title": "PHP Settings",

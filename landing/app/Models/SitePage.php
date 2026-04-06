@@ -36,6 +36,11 @@ class SitePage extends Model
         return $query->where('is_published', true);
     }
 
+    public function scopeForLocale(Builder $query, ?string $locale = null): Builder
+    {
+        return $query->where('locale', $locale ?? app()->getLocale());
+    }
+
     public function effectiveMetaTitle(): string
     {
         return $this->meta_title ?: $this->title;

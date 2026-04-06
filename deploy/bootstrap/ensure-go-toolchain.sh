@@ -6,7 +6,7 @@
 #   HOSTVIM_GO_VERSION=1.22.3   # engine/go.mod ile uyumlu (eski: PANELSAR_GO_VERSION)
 
 ensure_go_toolchain() {
-  local want="${HOSTVIM_GO_VERSION:-${PANELSAR_GO_VERSION:-1.22.3}}"
+  local want="${HOSTVIM_GO_VERSION:-${PANELSAR_GO_VERSION:-1.23.4}}"
   local arch tarball url tmp
   case "$(uname -m)" in
     x86_64) arch=amd64 ;;

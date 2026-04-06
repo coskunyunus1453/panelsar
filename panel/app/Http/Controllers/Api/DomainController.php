@@ -33,7 +33,7 @@ class DomainController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'php_version' => 'nullable|string|in:7.4,8.0,8.1,8.2,8.3,8.4',
-            'server_type' => 'nullable|string|in:nginx,apache',
+            'server_type' => 'nullable|string|in:nginx,apache,openlitespeed',
         ]);
 
         $this->quota->ensureCanCreateDomain($request->user());
@@ -144,7 +144,7 @@ class DomainController extends Controller
         $this->authorize('update', $domain);
 
         $validated = $request->validate([
-            'server_type' => 'required|string|in:nginx,apache',
+            'server_type' => 'required|string|in:nginx,apache,openlitespeed',
         ]);
 
         try {

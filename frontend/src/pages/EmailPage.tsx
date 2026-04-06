@@ -278,49 +278,6 @@ export default function EmailPage() {
         </button>
       </div>
 
-      <section className="rounded-xl border border-gray-200 bg-gradient-to-br from-gray-50 to-white p-5 dark:border-gray-700 dark:from-gray-900/80 dark:to-gray-900">
-        <div className="mb-4 flex items-center gap-2 text-gray-900 dark:text-white">
-          <Info className="h-5 w-5 text-violet-500" />
-          <h2 className="text-base font-semibold">{t('email.guide_title')}</h2>
-        </div>
-        <p className="mb-5 text-sm text-gray-600 dark:text-gray-400">{t('email.guide_intro')}</p>
-        <div className="grid gap-4 md:grid-cols-3">
-          <div className="rounded-lg border border-gray-200 bg-white/80 p-4 dark:border-gray-600 dark:bg-gray-800/50">
-            <div className="mb-2 flex items-center gap-2 font-medium text-gray-900 dark:text-white">
-              <BookOpen className="h-4 w-4 text-cyan-500" />
-              {t('email.card_incoming_title')}
-            </div>
-            <p className="text-sm text-gray-600 dark:text-gray-400">{t('email.card_incoming_body')}</p>
-          </div>
-          <div className="rounded-lg border border-gray-200 bg-white/80 p-4 dark:border-gray-600 dark:bg-gray-800/50">
-            <div className="mb-2 flex items-center gap-2 font-medium text-gray-900 dark:text-white">
-              <Send className="h-4 w-4 text-amber-500" />
-              {t('email.card_outgoing_title')}
-            </div>
-            <p className="text-sm text-gray-600 dark:text-gray-400">{t('email.card_outgoing_body')}</p>
-          </div>
-          <div className="rounded-lg border border-gray-200 bg-white/80 p-4 dark:border-gray-600 dark:bg-gray-800/50">
-            <div className="mb-2 flex items-center gap-2 font-medium text-gray-900 dark:text-white">
-              <Server className="h-4 w-4 text-emerald-500" />
-              {t('email.card_panel_mail_title')}
-            </div>
-            <p className="text-sm text-gray-600 dark:text-gray-400">{t('email.card_panel_mail_body')}</p>
-            {isAdmin && (
-              <Link
-                to="/admin/mail-settings"
-                className="mt-3 inline-flex text-sm font-medium text-primary-600 hover:text-primary-700 dark:text-primary-400"
-              >
-                {t('email.admin_mail_cta')} →
-              </Link>
-            )}
-          </div>
-        </div>
-        <div className="mt-4 rounded-lg border border-violet-200 bg-violet-50/80 p-4 dark:border-violet-900/50 dark:bg-violet-950/30">
-          <p className="text-sm font-medium text-violet-900 dark:text-violet-100">{t('email.webmail_note_title')}</p>
-          <p className="mt-1 text-sm text-violet-800/90 dark:text-violet-200/90">{t('email.webmail_note_body')}</p>
-        </div>
-      </section>
-
       <div className="card p-5">
         <label className="label">{t('domains.name')}</label>
         <select
@@ -731,6 +688,49 @@ export default function EmailPage() {
           )}
         </div>
       )}
+
+      <section className="rounded-xl border border-gray-200 bg-gradient-to-br from-gray-50 to-white p-5 dark:border-gray-700 dark:from-gray-900/80 dark:to-gray-900">
+        <div className="mb-4 flex items-center gap-2 text-gray-900 dark:text-white">
+          <Info className="h-5 w-5 text-violet-500" />
+          <h2 className="text-base font-semibold">{t('email.guide_title')}</h2>
+        </div>
+        <p className="mb-5 text-sm text-gray-600 dark:text-gray-400">{t('email.guide_intro')}</p>
+        <div className="grid gap-4 md:grid-cols-3">
+          <div className="rounded-lg border border-gray-200 bg-white/80 p-4 dark:border-gray-600 dark:bg-gray-800/50">
+            <div className="mb-2 flex items-center gap-2 font-medium text-gray-900 dark:text-white">
+              <BookOpen className="h-4 w-4 text-cyan-500" />
+              {t('email.card_incoming_title')}
+            </div>
+            <p className="text-sm text-gray-600 dark:text-gray-400">{t('email.card_incoming_body')}</p>
+          </div>
+          <div className="rounded-lg border border-gray-200 bg-white/80 p-4 dark:border-gray-600 dark:bg-gray-800/50">
+            <div className="mb-2 flex items-center gap-2 font-medium text-gray-900 dark:text-white">
+              <Send className="h-4 w-4 text-amber-500" />
+              {t('email.card_outgoing_title')}
+            </div>
+            <p className="text-sm text-gray-600 dark:text-gray-400">{t('email.card_outgoing_body')}</p>
+          </div>
+          <div className="rounded-lg border border-gray-200 bg-white/80 p-4 dark:border-gray-600 dark:bg-gray-800/50">
+            <div className="mb-2 flex items-center gap-2 font-medium text-gray-900 dark:text-white">
+              <Server className="h-4 w-4 text-emerald-500" />
+              {t('email.card_panel_mail_title')}
+            </div>
+            <p className="text-sm text-gray-600 dark:text-gray-400">{t('email.card_panel_mail_body')}</p>
+            {isAdmin && (
+              <Link
+                to="/admin/mail-settings"
+                className="mt-3 inline-flex text-sm font-medium text-primary-600 hover:text-primary-700 dark:text-primary-400"
+              >
+                {t('email.admin_mail_cta')} →
+              </Link>
+            )}
+          </div>
+        </div>
+        <div className="mt-4 rounded-lg border border-violet-200 bg-violet-50/80 p-4 dark:border-violet-900/50 dark:bg-violet-950/30">
+          <p className="text-sm font-medium text-violet-900 dark:text-violet-100">{t('email.webmail_note_title')}</p>
+          <p className="mt-1 text-sm text-violet-800/90 dark:text-violet-200/90">{t('email.webmail_note_body')}</p>
+        </div>
+      </section>
     </div>
   )
 }

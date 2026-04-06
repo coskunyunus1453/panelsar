@@ -136,7 +136,7 @@ class DomainService
 
     public function switchServerType(Domain $domain, string $serverType): void
     {
-        $serverType = in_array($serverType, ['nginx', 'apache'], true) ? $serverType : 'nginx';
+        $serverType = in_array($serverType, ['nginx', 'apache', 'openlitespeed'], true) ? $serverType : 'nginx';
         DB::transaction(function () use ($domain, $serverType): void {
             $resp = $this->engineApi->createSite(
                 $domain->name,

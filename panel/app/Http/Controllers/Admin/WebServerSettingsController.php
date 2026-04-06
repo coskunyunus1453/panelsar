@@ -28,6 +28,11 @@ class WebServerSettingsController extends Controller
             'apache_manage_vhosts' => 'sometimes|boolean',
             'apache_reload_after_vhost' => 'sometimes|boolean',
 
+            'openlitespeed_manage_vhosts' => 'sometimes|boolean',
+            'openlitespeed_conf_root' => 'sometimes|nullable|string|max:255',
+            'openlitespeed_reload_after_vhost' => 'sometimes|boolean',
+            'openlitespeed_ctrl_path' => 'sometimes|nullable|string|max:255',
+
             'php_fpm_manage_pools' => 'sometimes|boolean',
             'php_fpm_reload_after_pool' => 'sometimes|boolean',
             'php_fpm_socket' => 'sometimes|nullable|string|max:255',

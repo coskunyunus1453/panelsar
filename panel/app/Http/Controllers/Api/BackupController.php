@@ -334,26 +334,60 @@ class BackupController extends Controller
 
         if ($source === 'remote') {
             $destId = $validated['destination_id'] ?? $backup->destination_id;
-            $set = (string) ($validated['backup_set'] ?? '');
-            if (! $destId || trim($set) === '') {
+            $setRaw = (string) ($validated['backup_set'] ?? '');
+            if (! $destId || trim($setRaw) === '') {
                 return response()->json(['message' => __('backups.remote_restore_missing')], 422);
             }
-            $ownsDestination = BackupDestination::query()
+            $remoteKey = $this->sanitizeRemoteBackupSet($setRaw);
+            if ($remoteKey === null) {
+                return response()->json(['message' => __('backups.remote_restore_invalid_path')], 422);
+            }
+            $dest = BackupDestination::query()
                 ->where('id', (int) $destId)
                 ->where('user_id', $request->user()->id)
-                ->exists();
-            if (! $ownsDestination) {
+                ->first();
+            if (! $dest) {
                 abort(403);
             }
-            // Bu adım engine restore-file endpointi gelene kadar referans üretir.
-            $result = $this->engine->restoreBackup($eid ?: $set);
-            $this->audit($request, 'backup_restore_remote', true, null, [
-                'backup_id' => $backup->id,
-                'destination_id' => $destId,
-                'backup_set' => $set,
-            ]);
+            if (! $dest->is_active) {
+                return response()->json(['message' => __('backups.remote_restore_destination_inactive')], 422);
+            }
 
-            return response()->json(['message' => __('backups.restore_started'), 'engine' => $result]);
+            $tmpPath = null;
+            try {
+                $dl = $this->fetchRemoteBackupToTemp($dest, $remoteKey);
+                if (! $dl['ok']) {
+                    $this->audit($request, 'backup_restore_remote', false, $dl['error'] ?? 'download failed', [
+                        'backup_id' => $backup->id,
+                        'destination_id' => $destId,
+                        'backup_set' => $remoteKey,
+                    ]);
+
+                    return response()->json(['message' => $dl['error'] ?? __('backups.remote_restore_download_failed')], 422);
+                }
+                $tmpPath = $dl['path'];
+                $result = $this->engine->restoreBackupUpload($tmpPath, basename($remoteKey));
+                if (! empty($result['error'])) {
+                    $this->audit($request, 'backup_restore_remote', false, (string) $result['error'], [
+                        'backup_id' => $backup->id,
+                        'destination_id' => $destId,
+                        'backup_set' => $remoteKey,
+                    ]);
+
+                    return response()->json(['message' => (string) $result['error']], 502);
+                }
+                $this->audit($request, 'backup_restore_remote', true, null, [
+                    'backup_id' => $backup->id,
+                    'destination_id' => $destId,
+                    'backup_set' => $remoteKey,
+                ]);
+
+                return response()->json(['message' => __('backups.restore_started'), 'engine' => $result]);
+            } finally {
+                if (is_string($tmpPath) && $tmpPath !== '' && is_file($tmpPath)) {
+                    @unlink($tmpPath);
+                }
+            }
         }
 
         if ($eid === null || $eid === '') {
@@ -464,6 +498,63 @@ class BackupController extends Controller
             }
 
             return ['ok' => true, 'remote_path' => $remotePath];
+        } catch (\Throwable $e) {
+            return ['ok' => false, 'error' => $e->getMessage()];
+        }
+    }
+
+    /**
+     * Uzak depodaki nesne anahtarı (sync ile yazılan path ile aynı hiyerarşi, örn. backups/site.tar.gz).
+     */
+    private function sanitizeRemoteBackupSet(string $set): ?string
+    {
+        $set = str_replace('\\', '/', trim($set));
+        $set = ltrim($set, '/');
+        if ($set === '' || str_contains($set, '..')) {
+            return null;
+        }
+
+        return $set;
+    }
+
+    /**
+     * @return array{ok: bool, path?: string, error?: string}
+     */
+    private function fetchRemoteBackupToTemp(BackupDestination $dest, string $remoteKey): array
+    {
+        try {
+            $disk = $this->buildDestinationDisk($dest);
+            if (! $disk->exists($remoteKey)) {
+                return ['ok' => false, 'error' => __('backups.remote_restore_not_found')];
+            }
+            $in = $disk->readStream($remoteKey);
+            if ($in === false) {
+                return ['ok' => false, 'error' => __('backups.remote_restore_download_failed')];
+            }
+            $tmp = tempnam(sys_get_temp_dir(), 'hv_restore_');
+            if ($tmp === false) {
+                if (is_resource($in)) {
+                    fclose($in);
+                }
+
+                return ['ok' => false, 'error' => __('backups.remote_restore_download_failed')];
+            }
+            $out = fopen($tmp, 'wb');
+            if ($out === false) {
+                if (is_resource($in)) {
+                    fclose($in);
+                }
+                @unlink($tmp);
+
+                return ['ok' => false, 'error' => __('backups.remote_restore_download_failed')];
+            }
+            stream_copy_to_stream($in, $out);
+            if (is_resource($in)) {
+                fclose($in);
+            }
+            fclose($out);
+
+            return ['ok' => true, 'path' => $tmp];
         } catch (\Throwable $e) {
             return ['ok' => false, 'error' => $e->getMessage()];
         }

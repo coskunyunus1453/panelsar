@@ -55,7 +55,7 @@ security:
   allowed_origins: "__PANEL_ORIGINS__"
   token_expiry: 3600
   max_login_attempts: 5
-  fail2ban_enabled: false
+  fail2ban_enabled: true
 
 paths:
   web_root: "__HOSTVIM_HOME__/data/www"
@@ -74,6 +74,11 @@ hosting:
   apache_manage_vhosts: false
   # Nginx panel 80/443 kullanır; Apache HTTP bu portta (çakışma yok)
   apache_http_port: 8080
+  # OpenLiteSpeed: aynı makinede 80/443 tek dinleyici kuralına dikkat; engine vh + map parçaları üretir
+  openlitespeed_manage_vhosts: false
+  openlitespeed_conf_root: "/usr/local/lsws"
+  openlitespeed_reload_after_vhost: false
+  openlitespeed_ctrl_path: ""
   manage_ssl: true
   certbot_path: "/usr/bin/certbot"
   lets_encrypt_email: "__LETS_ENCRYPT_EMAIL__"

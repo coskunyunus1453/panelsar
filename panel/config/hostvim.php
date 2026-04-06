@@ -15,6 +15,8 @@ return [
     'engine_url' => rtrim(trim((string) env('ENGINE_API_URL', env('PANELSAR_ENGINE_URL', 'http://127.0.0.1:9090'))), '/'),
     'engine_internal_key' => trim((string) env('ENGINE_INTERNAL_KEY', env('PANELSAR_ENGINE_INTERNAL_KEY', ''))),
     'engine_secret' => trim((string) env('ENGINE_API_SECRET', env('PANELSAR_ENGINE_API_SECRET', env('PANELSAR_JWT_SECRET', '')))),
+    /** Uzak yedek → engine restore-upload (HTTP istemci timeout, saniye) */
+    'engine_restore_upload_timeout' => (int) env('HOSTVIM_ENGINE_RESTORE_UPLOAD_TIMEOUT', 7200),
     'vendor_license_signing_key' => env('VENDOR_LICENSE_SIGNING_KEY', ''),
     'vendor_billing_webhook_secret' => env('VENDOR_BILLING_WEBHOOK_SECRET', ''),
     'vendor_request_replay_ttl_seconds' => (int) env('VENDOR_REQUEST_REPLAY_TTL_SECONDS', 300),
@@ -24,8 +26,22 @@ return [
         explode(',', (string) env('VENDOR_PORTAL_HOSTS', ''))
     ))),
     'vendor_enabled' => filter_var(env('VENDOR_ENABLED', env('APP_PROFILE', 'customer') === 'vendor'), FILTER_VALIDATE_BOOLEAN),
-    /** false: zorunlu 2FA yok; admin/vendor Ayarlar’dan isteğe bağlı açar. true: 2FA açık hesaplarda yönetici API’leri için OTP ile alınan token gerekir. */
-    'enforce_admin_2fa' => filter_var(env('ENFORCE_ADMIN_2FA', false), FILTER_VALIDATE_BOOLEAN),
+    /**
+     * Varsayılan kapalı. Yalnızca .env’de açıkça true/1/on/yes iken açılır (boş veya false = kapalı).
+     * Açıkken: 2FA etkin admin hesaplarında kritik API’ler için girişte OTP ile verilen token gerekir.
+     */
+    'enforce_admin_2fa' => (static function (): bool {
+        $v = env('ENFORCE_ADMIN_2FA');
+        if ($v === null || $v === '') {
+            return false;
+        }
+        if (is_bool($v)) {
+            return $v;
+        }
+        $s = strtolower(trim((string) $v));
+
+        return in_array($s, ['1', 'true', 'yes', 'on'], true);
+    })(),
 
     /** Maskelemeli audit logları (önerilir: açık) */
     'safe_audit_enabled' => filter_var(env('HOSTVIM_SAFE_AUDIT', env('PANELSAR_SAFE_AUDIT', true)), FILTER_VALIDATE_BOOLEAN),
@@ -53,6 +69,17 @@ return [
     /** Otomasyon / eski kurulum: doluysa veritabanındaki anahtardan önceliklidir */
     'license_key' => trim((string) env('LICENSE_KEY', '')),
 
+    /**
+     * İsteğe bağlı CDN (Cloudflare: zone cache temizliği için api_token + zone_id).
+     *
+     * @var array{provider: string, api_token: string, zone_id: string}
+     */
+    'cdn' => [
+        'provider' => strtolower(trim((string) env('HOSTVIM_CDN_PROVIDER', ''))),
+        'api_token' => trim((string) env('HOSTVIM_CDN_API_TOKEN', '')),
+        'zone_id' => trim((string) env('HOSTVIM_CDN_ZONE_ID', '')),
+    ],
+
     'default_locale' => env('PANEL_DEFAULT_LOCALE', 'en'),
     'available_locales' => explode(',', env('PANEL_AVAILABLE_LOCALES', 'en,tr,de,fr,es,pt,zh,ja,ar,ru')),
 
@@ -69,6 +96,8 @@ return [
         'max_file_manager_size_mb' => 50,
         /** SQL yedeği içe aktarma (MB) */
         'max_db_import_mb' => (int) env('HOSTVIM_MAX_DB_IMPORT_MB', 512),
+        /** Zip açarken kota: arşiv boyutu × çarpan (tahmini çıkarılan veri) */
+        'disk_unzip_expand_multiplier' => max(2, (int) env('HOSTVIM_DISK_UNZIP_EXPAND_MULT', 4)),
     ],
 
     /** mysqldump / mysql / pg_dump / psql — PATH’te yoksa tam yol verin */

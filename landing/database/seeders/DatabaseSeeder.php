@@ -29,6 +29,8 @@ class DatabaseSeeder extends Seeder
         $this->call(LandingSettingsSeeder::class);
         $this->call(ContentSeeder::class);
         $this->call(NavMenuSeeder::class);
+        $this->call(LegalSitePagesSeeder::class);
+        $this->call(LegalNavFooterSeeder::class);
         $this->call(SaasBootstrapSeeder::class);
     }
 }

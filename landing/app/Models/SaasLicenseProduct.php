@@ -8,7 +8,15 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class SaasLicenseProduct extends Model
 {
     protected $fillable = [
-        'code', 'name', 'description', 'default_limits', 'default_modules', 'is_active', 'sort_order',
+        'code',
+        'name',
+        'description',
+        'default_limits',
+        'default_modules',
+        'is_active',
+        'sort_order',
+        'price_try_minor',
+        'price_usd_minor',
     ];
 
     protected function casts(): array

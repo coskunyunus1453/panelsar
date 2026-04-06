@@ -1,6 +1,5 @@
 <?php
 
-use App\Http\Controllers\Admin\CmsController;
 use App\Http\Controllers\Admin\OutboundMailSettingsController;
 use App\Http\Controllers\Admin\PackageController;
 use App\Http\Controllers\Admin\PhpSettingsController;
@@ -28,8 +27,6 @@ use App\Http\Controllers\Api\MonitoringController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\PluginStoreController;
 use App\Http\Controllers\Api\ProfileController;
-use App\Http\Controllers\Api\PublicCmsController;
-use App\Http\Controllers\Api\PublicPricingController;
 use App\Http\Controllers\Api\SecurityController;
 use App\Http\Controllers\Api\SiteController;
 use App\Http\Controllers\Api\SiteToolsController;
@@ -54,16 +51,6 @@ use Illuminate\Support\Facades\Route;
 Route::get('branding', [BrandingController::class, 'showPublic']);
 Route::get('branding/files/{filename}', [BrandingController::class, 'serveFile'])
     ->where('filename', '[A-Za-z0-9._-]+');
-
-Route::prefix('public')->group(function () {
-    Route::get('pricing', PublicPricingController::class);
-    Route::get('cms/landing', [PublicCmsController::class, 'landing']);
-    Route::get('cms/install', [PublicCmsController::class, 'install']);
-    Route::get('docs', [PublicCmsController::class, 'docsIndex']);
-    Route::get('docs/{slug}', [PublicCmsController::class, 'docsShow'])->where('slug', '[a-zA-Z0-9][a-zA-Z0-9\-_]*');
-    Route::get('blog', [PublicCmsController::class, 'blogIndex']);
-    Route::get('blog/{slug}', [PublicCmsController::class, 'blogShow'])->where('slug', '[a-zA-Z0-9][a-zA-Z0-9\-_]*');
-});
 
 Route::prefix('auth')->group(function () {
     Route::post('login', [AuthController::class, 'login'])->middleware('throttle:login');
@@ -191,6 +178,7 @@ Route::middleware(['auth:sanctum', 'abilities:access:customer-panel'])->group(fu
     });
 
     Route::middleware('ability:dns:read')->get('domains/{domain}/dns', [DnsRecordController::class, 'index']);
+    Route::middleware('ability:dns:read')->get('domains/{domain}/dns/zone', [DnsRecordController::class, 'exportZone']);
     Route::middleware('ability:dns:write')->group(function () {
         Route::post('domains/{domain}/dns', [DnsRecordController::class, 'store']);
         Route::delete('dns/{dnsRecord}', [DnsRecordController::class, 'destroy']);
@@ -321,13 +309,6 @@ Route::middleware(['auth:sanctum', 'abilities:access:customer-panel'])->group(fu
         Route::post('users/{user}/activate', [UserController::class, 'activate']);
         Route::post('users/{user}/reset-password', [UserController::class, 'resetPassword']);
         Route::apiResource('packages', PackageController::class);
-
-        Route::get('cms/{kind}', [CmsController::class, 'indexByKind'])
-            ->where('kind', 'landing|install|doc|blog');
-        Route::get('cms-items', [CmsController::class, 'index']);
-        Route::post('cms-items', [CmsController::class, 'store']);
-        Route::patch('cms-items/{cms_item}', [CmsController::class, 'update']);
-        Route::delete('cms-items/{cms_item}', [CmsController::class, 'destroy']);
     });
 
     Route::prefix('admin')->middleware(['role:admin', 'require_admin_2fa', 'ability:webserver:read'])->group(function () {

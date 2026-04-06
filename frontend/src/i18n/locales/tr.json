@@ -43,64 +43,7 @@
     "group_account": "Hesap",
     "admin_server": "Sunucu yönetimi",
     "admin_access": "Erişim ve yönetim",
-    "vendor_control": "Vendor kontrol merkezi",
-    "cms": "CMS ve pazarlama"
-  },
-  "cms_admin": {
-    "title": "CMS ve pazarlama",
-    "subtitle": "Landing, kurulum, dokümantasyon ve blog içeriklerini (Markdown) yönetin.",
-    "tab_landing": "Landing",
-    "tab_install": "Kurulum",
-    "tab_docs": "Dokümantasyon",
-    "tab_blog": "Blog",
-    "locale": "Dil",
-    "slug": "Slug",
-    "title": "Başlık",
-    "title_placeholder": "Sayfa başlığı",
-    "markdown": "Markdown",
-    "preview": "Önizleme",
-    "save_draft": "Taslak kaydet",
-    "publish": "Yayınla",
-    "saved": "Kaydedildi.",
-    "deleted": "Silindi.",
-    "status_draft": "Taslak",
-    "status_published": "Yayında",
-    "landing_heading": "Landing sayfası",
-    "install_heading": "Kurulum sayfası",
-    "docs_heading": "Dokümantasyon sayfaları",
-    "blog_heading": "Blog yazıları",
-    "new_page": "Yeni sayfa",
-    "new_post": "Yeni yazı",
-    "new_doc": "Yeni dokümantasyon sayfası",
-    "edit_doc": "Dokümantasyonu düzenle",
-    "new_blog": "Yeni blog yazısı",
-    "edit_blog": "Blog yazısını düzenle",
-    "slug_required": "Slug zorunludur."
-  },
-  "marketing": {
-    "nav_home": "Ana sayfa",
-    "nav_pricing": "Fiyatlandırma",
-    "nav_install": "Kurulum",
-    "nav_docs": "Dokümantasyon",
-    "nav_blog": "Blog",
-    "nav_login": "Giriş",
-    "landing_title": "Hoş geldiniz",
-    "landing_placeholder": "İçerik, yönetici CMS’de yayınlandığında burada görünür.",
-    "install_title": "Kurulum",
-    "install_placeholder": "Kurulum rehberi, yönetici CMS’de yayınlandığında burada görünür.",
-    "pricing_title": "Fiyatlandırma",
-    "pricing_subtitle": "Barındırma ihtiyacınıza uygun planı seçin.",
-    "price_monthly": "Aylık",
-    "price_yearly": "Yıllık",
-    "cta_monthly": "Aylık abone ol",
-    "cta_yearly": "Yıllık abone ol",
-    "docs_title": "Dokümantasyon",
-    "blog_title": "Blog",
-    "not_found": "Sayfa bulunamadı.",
-    "invalid_slug": "Geçersiz adres.",
-    "back_docs": "Dokümantasyona dön",
-    "back_blog": "Bloga dön",
-    "empty_body": "İçerik yok."
+    "vendor_control": "Vendor kontrol merkezi"
   },
   "roles": {
     "title": "Roller ve izinler",
@@ -342,6 +285,7 @@
     "created": "Alan adı başarıyla oluşturuldu",
     "deleted": "Alan adı başarıyla silindi",
     "server_type": "Web sunucusu",
+    "server_openlitespeed": "OpenLiteSpeed",
     "document_root": "Belge Kökü",
     "quick_settings": "Hızlı ayarlar",
     "apply": "Uygula",
@@ -459,6 +403,10 @@
   },
   "files": {
     "subtitle": "Kök yol, sürükle-bırak yükleme, çift tıkla düzenleme ve içerik araması",
+    "tip_root": "Site kökünden başlarsınız; üstteki yol (breadcrumb) ile klasörlere girin.",
+    "tip_drop": "Dosya veya klasörleri bu sayfanın herhangi bir yerine sürükleyip bırakın; mevcut klasöre yüklenir.",
+    "tip_dblclick": "Desteklenen metin/kod dosyalarında çift tıklayınca düzenleyicide açılır.",
+    "tip_search": "Aşağıdaki kutuya en az 2 karakter yazın; alt klasörler için kutuyu işaretleyin.",
     "path": "Yol",
     "name": "Ad",
     "type": "Tür",
@@ -830,7 +778,156 @@
     "used_pct": "Dolu",
     "total": "Toplam"
   },
-  "security": { "subtitle": "Güvenlik duvarı, Fail2ban, WAF, zararlı yazılım taraması" },
+  "security": {
+    "subtitle": "Güvenlik duvarı, SSH, sunucu sertleştirme, WAF ve saldırı önleme katmanları",
+    "refresh": "Yenile",
+    "overview_error": "Özet alınamadı.",
+    "tabs": {
+      "firewall": "Güvenlik Duvarı",
+      "ssh": "SSH",
+      "server": "Sunucu Güvenliği",
+      "website": "Website Security",
+      "brute": "Kaba Kuvvet Koruması",
+      "compiler": "Derleyici Erişimi",
+      "attack": "Saldırı Önleme"
+    },
+    "toast": {
+      "rule_sent": "Kural gönderildi",
+      "setting_updated": "Güvenlik ayarı güncellendi",
+      "install_done": "Paket kurulumu tamamlandı",
+      "scan_done": "ClamAV taraması tamamlandı",
+      "jail_updated": "Fail2ban ayarları güncellendi",
+      "mail_dry_done": "Dry-run tamamlandı",
+      "mail_clean_done": "Orphan mail kayıt temizliği tamamlandı",
+      "admin_only": "Yalnızca yönetici"
+    },
+    "install": {
+      "started": "{{name}} kurulum işlemi başlatıldı.",
+      "step_apt": "APT paket listesi güncelleniyor...",
+      "step_service": "Paket kurulumu ve servis etkinleştirme adımları uygulanıyor...",
+      "done_log": "Kurulum tamamlandı ve servis doğrulaması geçti.",
+      "modal_fail2ban": "Fail2ban kurulum",
+      "modal_modsec": "ModSecurity kurulum",
+      "status": "Durum",
+      "running": "Çalışıyor",
+      "success": "Tamamlandı",
+      "error": "Hata",
+      "idle": "Bekliyor"
+    },
+    "status": {
+      "on": "Açık",
+      "off": "Kapalı",
+      "label": "Durum"
+    },
+    "action": {
+      "enable": "Aç",
+      "disable": "Kapat",
+      "install_fail2ban": "Fail2ban kur (APT)",
+      "install_modsec": "ModSecurity kur (APT)"
+    },
+    "firewall": {
+      "backend": "Güvenlik duvarı arka ucu",
+      "default_policy": "Varsayılan politika:",
+      "quick_stats": "Kural özeti",
+      "quick_stats_hint": "Son kayıtlı kurallardan allow/deny sayıları",
+      "allow_rules": "İzin",
+      "deny_rules": "Red",
+      "recent_rules": "Son güvenlik duvarı kuralları",
+      "add_rule": "Güvenlik duvarı kuralı ekle"
+    },
+    "form": {
+      "action": "Eylem",
+      "protocol": "Protokol",
+      "port": "Port",
+      "source": "Kaynak",
+      "apply": "Uygula"
+    },
+    "table": {
+      "action": "Eylem",
+      "protocol": "Protokol",
+      "port": "Port",
+      "source": "Kaynak",
+      "time": "Zaman"
+    },
+    "charts": {
+      "coverage": "Güvenlik kapsaması",
+      "actions_protocols": "Eylem ve protokol dağılımı"
+    },
+    "ssh": {
+      "intro": "SSH erişim politikası ve oturum sertleştirme. Aşağıdaki kontroller Hostvim Pro ile merkezi olarak yönetilecek.",
+      "port_title": "SSH portu ve dinleme arayüzü",
+      "port_desc": "Varsayılan 22 yerine özel port, yalnızca iç ağdan dinleme ve güvenlik duvarı ile eşleme.",
+      "root_title": "Root girişi",
+      "root_desc": "PermitRootLogin ve yetkili anahtar politikası; zorunlu 2FA ile birleştirme (planlanan).",
+      "password_title": "Parola ile kimlik doğrulama",
+      "password_desc": "Parolayı kapatıp yalnızca anahtar; başarısız deneme eşikleri.",
+      "keys_title": "Authorized keys yönetimi",
+      "keys_desc": "Sunucu başına izinli anahtarlar, süreli erişim ve denetim günlüğü."
+    },
+    "server": {
+      "brute_hint": "Ayrıntılar Kaba Kuvvet sekmesinde",
+      "waf_hint": "Ayrıntılar Website Security sekmesinde",
+      "kernel_title": "Çekirdek ve otomatik güvenlik yamaları",
+      "kernel_desc": "KSplice/unattended-upgrades entegrasyonu ve yeniden başlatma pencereleri (Pro).",
+      "audit_title": "Denetim ve uyumluluk raporu",
+      "audit_desc": "CIS benzeri kontrol listesi ve dışa aktarılabilir özet (Pro)."
+    },
+    "website": {
+      "modsec_intro": "Apache için ModSecurity (OWASP CRS) ile istek gövdesi ve imza tabanlı filtreleme. Nginx ön uçlu kurulumlarda Apache arka uçta etkin olmalıdır.",
+      "toggle_hint": "Aç dediğinizde paket yüklü değilse sunucu önce libapache2-mod-security2 kurmayı dener; ardından kural motorunu etkinleştirir.",
+      "per_site_title": "Site bazlı WAF kuralları",
+      "per_site_desc": "VirtualHost başına özel istisnalar, hassas URL’ler ve özel CRS parçaları (Pro).",
+      "crs_title": "CRS sürümü ve öğrenme modu",
+      "crs_desc": "Yanlış pozitif azaltma, özel kural seti ve denetim modu (Pro)."
+    },
+    "brute": {
+      "intro": "Fail2ban SSH ve panel oturum denemelerini izler; eşik aşımında IP geçici olarak engellenir.",
+      "toggle_hint": "Etkinleştir: paket yoksa APT ile fail2ban kurulur ve servis açılır.",
+      "jail_title": "Fail2ban ceza parametreleri",
+      "bantime": "Ban süresi (sn)",
+      "findtime": "Pencere (sn)",
+      "maxretry": "Maks. deneme",
+      "jail_hint": "Öneri: bantime 3600, findtime 600, maxretry 5",
+      "apply": "Fail2ban ayarlarını uygula",
+      "captcha_title": "Oturum açma için CAPTCHA / hız sınırı",
+      "captcha_desc": "Panel girişinde ek koruma katmanı ve coğrafi risk skoru (Pro)."
+    },
+    "compiler": {
+      "intro": "Paylaşımlı barındırmada derleyiciyi kapatmak sızma sonrası zararlı derlemeyi zorlaştırır.",
+      "gcc_title": "GCC / build araçları kilidi",
+      "gcc_desc": "gcc, make ve benzeri araçları devre dışı bırakma; yalnızca güvenli bakım pencerelerinde açma (Pro).",
+      "per_user_title": "Kullanıcı başı derleyici izni",
+      "per_user_desc": "Belirli sistem kullanıcılarına sınırlı derleme hakkı (Pro)."
+    },
+    "attack": {
+      "intro": "Çok katmanlı savunma: ağ, uygulama ve oturum. Aşağıdakiler Pro planında gelişmiş olarak sunulacak.",
+      "layers_title": "Şu an kullanılabilen katmanlar",
+      "layer_fw": "Güvenlik duvarı (iptables) — port ve kaynak politikası",
+      "layer_f2b": "Fail2ban — kaba kuvvet ve tekrarlayan denemeler",
+      "layer_modsec": "ModSecurity — web uygulama güvenlik duvarı",
+      "rate_title": "Nginx / HTTP hız sınırlama",
+      "rate_desc": "İstek başına ve IP başına limit, burst ve özel location kuralları (Pro).",
+      "ddos_title": "Bağlantı taşması ve yarım açık soket koruması",
+      "ddos_desc": "SYN proxy, connection tracking ve kernel ayar önerileri (Pro).",
+      "bot_title": "Bot ve tarayıcı doğrulama",
+      "bot_desc": "Şüpheli otomasyon trafiğini işaretleme ve meşru bot listeleri (Pro).",
+      "geo_title": "Coğrafi engelleme ve izin listeleri",
+      "geo_desc": "Ülke/ASN bazlı kurallar ve CDN arkası gerçek IP (Pro)."
+    },
+    "mail_cleanup": {
+      "title": "Mail state temizliği",
+      "warning": "Panelde olmayan domainlere ait engine mail kayıtlarını siler. Önce dry-run çalıştırın.",
+      "dry": "Dry-run raporu al",
+      "confirm": "Onayla ve temizle"
+    },
+    "clamav": {
+      "scan_title": "ClamAV tarama",
+      "target": "Hedef dizin (mutlak yol)",
+      "run": "Taramayı başlat",
+      "no_output": "Henüz tarama çıktısı yok",
+      "no_scan": "kayıt yok"
+    }
+  },
   "installer": {
     "subtitle": "Tek tıkla uygulamalar",
     "install": "Kur",
@@ -921,7 +1018,32 @@
     "profile": "Profil",
     "change_password": "Şifre Değiştir",
     "two_factor": "İki Faktörlü Doğrulama",
-    "mandatory_2fa_banner": "Rolünüz için iki aşamalı doğrulama zorunludur. Panelin geri kalanını kullanmadan önce aşağıdaki kurulumu tamamlayın.",
+    "two_factor_sub_off": "Varsayılan kapalı — İsterseniz aşağıdan açarak girişe ek koruma ekleyin.",
+    "two_factor_sub_on": "Açık — oturum açarken uygulama kodu istenir.",
+    "two_factor_start_setup": "Kurulum başlat (QR)",
+    "two_factor_qr_label": "QR kodu",
+    "two_factor_qr_loading": "QR oluşturuluyor…",
+    "two_factor_secret_label": "Secret (manuel ekleme)",
+    "two_factor_copy": "Kopyala",
+    "two_factor_secret_copied": "Secret kopyalandı.",
+    "two_factor_secret_copy_fail": "Secret kopyalanamadı.",
+    "two_factor_otp_label": "OTP kodu (6 hane)",
+    "two_factor_otp_placeholder": "123456",
+    "two_factor_activate": "Etkinleştir",
+    "two_factor_cancel": "Vazgeç",
+    "two_factor_otp_invalid": "OTP 6 hane olmalı (örn: 123456).",
+    "two_factor_hint_optional": "2FA’yı açarsanız girişte doğrulama kodu sorulur. Sunucuda ENFORCE_ADMIN_2FA kapalıysa bu tamamen isteğe bağlıdır.",
+    "two_factor_hint_enforced": "Sunucu politikası yönetici işlemleri için 2FA zorunlu kılıyor. Aşağıdan etkinleştirdikten sonra girişte kod girin; bazı yönetici API’leri doğrulanmış oturum ister.",
+    "two_factor_active_title": "2FA açık",
+    "two_factor_active_backup_hint": "Authenticator’a erişemezseniz girişte yedek kod kullanın.",
+    "two_factor_regen_backup": "Yedek kodları yenile",
+    "two_factor_restart_setup": "TOTP kurulumunu yeniden başlat (QR / secret)",
+    "two_factor_backup_title": "Yedek kodlar (tek kullanımlık)",
+    "two_factor_setup_ready_toast": "2FA kurulum hazır.",
+    "two_factor_enabled_toast": "2FA etkinleştirildi.",
+    "two_factor_backup_regen_toast": "Yeni yedek kodlar üretildi.",
+    "two_factor_backup_footer": "Bu kodları güvenli yerde saklayın. Her kod yalnızca bir kez kullanılabilir.",
+    "mandatory_2fa_banner": "Sunucu politikası rolünüz için iki aşamalı doğrulama zorunlu kılıyor. Panelin geri kalanını kullanmadan önce aşağıdaki kurulumu tamamlayın.",
     "branding": "Marka görselleri",
     "branding_hint": "Müşteri paneli ile yönetici bölümü için ayrı logolar. Kenar çubukunda yol (/admin) hangi logo ile eşleşiyorsa o gösterilir; giriş ekranında müşteri logosu kullanılır.",
     "logo_customer": "Müşteri paneli logosu",
@@ -943,6 +1065,7 @@
 
     "nginx": "Nginx",
     "apache": "Apache",
+    "openlitespeed": "OpenLiteSpeed",
     "php_fpm": "PHP-FPM",
 
     "manage_vhosts": "VHost yönetimi",
@@ -957,7 +1080,12 @@
     "php_fpm_pool_user": "Pool user",
     "php_fpm_pool_group": "Pool group",
 
-    "save_hint": "Değişiklikler engine tarafında uygulanır; mevcut vhost/pool yapısı hemen güncellenmeyebilir."
+    "save_hint": "Değişiklikler engine tarafında uygulanır; mevcut vhost/pool yapısı hemen güncellenmeyebilir.",
+
+    "ols_conf_root": "OpenLiteSpeed kökü ($SERVER_ROOT)",
+    "ols_ctrl_path": "lswsctrl yolu (isteğe bağlı)",
+    "ols_include_hint": "httpd_config.conf içine bir kez ekleyin: include conf/conf.d/hostvim-ols-vhosts.conf; HTTP ve HTTPS listener bloklarına sırasıyla hostvim-ols-http-maps.conf ve hostvim-ols-https-maps.conf include edin (engine openlitespeed paket başlığına bakın).",
+    "ols_not_installed_hint": "OpenLiteSpeed kurulu görünmüyor. Yine de yönetimi açıp vhost dosyaları üretilebilir."
   },
   "php_settings": {
     "title": "PHP Ayarları",

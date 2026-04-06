@@ -30,6 +30,23 @@ class DnsRecordController extends Controller
         ]);
     }
 
+    /**
+     * BIND benzeri metin (paneldeki kayıtlar; SOA/NS sağlayıcıda tanımlanmalı).
+     */
+    public function exportZone(Request $request, Domain $domain): JsonResponse
+    {
+        if (! $this->userOwnsDomain($request, $domain)) {
+            abort(403);
+        }
+        $domain->load(['dnsRecords' => static fn ($q) => $q->orderBy('type')->orderBy('name')]);
+
+        return response()->json([
+            'domain' => $domain->name,
+            'format' => 'bind-lite',
+            'zone' => $this->bindZoneText($domain),
+        ]);
+    }
+
     public function store(Request $request, Domain $domain): JsonResponse
     {
         if (! $this->userOwnsDomain($request, $domain)) {
@@ -67,5 +84,62 @@ class DnsRecordController extends Controller
             'message' => __('dns.deleted'),
             'engine' => $this->engine->dnsDeleteRecord($domain->name, $id),
         ]);
+    }
+
+    private function bindZoneText(Domain $domain): string
+    {
+        $zone = strtolower(trim($domain->name));
+        $lines = [
+            '; DNS zone export — '.$zone.' ('.__('dns.zone_export_panel_records').')',
+            '; '.__('dns.zone_export_soa_hint'),
+            '$ORIGIN '.$zone.'.',
+            '$TTL 3600',
+            '',
+        ];
+        foreach ($domain->dnsRecords as $r) {
+            $fqdn = $this->dnsNameToFqdn($zone, (string) $r->name);
+            $ttl = max(60, (int) ($r->ttl ?: 3600));
+            $type = strtoupper(trim((string) $r->type));
+            $val = trim((string) $r->value);
+            if ($type === 'TXT' && $val !== '') {
+                $val = '"'.str_replace('"', '\\"', $val).'"';
+            }
+            if ($type === 'MX') {
+                $pri = (int) ($r->priority ?? 10);
+                $target = $this->mxTargetFqdn($val);
+
+                $lines[] = sprintf('%s %d IN MX %d %s', $fqdn, $ttl, $pri, $target);
+            } else {
+                $lines[] = sprintf('%s %d IN %s %s', $fqdn, $ttl, $type, $val);
+            }
+        }
+
+        return implode("\n", $lines)."\n";
+    }
+
+    private function dnsNameToFqdn(string $zone, string $name): string
+    {
+        $name = strtolower(trim($name));
+        if ($name === '' || $name === '@') {
+            return $zone.'.';
+        }
+        if (str_ends_with($name, '.')) {
+            return $name;
+        }
+
+        return $name.'.'.$zone.'.';
+    }
+
+    private function mxTargetFqdn(string $target): string
+    {
+        $target = strtolower(trim($target));
+        if ($target === '') {
+            return '.';
+        }
+        if (str_ends_with($target, '.')) {
+            return $target;
+        }
+
+        return $target.'.';
     }
 }

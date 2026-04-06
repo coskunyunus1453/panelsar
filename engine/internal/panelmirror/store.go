@@ -23,6 +23,11 @@ func dir(cfg *config.Config) string {
 	return filepath.Join(filepath.Dir(base), "engine-state")
 }
 
+// EngineStateDir web kökünün bir üstündeki engine-state dizini (yedek, DNS aynası vb.).
+func EngineStateDir(cfg *config.Config) string {
+	return dir(cfg)
+}
+
 func safeDomain(s string) string {
 	s = strings.ToLower(strings.TrimSpace(s))
 	if s == "" || strings.Contains(s, "..") || strings.Contains(s, "/") || strings.Contains(s, "\\") {

@@ -13,6 +13,10 @@ type WebServerSettings = {
   nginx_reload_after_vhost: boolean
   apache_manage_vhosts: boolean
   apache_reload_after_vhost: boolean
+  openlitespeed_manage_vhosts?: boolean
+  openlitespeed_conf_root?: string
+  openlitespeed_reload_after_vhost?: boolean
+  openlitespeed_ctrl_path?: string
   php_fpm_manage_pools: boolean
   php_fpm_reload_after_pool: boolean
   php_fpm_socket: string
@@ -48,7 +52,16 @@ export default function AdminWebServerSettingsPage() {
 
   const [form, setForm] = useState<WebServerSettings | null>(null)
   useEffect(() => {
-    if (settingsQ.data?.settings) setForm(settingsQ.data.settings)
+    if (settingsQ.data?.settings) {
+      const s = settingsQ.data.settings
+      setForm({
+        ...s,
+        openlitespeed_manage_vhosts: s.openlitespeed_manage_vhosts ?? false,
+        openlitespeed_conf_root: s.openlitespeed_conf_root ?? '/usr/local/lsws',
+        openlitespeed_reload_after_vhost: s.openlitespeed_reload_after_vhost ?? false,
+        openlitespeed_ctrl_path: s.openlitespeed_ctrl_path ?? '',
+      })
+    }
   }, [settingsQ.data])
 
   const canEdit = useMemo(() => !!form && canWrite, [form, canWrite])
@@ -64,6 +77,10 @@ export default function AdminWebServerSettingsPage() {
         nginx_reload_after_vhost: form.nginx_reload_after_vhost,
         apache_manage_vhosts: form.apache_manage_vhosts,
         apache_reload_after_vhost: form.apache_reload_after_vhost,
+        openlitespeed_manage_vhosts: form.openlitespeed_manage_vhosts ?? false,
+        openlitespeed_conf_root: form.openlitespeed_conf_root ?? '',
+        openlitespeed_reload_after_vhost: form.openlitespeed_reload_after_vhost ?? false,
+        openlitespeed_ctrl_path: form.openlitespeed_ctrl_path ?? '',
         php_fpm_manage_pools: form.php_fpm_manage_pools,
         php_fpm_reload_after_pool: form.php_fpm_reload_after_pool,
         php_fpm_socket: form.php_fpm_socket,
@@ -93,7 +110,9 @@ export default function AdminWebServerSettingsPage() {
   const servicesQ = useQuery({
     queryKey: ['admin-webserver-services'],
     queryFn: async () =>
-      (await api.get('/admin/settings/webserver/services')).data as { services: { nginx?: ServiceHealth; apache?: ServiceHealth } },
+      (await api.get('/admin/settings/webserver/services')).data as {
+        services: { nginx?: ServiceHealth; apache?: ServiceHealth; openlitespeed?: ServiceHealth }
+      },
     enabled: canView,
   })
 
@@ -174,7 +193,7 @@ export default function AdminWebServerSettingsPage() {
       )}
 
       <div className="card p-4 sm:p-6 space-y-5">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           <div className="rounded-xl border border-gray-200 dark:border-gray-800 p-3 text-sm">
             <div className="font-semibold">Nginx</div>
             <div className="mt-1 text-xs text-gray-500">
@@ -193,6 +212,16 @@ export default function AdminWebServerSettingsPage() {
             </div>
             {!servicesQ.data?.services?.apache?.installed && (
               <p className="mt-2 text-xs text-amber-600">Apache kurulu görünmüyor. Modül yönetimi kullanılamaz.</p>
+            )}
+          </div>
+          <div className="rounded-xl border border-gray-200 dark:border-gray-800 p-3 text-sm">
+            <div className="font-semibold">{t('webserver.openlitespeed')}</div>
+            <div className="mt-1 text-xs text-gray-500">
+              {servicesQ.data?.services?.openlitespeed?.installed ? 'Kurulu' : 'Kurulu değil'} /{' '}
+              {servicesQ.data?.services?.openlitespeed?.active ? 'Aktif' : 'Pasif'}
+            </div>
+            {!servicesQ.data?.services?.openlitespeed?.installed && (
+              <p className="mt-2 text-xs text-amber-600">{t('webserver.ols_not_installed_hint')}</p>
             )}
           </div>
         </div>
@@ -256,6 +285,60 @@ export default function AdminWebServerSettingsPage() {
               />
               {t('webserver.reload_after_vhost')}
             </label>
+          </div>
+        </section>
+
+        <section className="space-y-3">
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+            {t('webserver.openlitespeed')}
+          </h2>
+          <p className="text-xs text-gray-500 dark:text-gray-400">{t('webserver.ols_include_hint')}</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <label className="flex items-center gap-3 text-sm">
+              <input
+                type="checkbox"
+                className="rounded border-gray-300"
+                checked={form?.openlitespeed_manage_vhosts ?? false}
+                onChange={(e) =>
+                  setForm((s) => (s ? { ...s, openlitespeed_manage_vhosts: e.target.checked } : s))
+                }
+              />
+              {t('webserver.manage_vhosts')}
+            </label>
+            <label className="flex items-center gap-3 text-sm">
+              <input
+                type="checkbox"
+                className="rounded border-gray-300"
+                checked={form?.openlitespeed_reload_after_vhost ?? false}
+                onChange={(e) =>
+                  setForm((s) => (s ? { ...s, openlitespeed_reload_after_vhost: e.target.checked } : s))
+                }
+              />
+              {t('webserver.reload_after_vhost')}
+            </label>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+            <div>
+              <label className="label">{t('webserver.ols_conf_root')}</label>
+              <input
+                className="input w-full"
+                value={form?.openlitespeed_conf_root ?? ''}
+                onChange={(e) =>
+                  setForm((s) => (s ? { ...s, openlitespeed_conf_root: e.target.value } : s))
+                }
+              />
+            </div>
+            <div>
+              <label className="label">{t('webserver.ols_ctrl_path')}</label>
+              <input
+                className="input w-full"
+                placeholder="/usr/local/lsws/bin/lswsctrl"
+                value={form?.openlitespeed_ctrl_path ?? ''}
+                onChange={(e) =>
+                  setForm((s) => (s ? { ...s, openlitespeed_ctrl_path: e.target.value } : s))
+                }
+              />
+            </div>
           </div>
         </section>
 

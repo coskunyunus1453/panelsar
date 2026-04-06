@@ -70,6 +70,8 @@ class SaasLicenseProductController extends Controller
             'description' => ['nullable', 'string', 'max:500'],
             'is_active' => ['boolean'],
             'sort_order' => ['integer', 'min:0'],
+            'price_try_minor' => ['nullable', 'integer', 'min:0'],
+            'price_usd_minor' => ['nullable', 'integer', 'min:0'],
             'default_limits_raw' => ['nullable', 'string'],
             'default_modules_raw' => ['nullable', 'string'],
         ]);
@@ -80,6 +82,8 @@ class SaasLicenseProductController extends Controller
             'description' => $request->input('description'),
             'is_active' => $request->boolean('is_active'),
             'sort_order' => (int) $request->input('sort_order', 0),
+            'price_try_minor' => $request->filled('price_try_minor') ? (int) $request->input('price_try_minor') : null,
+            'price_usd_minor' => $request->filled('price_usd_minor') ? (int) $request->input('price_usd_minor') : null,
             'default_limits' => $this->jsonField($request->input('default_limits_raw')),
             'default_modules' => $this->jsonField($request->input('default_modules_raw')),
         ];

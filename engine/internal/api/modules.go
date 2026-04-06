@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"encoding/base64"
 	"errors"
 	"mime"
@@ -18,9 +19,12 @@ import (
 	"hostvim/engine/internal/config"
 	"hostvim/engine/internal/daemon"
 	"hostvim/engine/internal/middleware"
+	"hostvim/engine/internal/backup"
 	"hostvim/engine/internal/files"
+	"hostvim/engine/internal/hosting"
 	"hostvim/engine/internal/installer"
 	"hostvim/engine/internal/monitoring"
+	"hostvim/engine/internal/nginx"
 	"hostvim/engine/internal/panelmirror"
 	"hostvim/engine/internal/phpfpm"
 	"hostvim/engine/internal/phpini"
@@ -108,6 +112,41 @@ func registerModuleRoutes(cfg *config.Config, d *daemon.Daemon, api *gin.RouterG
 			return
 		}
 		c.JSON(http.StatusOK, res)
+	})
+	// Panel: uzak hedeften indirilen tar.gz’yi multipart ile gönderir (S3/FTP senk sonrası geri yükleme).
+	api.POST("/backups/restore-upload", handleBackupRestoreUpload(cfg))
+
+	api.GET("/sites/:domain/disk-usage", func(c *gin.Context) {
+		d := strings.ToLower(strings.TrimSpace(c.Param("domain")))
+		if d == "" || strings.Contains(d, "..") || !nginx.DomainSafe(d) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid domain"})
+			return
+		}
+		webRoot := filepath.Clean(cfg.Paths.WebRoot)
+		if webRoot == "" || webRoot == "." {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "paths.web_root is not set"})
+			return
+		}
+		siteDir := filepath.Join(webRoot, d)
+		fi, err := os.Stat(siteDir)
+		if err != nil {
+			if os.IsNotExist(err) {
+				c.JSON(http.StatusOK, gin.H{"domain": d, "bytes": 0, "exists": false})
+				return
+			}
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		if !fi.IsDir() {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "site path is not a directory"})
+			return
+		}
+		n, err := hosting.DirSizeBytes(siteDir)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"domain": d, "bytes": n, "exists": true})
 	})
 
 	api.GET("/dns/:domain", func(c *gin.Context) {
@@ -266,30 +305,38 @@ func registerModuleRoutes(cfg *config.Config, d *daemon.Daemon, api *gin.RouterG
 		clamavOn, clamavErr := security.EnabledStatus("clamav")
 		clamavLast, _ := panelmirror.SecurityGetValue(cfg, "clamav_last_scan")
 
+		fbInstalled, fbErrDisp := normalizeSecurityComponent(fail2banErr)
+		msInstalled, msErrDisp := normalizeSecurityComponent(modsecErr)
+		cvInstalled, cvErrDisp := normalizeSecurityComponent(clamavErr)
+
 		c.JSON(http.StatusOK, gin.H{
 			"fail2ban": gin.H{
-				"enabled": fail2banOn,
-				"jails":   []string{"sshd", "hostvim-auth", "panelsar-auth"}, // panelsar-auth: eski fail2ban jail adı
+				"enabled":   fail2banOn,
+				"installed": fbInstalled,
+				"jails":     []string{"sshd", "hostvim-auth", "panelsar-auth"}, // panelsar-auth: eski fail2ban jail adı
 				"settings": func() gin.H {
 					b, f, m, e := security.Fail2banJailGet()
+					_, jailErr := normalizeSecurityComponent(e)
 					return gin.H{
 						"bantime":  b,
 						"findtime": f,
 						"maxretry": m,
-						"error":    errMsg(e),
+						"error":    jailErr,
 					}
 				}(),
-				"error": errMsg(fail2banErr),
+				"error": fbErrDisp,
 			},
 			"firewall": gin.H{"backend": "iptables", "default_policy": "DROP", "recent_rules": rules},
 			"modsecurity": gin.H{
-				"enabled": modsecOn,
-				"error":   errMsg(modsecErr),
+				"enabled":   modsecOn,
+				"installed": msInstalled,
+				"error":     msErrDisp,
 			},
 			"clamav": gin.H{
-				"enabled":   clamavOn,
-				"last_scan": nullIfEmpty(clamavLast),
-				"error":     errMsg(clamavErr),
+				"enabled":    clamavOn,
+				"installed":  cvInstalled,
+				"last_scan":  nullIfEmpty(clamavLast),
+				"error":      cvErrDisp,
 			},
 		})
 	})
@@ -515,6 +562,10 @@ func registerModuleRoutes(cfg *config.Config, d *daemon.Daemon, api *gin.RouterG
 				"nginx_reload_after_vhost":  cfg.Hosting.NginxReloadAfterVhost,
 				"apache_manage_vhosts":      cfg.Hosting.ApacheManageVhosts,
 				"apache_reload_after_vhost": cfg.Hosting.ApacheReloadAfterVhost,
+				"openlitespeed_manage_vhosts":       cfg.Hosting.OLSManageVhosts,
+				"openlitespeed_conf_root":           strings.TrimSpace(cfg.Hosting.OLSConfRoot),
+				"openlitespeed_reload_after_vhost":  cfg.Hosting.OLSReloadAfterVhost,
+				"openlitespeed_ctrl_path":           strings.TrimSpace(cfg.Hosting.OLSCtrlPath),
 				"php_fpm_manage_pools":      cfg.Hosting.PHPFPMmanagePools,
 				"php_fpm_reload_after_pool": cfg.Hosting.PHPFPMreloadAfterPool,
 				"php_fpm_socket":            cfg.Hosting.PHPFPMsocket,
@@ -543,10 +594,23 @@ func registerModuleRoutes(cfg *config.Config, d *daemon.Daemon, api *gin.RouterG
 				return gin.H{"installed": installed, "active": active}
 			}
 
+			olsInstalled := false
+			for _, unit := range []string{"lshttpd.service", "openlitespeed.service"} {
+				if out, _ := exec.Command("systemctl", "list-unit-files", "--type=service", unit).CombinedOutput(); strings.Contains(string(out), unit) {
+					olsInstalled = true
+					break
+				}
+			}
+			olsActive := exec.Command("systemctl", "is-active", "--quiet", "lshttpd").Run() == nil
+			if !olsActive {
+				olsActive = exec.Command("systemctl", "is-active", "--quiet", "openlitespeed").Run() == nil
+			}
+
 			c.JSON(http.StatusOK, gin.H{
 				"services": gin.H{
-					"nginx":  check("nginx"),
-					"apache": check("apache2"),
+					"nginx":           check("nginx"),
+					"apache":          check("apache2"),
+					"openlitespeed":   gin.H{"installed": olsInstalled, "active": olsActive},
 				},
 			})
 			return
@@ -589,10 +653,15 @@ func registerModuleRoutes(cfg *config.Config, d *daemon.Daemon, api *gin.RouterG
 		apacheInstalled := fileExists(httpdBin) || (func() bool { _, err := exec.LookPath("httpd"); return err == nil })()
 		apacheActive := pgrepHasProc("httpd") || pgrepHasProc("apache2")
 
+		olsBin := "/usr/local/lsws/bin/lswsctrl"
+		olsInstalled := fileExists(olsBin) || fileExists("/usr/local/lsws/bin/openlitespeed")
+		olsActive := pgrepHasProc("lshttpd") || pgrepHasProc("openlitespeed")
+
 		c.JSON(http.StatusOK, gin.H{
 			"services": gin.H{
-				"nginx":  gin.H{"installed": nginxInstalled, "active": nginxActive},
-				"apache": gin.H{"installed": apacheInstalled, "active": apacheActive},
+				"nginx":         gin.H{"installed": nginxInstalled, "active": nginxActive},
+				"apache":        gin.H{"installed": apacheInstalled, "active": apacheActive},
+				"openlitespeed": gin.H{"installed": olsInstalled, "active": olsActive},
 			},
 		})
 	})
@@ -603,6 +672,10 @@ func registerModuleRoutes(cfg *config.Config, d *daemon.Daemon, api *gin.RouterG
 			NginxReloadAfterVhost  *bool   `json:"nginx_reload_after_vhost"`
 			ApacheManageVhosts     *bool   `json:"apache_manage_vhosts"`
 			ApacheReloadAfterVhost *bool   `json:"apache_reload_after_vhost"`
+			OpenLiteSpeedManageVhosts     *bool   `json:"openlitespeed_manage_vhosts"`
+			OpenLiteSpeedConfRoot         *string `json:"openlitespeed_conf_root"`
+			OpenLiteSpeedReloadAfterVhost *bool   `json:"openlitespeed_reload_after_vhost"`
+			OpenLiteSpeedCtrlPath         *string `json:"openlitespeed_ctrl_path"`
 			PhpFpmManagePools      *bool   `json:"php_fpm_manage_pools"`
 			PhpFpmReloadAfterPool  *bool   `json:"php_fpm_reload_after_pool"`
 			PhpFpmSocket           *string `json:"php_fpm_socket"`
@@ -626,6 +699,8 @@ func registerModuleRoutes(cfg *config.Config, d *daemon.Daemon, api *gin.RouterG
 		oldNginxReload := cfg.Hosting.NginxReloadAfterVhost
 		oldApacheManage := cfg.Hosting.ApacheManageVhosts
 		oldApacheReload := cfg.Hosting.ApacheReloadAfterVhost
+		oldOlsManage := cfg.Hosting.OLSManageVhosts
+		oldOlsReload := cfg.Hosting.OLSReloadAfterVhost
 		oldPhpManage := cfg.Hosting.PHPFPMmanagePools
 		oldPhpReload := cfg.Hosting.PHPFPMreloadAfterPool
 
@@ -640,6 +715,18 @@ func registerModuleRoutes(cfg *config.Config, d *daemon.Daemon, api *gin.RouterG
 		}
 		if req.ApacheReloadAfterVhost != nil {
 			cfg.Hosting.ApacheReloadAfterVhost = *req.ApacheReloadAfterVhost
+		}
+		if req.OpenLiteSpeedManageVhosts != nil {
+			cfg.Hosting.OLSManageVhosts = *req.OpenLiteSpeedManageVhosts
+		}
+		if req.OpenLiteSpeedConfRoot != nil {
+			cfg.Hosting.OLSConfRoot = strings.TrimSpace(*req.OpenLiteSpeedConfRoot)
+		}
+		if req.OpenLiteSpeedReloadAfterVhost != nil {
+			cfg.Hosting.OLSReloadAfterVhost = *req.OpenLiteSpeedReloadAfterVhost
+		}
+		if req.OpenLiteSpeedCtrlPath != nil {
+			cfg.Hosting.OLSCtrlPath = strings.TrimSpace(*req.OpenLiteSpeedCtrlPath)
 		}
 		if req.PhpFpmManagePools != nil {
 			cfg.Hosting.PHPFPMmanagePools = *req.PhpFpmManagePools
@@ -665,6 +752,7 @@ func registerModuleRoutes(cfg *config.Config, d *daemon.Daemon, api *gin.RouterG
 
 		nginxChanged := oldNginxManage != cfg.Hosting.NginxManageVhosts || oldNginxReload != cfg.Hosting.NginxReloadAfterVhost
 		apacheChanged := oldApacheManage != cfg.Hosting.ApacheManageVhosts || oldApacheReload != cfg.Hosting.ApacheReloadAfterVhost
+		olsChanged := oldOlsManage != cfg.Hosting.OLSManageVhosts || oldOlsReload != cfg.Hosting.OLSReloadAfterVhost
 		phpChanged := oldPhpManage != cfg.Hosting.PHPFPMmanagePools || oldPhpReload != cfg.Hosting.PHPFPMreloadAfterPool
 
 		reloadResult := gin.H{}
@@ -687,6 +775,20 @@ func registerModuleRoutes(cfg *config.Config, d *daemon.Daemon, api *gin.RouterG
 			reloadResult["apache"] = gin.H{"ok": ok}
 		}
 
+		if reload && olsChanged {
+			ok := false
+			if _, err := os.Stat("/usr/local/lsws/bin/lswsctrl"); err == nil {
+				ok = exec.Command("/usr/local/lsws/bin/lswsctrl", "reload").Run() == nil
+				if !ok {
+					ok = exec.Command("/usr/local/lsws/bin/lswsctrl", "restart").Run() == nil
+				}
+			}
+			if !ok {
+				ok = exec.Command("systemctl", "reload", "lshttpd").Run() == nil || exec.Command("systemctl", "reload", "openlitespeed").Run() == nil
+			}
+			reloadResult["openlitespeed"] = gin.H{"ok": ok}
+		}
+
 		if reload && phpChanged {
 			// Bu panel şu an standart PHP sürümü için pool tasarlıyor (8.2). Gerekirse genişletilir.
 			phpErr := phpfpm.Reload("8.2")
@@ -700,6 +802,10 @@ func registerModuleRoutes(cfg *config.Config, d *daemon.Daemon, api *gin.RouterG
 				"nginx_reload_after_vhost":  cfg.Hosting.NginxReloadAfterVhost,
 				"apache_manage_vhosts":      cfg.Hosting.ApacheManageVhosts,
 				"apache_reload_after_vhost": cfg.Hosting.ApacheReloadAfterVhost,
+				"openlitespeed_manage_vhosts":       cfg.Hosting.OLSManageVhosts,
+				"openlitespeed_conf_root":           strings.TrimSpace(cfg.Hosting.OLSConfRoot),
+				"openlitespeed_reload_after_vhost":  cfg.Hosting.OLSReloadAfterVhost,
+				"openlitespeed_ctrl_path":           strings.TrimSpace(cfg.Hosting.OLSCtrlPath),
 				"php_fpm_manage_pools":      cfg.Hosting.PHPFPMmanagePools,
 				"php_fpm_reload_after_pool": cfg.Hosting.PHPFPMreloadAfterPool,
 				"php_fpm_socket":            cfg.Hosting.PHPFPMsocket,
@@ -1181,6 +1287,33 @@ func registerModuleRoutes(cfg *config.Config, d *daemon.Daemon, api *gin.RouterG
 
 	_ = d
 	_ = log
+}
+
+// normalizeSecurityComponent maps engine helper errors to (installed, displayError).
+// When a package is simply missing, installed=false and the UI can offer setup without raw "exit status 1" noise.
+func normalizeSecurityComponent(err error) (installed bool, display string) {
+	if err == nil {
+		return true, ""
+	}
+	msg := err.Error()
+	low := strings.ToLower(msg)
+	if strings.Contains(low, "fail2ban service not installed") {
+		return false, ""
+	}
+	if strings.Contains(low, "missing modsecurity config file") && !strings.Contains(low, "after install") {
+		return false, ""
+	}
+	if strings.Contains(low, "clamav services not installed") {
+		return false, ""
+	}
+	// Prefer the last ": …" segment from sudo/exec wrappers
+	if i := strings.LastIndex(msg, ": "); i >= 0 {
+		tail := strings.TrimSpace(msg[i+2:])
+		if tail != "" && !strings.HasPrefix(strings.ToLower(tail), "exit status") {
+			return true, tail
+		}
+	}
+	return true, msg
 }
 
 func errMsg(err error) string {
@@ -1726,4 +1859,46 @@ func resolveFileManagerRoot(cfg *config.Config, domain string) (string, error) {
 	}
 
 	return realRoot, nil
+}
+
+func handleBackupRestoreUpload(cfg *config.Config) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if !cfg.Hosting.ExecuteBackupRestore {
+			c.JSON(http.StatusOK, gin.H{"message": "restore not executed (hosting.execute_backup_restore=false)"})
+			return
+		}
+		if err := c.Request.ParseMultipartForm(64 << 20); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "multipart: " + err.Error()})
+			return
+		}
+		fh, err := c.FormFile("archive")
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "archive file required (field name: archive)"})
+			return
+		}
+		backupDir := filepath.Join(panelmirror.EngineStateDir(cfg), "backup-files")
+		incoming := filepath.Join(backupDir, "incoming")
+		if err := os.MkdirAll(incoming, 0o750); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		dest := filepath.Join(incoming, "upload_"+strconv.FormatInt(time.Now().UnixNano(), 10)+".tar.gz")
+		if err := c.SaveUploadedFile(fh, dest); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		maxSec := cfg.Hosting.BackupMaxSeconds
+		if maxSec <= 0 {
+			maxSec = 3600
+		}
+		ctx, cancel := context.WithTimeout(c.Request.Context(), time.Duration(maxSec)*time.Second)
+		defer cancel()
+		restoreErr := backup.RestoreDomain(ctx, cfg, dest, backupDir)
+		_ = os.Remove(dest)
+		if restoreErr != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": restoreErr.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"message": "restore completed from upload"})
+	}
 }

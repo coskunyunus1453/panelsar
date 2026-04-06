@@ -29,26 +29,45 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <script>
+      (function () {
+        try {
+          var raw = localStorage.getItem('hostvim-theme');
+          if (raw) {
+            var o = JSON.parse(raw);
+            if (o && o.state && o.state.isDark === false) {
+              document.documentElement.classList.remove('dark');
+            } else {
+              document.documentElement.classList.add('dark');
+            }
+          } else {
+            document.documentElement.classList.add('dark');
+          }
+        } catch (e) {
+          document.documentElement.classList.add('dark');
+        }
+      })();
+    </script>
     <style>
+      /* Açık/koyu: Tailwind ile aynı kaynak — html.dark (tercih hostvim-theme). OS prefers-color-scheme kullanılmaz. */
       :root {
+        --ps-bg: #f8fafc;
+        --ps-bg-mid: #e2e8f0;
+        --ps-accent: #3b82f6;
+        --ps-accent-dim: rgba(59, 130, 246, 0.22);
+        --ps-text: #0f172a;
+        --ps-muted: #64748b;
+        --ps-card: rgba(255, 255, 255, 0.92);
+        --ps-border: rgba(15, 23, 42, 0.1);
+      }
+      html.dark {
         --ps-bg: #0f172a;
         --ps-bg-mid: #1e293b;
-        --ps-accent: #3b82f6;
         --ps-accent-dim: rgba(59, 130, 246, 0.35);
         --ps-text: #f1f5f9;
         --ps-muted: #94a3b8;
         --ps-card: rgba(30, 41, 59, 0.75);
         --ps-border: rgba(148, 163, 184, 0.15);
-      }
-      @media (prefers-color-scheme: light) {
-        :root {
-          --ps-bg: #f8fafc;
-          --ps-bg-mid: #e2e8f0;
-          --ps-text: #0f172a;
-          --ps-muted: #64748b;
-          --ps-card: rgba(255, 255, 255, 0.85);
-          --ps-border: rgba(15, 23, 42, 0.08);
-        }
       }
       html, body {
         margin: 0;
@@ -123,12 +142,10 @@
         border-radius: 9999px;
         border: 1px solid var(--ps-border);
         color: var(--ps-muted);
-        background: rgba(59, 130, 246, 0.08);
+        background: rgba(59, 130, 246, 0.12);
       }
-      @media (prefers-color-scheme: light) {
-        .ps-boot-pill {
-          background: rgba(59, 130, 246, 0.12);
-        }
+      html.dark .ps-boot-pill {
+        background: rgba(59, 130, 246, 0.08);
       }
       .ps-boot-skel {
         display: flex;
