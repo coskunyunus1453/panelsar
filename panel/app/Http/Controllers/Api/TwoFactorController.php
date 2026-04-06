@@ -9,6 +9,7 @@ use App\Services\TotpService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\ValidationException;
 
 class TwoFactorController extends Controller
 {
@@ -153,6 +154,36 @@ class TwoFactorController extends Controller
 
         return response()->json([
             'backup_codes' => $codes,
+        ]);
+    }
+
+    /**
+     * 2FA’yı kapatır: secret ve yedek kodlar silinir (girişte OTP istenmez).
+     */
+    public function disable(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        $payload = $request->validate([
+            'password' => ['required', 'string'],
+        ]);
+
+        if (! Hash::check($payload['password'], $user->password)) {
+            throw ValidationException::withMessages([
+                'password' => ['Mevcut şifre doğrulanamadı.'],
+            ]);
+        }
+
+        $user->two_factor_secret = null;
+        $user->two_factor_enabled = false;
+        $user->save();
+
+        TwoFactorBackupCode::query()
+            ->where('user_id', $user->id)
+            ->delete();
+
+        return response()->json([
+            'two_factor_enabled' => false,
         ]);
     }
 }

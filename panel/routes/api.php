@@ -60,6 +60,7 @@ Route::prefix('auth')->group(function () {
         Route::post('2fa/setup', [TwoFactorController::class, 'setup']);
         Route::post('2fa/verify', [TwoFactorController::class, 'verify']);
         Route::post('2fa/backup-codes/regenerate', [TwoFactorController::class, 'regenerateBackupCodes']);
+        Route::post('2fa/disable', [TwoFactorController::class, 'disable']);
 
         Route::post('logout', [AuthController::class, 'logout']);
         Route::get('me', [AuthController::class, 'me']);

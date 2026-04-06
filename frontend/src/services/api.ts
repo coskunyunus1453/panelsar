@@ -58,8 +58,11 @@ api.interceptors.response.use(
       window.location.href = `${window.location.origin}${prefix}${loginPath}`
     } else {
       const code = error.response?.data?.code as string | undefined
-      // 2FA challenge durumlarında UI zaten yönlendiriyor; interceptor otomatik error üretmesin.
-      if (error.response?.status === 423 && code === 'twofa_required') {
+      // 2FA challenge / admin 2FA token: bildirim spam’i yapma; ilgili sayfa kendi mesajını gösterir.
+      if (
+        error.response?.status === 423 &&
+        (code === 'twofa_required' || code === 'admin_2fa_required')
+      ) {
         return Promise.reject(error)
       }
 

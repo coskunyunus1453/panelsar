@@ -254,5 +254,25 @@
         </p>
       </div>
     </div>
+    <script>
+      (function () {
+        try {
+          var el = document.querySelector('script[type="module"][src*="assets/index"]')
+          if (!el || !el.src) return
+          var pathname = new URL(el.src, window.location.href).pathname
+          var marker = '/assets/index-'
+          var idx = pathname.indexOf(marker)
+          if (idx < 0) return
+          var base = pathname.slice(0, idx).replace(/\/*$/, '')
+          var iconPath = (base === '' ? '' : base) + '/hostvim-icon.svg'
+          if (!iconPath.startsWith('/')) iconPath = '/' + iconPath.replace(/^\/+/, '')
+          document.querySelectorAll('link[rel="icon"], link[rel="apple-touch-icon"]').forEach(function (l) {
+            l.setAttribute('href', iconPath)
+          })
+          var bootImg = document.querySelector('#hostvim-boot img')
+          if (bootImg) bootImg.setAttribute('src', iconPath)
+        } catch (e) {}
+      })()
+    </script>
   </body>
 </html>

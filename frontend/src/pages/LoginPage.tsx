@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useAuthStore } from '../store/authStore'
-import { authService } from '../services/authService'
+import { authService, type LoginResponse } from '../services/authService'
 import { useBranding } from '../hooks/useBranding'
 import { Server, Eye, EyeOff } from 'lucide-react'
 import toast from 'react-hot-toast'
@@ -53,7 +53,7 @@ export default function LoginPage() {
     navigate('/dashboard')
   }
 
-  const finishLogin = (data: Awaited<ReturnType<typeof authService.login>>) => {
+  const finishLogin = (data: LoginResponse) => {
     setAuth(data.user, data.token, portal, { enforce_admin_2fa: data.enforce_admin_2fa })
     toast.success(t('dashboard.welcome'))
     const enforce = data.enforce_admin_2fa ?? null
@@ -71,8 +71,14 @@ export default function LoginPage() {
 
     try {
       if (step === 'password') {
-        const data = await authService.login(email.trim(), password, portal)
-        finishLogin(data)
+        const result = await authService.login(email.trim(), password, portal)
+        if (!result.ok && result.challenge === 'twofa_required') {
+          setStep('twofa')
+          setOtp('')
+          setBackupCode('')
+          return
+        }
+        if (result.ok) finishLogin(result.data)
         return
       }
 
@@ -83,8 +89,12 @@ export default function LoginPage() {
           return
         }
 
-        const data = await authService.login(email.trim(), password, portal, { otp: code })
-        finishLogin(data)
+        const result = await authService.login(email.trim(), password, portal, { otp: code })
+        if (result.ok) {
+          finishLogin(result.data)
+        } else {
+          toast.error(result.message || t('common.error'))
+        }
         return
       }
 
@@ -94,20 +104,15 @@ export default function LoginPage() {
         return
       }
 
-      const data = await authService.login(email.trim(), password, portal, { backupCode: bc })
-      finishLogin(data)
+      const result = await authService.login(email.trim(), password, portal, { backupCode: bc })
+      if (result.ok) {
+        finishLogin(result.data)
+      } else {
+        toast.error(result.message || t('common.error'))
+      }
     } catch (err: unknown) {
       const error = err as { response?: { data?: { message?: string; code?: string } } }
-      const code = error.response?.data?.code
       const message = error.response?.data?.message || t('common.error')
-
-      if (step === 'password' && code === 'twofa_required') {
-        // OTP/backup adımı göster
-        setStep('twofa')
-        setOtp('')
-        setBackupCode('')
-        return
-      }
 
       toast.error(message)
     } finally {

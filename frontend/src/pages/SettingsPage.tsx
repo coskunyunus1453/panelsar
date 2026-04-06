@@ -116,6 +116,8 @@ export default function SettingsPage() {
   const [twofaOtp, setTwofaOtp] = useState('')
   const [twofaBackupCodes, setTwofaBackupCodes] = useState<string[] | null>(null)
   const [twofaQrDataUrl, setTwofaQrDataUrl] = useState<string | null>(null)
+  const [twofaDisableOpen, setTwofaDisableOpen] = useState(false)
+  const [twofaDisablePassword, setTwofaDisablePassword] = useState('')
 
   useEffect(() => {
     if (!twofaSetup?.otpauth_url) {
@@ -188,6 +190,27 @@ export default function SettingsPage() {
     onError: (err: unknown) => {
       const ax = err as { response?: { data?: { message?: string } } }
       toast.error(ax.response?.data?.message ?? String(err))
+    },
+  })
+
+  const disable2faM = useMutation({
+    mutationFn: async (password: string) =>
+      (await api.post('/auth/2fa/disable', { password })).data as { two_factor_enabled: boolean },
+    onSuccess: () => {
+      setTwofaDisableOpen(false)
+      setTwofaDisablePassword('')
+      setTwofaSetup(null)
+      setTwofaBackupCodes(null)
+      updateUser({ two_factor_enabled: false })
+      toast.success(t('settings.two_factor_disabled_toast'))
+      qc.invalidateQueries({ queryKey: ['twofa-status'] })
+    },
+    onError: (err: unknown) => {
+      const ax = err as {
+        response?: { data?: { message?: string; errors?: Record<string, string[]> } }
+      }
+      const pwdErr = ax.response?.data?.errors?.password?.[0]
+      toast.error(pwdErr ?? ax.response?.data?.message ?? String(err))
     },
   })
 
@@ -633,6 +656,40 @@ export default function SettingsPage() {
               >
                 {t('settings.two_factor_restart_setup')}
               </button>
+              <button
+                type="button"
+                className="w-full rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm font-medium text-red-200 hover:bg-red-500/15 disabled:opacity-50"
+                disabled={disable2faM.isPending}
+                onClick={() => {
+                  setTwofaDisableOpen((o) => !o)
+                  setTwofaDisablePassword('')
+                }}
+              >
+                {twofaDisableOpen ? t('settings.two_factor_cancel') : t('settings.two_factor_disable')}
+              </button>
+              {twofaDisableOpen && (
+                <div className="rounded-xl border border-red-500/30 bg-black/20 p-4 space-y-3">
+                  <p className="text-sm text-gray-300">{t('settings.two_factor_disable_hint')}</p>
+                  <label className="block text-sm font-medium text-gray-300">{t('settings.two_factor_disable_password_label')}</label>
+                  <input
+                    type="password"
+                    autoComplete="current-password"
+                    value={twofaDisablePassword}
+                    onChange={(e) => setTwofaDisablePassword(e.target.value)}
+                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white"
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      className="flex-1 rounded-xl bg-red-600 hover:bg-red-500 px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50"
+                      disabled={disable2faM.isPending || !twofaDisablePassword}
+                      onClick={() => disable2faM.mutate(twofaDisablePassword)}
+                    >
+                      {t('settings.two_factor_disable_confirm')}
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

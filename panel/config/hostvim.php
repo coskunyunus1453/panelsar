@@ -28,7 +28,9 @@ return [
     'vendor_enabled' => filter_var(env('VENDOR_ENABLED', env('APP_PROFILE', 'customer') === 'vendor'), FILTER_VALIDATE_BOOLEAN),
     /**
      * Varsayılan kapalı. Yalnızca .env’de açıkça true/1/on/yes iken açılır (boş veya false = kapalı).
+     * Satır yoksa veya false ise kapatılmış sayılır; üretimde `ENFORCE_ADMIN_2FA=true` kaldıysa `php artisan config:clear` deneyin.
      * Açıkken: 2FA etkin admin hesaplarında kritik API’ler için girişte OTP ile verilen token gerekir.
+     * Not: Kullanıcının Ayarlar’dan kendi açtığı 2FA (two_factor_enabled) bundan bağımsızdır; kapalı politika ile bile o hesap OTP ister.
      */
     'enforce_admin_2fa' => (static function (): bool {
         $v = env('ENFORCE_ADMIN_2FA');

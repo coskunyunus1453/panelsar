@@ -1,12 +1,16 @@
 import api from './api'
 import type { User } from '../types'
 
-interface LoginResponse {
+export interface LoginResponse {
   user: User
   token: string
   expires_at: string
   enforce_admin_2fa?: boolean
 }
+
+export type LoginResult =
+  | { ok: true; data: LoginResponse }
+  | { ok: false; challenge: 'twofa_required'; message: string }
 
 interface LoginOptions {
   otp?: string
@@ -19,13 +23,22 @@ export const authService = {
     password: string,
     portal: 'customer' | 'vendor' = 'customer',
     options?: LoginOptions,
-  ): Promise<LoginResponse> => {
+  ): Promise<LoginResult> => {
     const payload: any = { email, password, portal }
     if (options?.otp) payload.otp = options.otp
     if (options?.backupCode) payload.backup_code = options.backupCode
 
     const { data } = await api.post('/auth/login', payload)
-    return data
+    if (data && typeof data === 'object' && (data as { code?: string }).code === 'twofa_required') {
+      return {
+        ok: false,
+        challenge: 'twofa_required',
+        message: typeof (data as { message?: string }).message === 'string'
+          ? (data as { message: string }).message
+          : '',
+      }
+    }
+    return { ok: true, data: data as LoginResponse }
   },
 
   logout: async (): Promise<void> => {

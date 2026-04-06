@@ -76,11 +76,12 @@ class AuthController extends Controller
                 $backupCode = $request->input('backup_code');
 
                 if (! $otp && ! $backupCode) {
+                    // 423 tarayıcıda “hata” gibi görünür; bu normal bir giriş adımı — 200 + code ile döneriz.
                     return response()->json([
                         'message' => '2FA kodu gerekli.',
                         'code' => 'twofa_required',
                         'two_factor_enabled' => true,
-                    ], 423);
+                    ], 200);
                 }
 
                 $totp = app(TotpService::class);
