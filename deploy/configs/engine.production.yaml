@@ -9,6 +9,9 @@ server:
   # Faz 9 — Prometheus (127.0.0.1’de dinliyorsanız yerel scrape veya SSH tüneli)
   prometheus_enabled: true
   prometheus_path: "/metrics"
+  read_timeout_seconds: 600
+  write_timeout_seconds: 600
+  idle_timeout_seconds: 120
 
 database:
   host: "127.0.0.1"

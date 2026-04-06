@@ -4,9 +4,10 @@ import path from 'path'
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
-  // Alt klasör (örn. XAMPP: /hostvim/panel/public/) ve kök kurulumda asset 404 olmaması için
-  // varsayılan göreli taban. Kökte sabit / istiyorsanız: VITE_BASE_URL=/
-  const base = env.VITE_BASE_URL ?? './'
+  // Varsayılan `/`: panel alan adı kökündeyken `/admin/...` gibi yollarda sayfa yenilenince
+  // `./assets/*` göreli yol `/admin/assets/*` olur ve JS 404 → "Uygulama yükleniyor" takılı kalır.
+  // Alt klasör kurulum: build öncesi `VITE_BASE_URL=/hostvim/panel/public/` (sonunda /) verin.
+  const base = env.VITE_BASE_URL ?? '/'
 
   return {
     base,

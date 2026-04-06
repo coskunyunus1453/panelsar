@@ -26,6 +26,10 @@ type ServerConfig struct {
 	Debug              bool   `mapstructure:"debug"`
 	PrometheusEnabled  bool   `mapstructure:"prometheus_enabled"`
 	PrometheusPath     string `mapstructure:"prometheus_path"`
+	// HTTP sunucu zaman aşımları (saniye). Dosya yükleme / yedek gibi büyük gövdeler için düşük değer 502 üretebilir.
+	ReadTimeoutSeconds  int `mapstructure:"read_timeout_seconds"`
+	WriteTimeoutSeconds int `mapstructure:"write_timeout_seconds"`
+	IdleTimeoutSeconds  int `mapstructure:"idle_timeout_seconds"`
 }
 
 type DatabaseConfig struct {
@@ -202,6 +206,9 @@ func setDefaults() {
 	viper.SetDefault("server.debug", false)
 	viper.SetDefault("server.prometheus_enabled", false)
 	viper.SetDefault("server.prometheus_path", "/metrics")
+	viper.SetDefault("server.read_timeout_seconds", 600)
+	viper.SetDefault("server.write_timeout_seconds", 600)
+	viper.SetDefault("server.idle_timeout_seconds", 120)
 
 	viper.SetDefault("database.host", "localhost")
 	viper.SetDefault("database.port", 5432)

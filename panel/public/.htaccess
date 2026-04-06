@@ -1,5 +1,15 @@
 Options -MultiViews
 
+# mod_php: yükleme 413 — php.ini veya sanal hostta php_admin_value ile de artırılabilir (XAMPP: deploy/host/apache-hostvim-xampp.conf).
+<IfModule php_module>
+    php_value upload_max_filesize 128M
+    php_value post_max_size 128M
+</IfModule>
+<IfModule mod_php.c>
+    php_value upload_max_filesize 128M
+    php_value post_max_size 128M
+</IfModule>
+
 RewriteEngine On
 
 # Apache/mod_php bazen `Authorization` header’ını PHP’ye iletmez.

@@ -10,11 +10,8 @@ import {
   ChevronDown,
   ChevronRight,
   FileCode,
-  FilePenLine,
   FileText,
   Folder,
-  FolderOpen,
-  Home,
   LayoutGrid,
   List as ListIcon,
   RefreshCw,
@@ -23,12 +20,14 @@ import {
   Trash2,
   Unlock,
   Upload,
-  UploadCloud,
   FilePlus,
   X,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import clsx from 'clsx'
+import FileUploadProgressOverlay, {
+  type FileUploadProgressView,
+} from '../components/files/FileUploadProgressOverlay'
 
 type ListEntry = {
   name: string
@@ -354,6 +353,7 @@ export default function FileManagerPage() {
   } | null>(null)
 
   const [uploadBusy, setUploadBusy] = useState(false)
+  const [uploadProgressView, setUploadProgressView] = useState<FileUploadProgressView | null>(null)
   const [uploadConflictDialog, setUploadConflictDialog] = useState<{
     open: boolean
     basePath: string
@@ -609,12 +609,21 @@ export default function FileManagerPage() {
     },
   })
 
-  const postOneUpload = useCallback(async (item: NormalizedUploadItem) => {
-    const fd = new FormData()
-    fd.append('file', item.file, item.baseName)
-    fd.append('path', item.parentRel)
-    await api.post(`/domains/${domainId}/files/upload`, fd)
-  }, [domainId])
+  const postOneUpload = useCallback(
+    async (item: NormalizedUploadItem, onProgress?: (loaded: number, total: number) => void) => {
+      const fd = new FormData()
+      fd.append('file', item.file, item.baseName)
+      fd.append('path', item.parentRel)
+      const sizeHint = item.file.size > 0 ? item.file.size : 0
+      await api.post(`/domains/${domainId}/files/upload`, fd, {
+        onUploadProgress: (ev) => {
+          const total = ev.total && ev.total > 0 ? ev.total : sizeHint
+          onProgress?.(ev.loaded, total > 0 ? total : Math.max(ev.loaded, 1))
+        },
+      })
+    },
+    [domainId],
+  )
 
   const deleteRemotePath = useCallback(
     async (rel: string) => {
@@ -632,31 +641,97 @@ export default function FileManagerPage() {
         await qc.invalidateQueries({ queryKey: ['files', domainId, path] })
         return
       }
+      const weights = items.map((it) => Math.max(1, it.file.size || 0))
+      const overallTotal = weights.reduce((a, b) => a + b, 0)
+
       let ok = 0
       let failed = 0
-      for (const it of items) {
-        try {
-          await postOneUpload(it)
-          ok++
-        } catch (err: unknown) {
-          failed++
-          const ax = err as {
-            response?: { data?: { error?: string; message?: string; errors?: { file?: string[] } } }
+      let completedSum = 0
+
+      try {
+        setUploadProgressView({
+          totalFiles: items.length,
+          currentIndex: 0,
+          currentName: items[0]?.baseName ?? '',
+          currentLoaded: 0,
+          currentTotal: weights[0] ?? 1,
+          overallLoaded: 0,
+          overallTotal,
+          speedBps: 0,
+        })
+
+        for (let i = 0; i < items.length; i++) {
+          const it = items[i]
+          const w = weights[i] ?? 1
+          let lastTime = performance.now()
+          let lastLoaded = 0
+          let emaSpeed = 0
+
+          setUploadProgressView((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  currentIndex: i,
+                  currentName: it.baseName,
+                  currentLoaded: 0,
+                  currentTotal: w,
+                }
+              : null,
+          )
+
+          try {
+            await postOneUpload(it, (loaded, total) => {
+              const tsize = total > 0 ? total : w
+              const ld = Math.min(loaded, tsize)
+              const now = performance.now()
+              const dt = (now - lastTime) / 1000
+              if (dt >= 0.08) {
+                const dbytes = ld - lastLoaded
+                if (dbytes >= 0) {
+                  const inst = dbytes / dt
+                  emaSpeed = emaSpeed > 0 ? emaSpeed * 0.62 + inst * 0.38 : inst
+                }
+                lastTime = now
+                lastLoaded = ld
+              }
+              const overallLoaded = Math.min(overallTotal, completedSum + ld)
+              setUploadProgressView((prev) =>
+                prev
+                  ? {
+                      ...prev,
+                      currentLoaded: ld,
+                      currentTotal: tsize,
+                      overallLoaded,
+                      speedBps: emaSpeed,
+                    }
+                  : null,
+              )
+            })
+            completedSum += w
+            ok++
+          } catch (err: unknown) {
+            failed++
+            const ax = err as {
+              response?: { data?: { error?: string; message?: string; errors?: { file?: string[] } } }
+            }
+            const d = ax.response?.data
+            const v = d?.errors?.file?.[0]
+            toast.error(v ?? d?.error ?? d?.message ?? t('files.upload_err'))
           }
-          const d = ax.response?.data
-          const v = d?.errors?.file?.[0]
-          toast.error(v ?? d?.error ?? d?.message ?? t('files.upload_err'))
         }
-      }
-      setOffset(0)
-      await qc.invalidateQueries({ queryKey: ['files', domainId, path] })
-      await qc.refetchQueries({ queryKey: ['files', domainId, path] })
-      if (failed === 0 && ok > 0) {
-        toast.success(t('files.upload_ok'))
-      } else if (ok > 0 && failed > 0) {
-        toast.success(t('files.upload_partial_ok', { ok, failed: t('files.upload_partial_fail', { n: failed }) }))
-      } else if (failed > 0 && ok === 0) {
-        toast.error(t('files.upload_err'))
+
+        setOffset(0)
+        await qc.invalidateQueries({ queryKey: ['files', domainId, path] })
+        await qc.refetchQueries({ queryKey: ['files', domainId, path] })
+        if (failed === 0 && ok > 0) {
+          toast.success(t('files.upload_ok'))
+        } else if (ok > 0 && failed > 0) {
+          toast.success(t('files.upload_partial_ok', { ok, failed: t('files.upload_partial_fail', { n: failed }) }))
+        } else if (failed > 0 && ok === 0) {
+          toast.error(t('files.upload_err'))
+        }
+      } finally {
+        setUploadProgressView(null)
       }
     },
     [domainId, path, postOneUpload, qc, t],
@@ -826,6 +901,28 @@ export default function FileManagerPage() {
     onSuccess: ({ total, failed }) => {
       if (failed === 0) toast.success(t('files.bulk_chmod_ok', { total }))
       else toast.error(t('files.bulk_chmod_fail', { failed, total }))
+      qc.invalidateQueries({ queryKey: ['files', domainId, path] })
+    },
+    onError: (err: unknown) => {
+      const ax = err as { response?: { data?: { message?: string } } }
+      toast.error(ax.response?.data?.message ?? String(err))
+    },
+  })
+
+  const bulkTrashMoveM = useMutation({
+    mutationFn: async (paths: string[]) => {
+      const settled = await Promise.allSettled(
+        paths.map((p) => api.post(`/domains/${domainId}/files/trash/move`, { path: p })),
+      )
+      const failed = settled.filter((x) => x.status === 'rejected').length
+      return { total: paths.length, failed }
+    },
+    onSuccess: ({ total, failed }) => {
+      if (failed === 0) toast.success(t('files.bulk_trash_ok', { total }))
+      else toast.error(t('files.bulk_trash_fail', { failed, total }))
+      setSelectedIds(new Set())
+      setSelected(null)
+      setOffset(0)
       qc.invalidateQueries({ queryKey: ['files', domainId, path] })
     },
     onError: (err: unknown) => {
@@ -1017,6 +1114,20 @@ export default function FileManagerPage() {
   }, [currentPageNum])
 
   const rowKey = (e: ListEntry) => `${e.name}|${e.is_dir}`
+
+  const confirmBulkTrashSelection = () => {
+    const paths = entries
+      .filter((e) => selectedIds.has(rowKey(e)))
+      .map((e) => joinRel(path, e.name))
+      .filter((p) => isSafeRelativePath(p))
+    if (paths.length === 0) {
+      toast.error(t('files.bulk_delete_none'))
+      return
+    }
+    if (!window.confirm(t('files.bulk_delete_confirm', { count: paths.length }))) return
+    bulkTrashMoveM.mutate(paths)
+  }
+
   const splitExt = (name: string): { base: string; ext: string } => {
     const i = name.lastIndexOf('.')
     if (i <= 0) return { base: name, ext: '' }
@@ -1139,51 +1250,17 @@ export default function FileManagerPage() {
       <input {...getInputProps()} />
 
       <div className="card overflow-hidden border border-gray-200 dark:border-gray-700">
-        <div className="flex flex-col gap-2 border-b border-gray-100 bg-gray-50/60 px-2 py-2 dark:border-gray-800 dark:bg-gray-900/40 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3 sm:px-3">
-          <div className="flex shrink-0 items-center gap-1 border-gray-200 dark:border-gray-700 sm:border-r sm:pr-2">
-            <span
-              className="inline-flex items-center rounded-lg p-1.5 text-primary-600 dark:text-primary-400"
-              title={t('nav.files')}
+        <div className="flex flex-col gap-3 border-b border-gray-100 bg-gray-50/60 px-2 py-2.5 dark:border-gray-800 dark:bg-gray-900/40 sm:px-3 lg:flex-row lg:flex-wrap lg:items-end lg:gap-x-4 lg:gap-y-2">
+          <div className="min-w-0 flex-1 lg:max-w-[min(100%,22rem)]">
+            <label
+              className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400"
+              htmlFor="file-manager-domain"
             >
-              <FolderOpen className="h-5 w-5" aria-hidden />
-            </span>
-            <div
-              className="flex items-center gap-0.5"
-              role="group"
-              aria-label={t('files.subtitle')}
-            >
-              <span
-                className="inline-flex cursor-help rounded-md p-1.5 text-gray-500 hover:bg-white hover:text-gray-800 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100"
-                title={t('files.tip_root')}
-              >
-                <Home className="h-4 w-4" />
-              </span>
-              <span
-                className="inline-flex cursor-help rounded-md p-1.5 text-gray-500 hover:bg-white hover:text-gray-800 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100"
-                title={t('files.tip_drop')}
-              >
-                <UploadCloud className="h-4 w-4" />
-              </span>
-              <span
-                className="inline-flex cursor-help rounded-md p-1.5 text-gray-500 hover:bg-white hover:text-gray-800 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100"
-                title={t('files.tip_dblclick')}
-              >
-                <FilePenLine className="h-4 w-4" />
-              </span>
-              <span
-                className="inline-flex cursor-help rounded-md p-1.5 text-gray-500 hover:bg-white hover:text-gray-800 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100"
-                title={t('files.tip_search')}
-              >
-                <Search className="h-4 w-4" />
-              </span>
-            </div>
-          </div>
-          <div className="flex min-w-0 flex-1 flex-col gap-1 sm:max-w-md">
-            <label className="text-[11px] font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
               {t('domains.name')}
             </label>
             <select
-              className="input w-full min-w-0 text-sm sm:min-w-[200px]"
+              id="file-manager-domain"
+              className="input w-full min-w-0 text-sm"
               value={domainId}
               onChange={(e) => {
                 onDomainSelectChange(e.target.value)
@@ -1199,9 +1276,60 @@ export default function FileManagerPage() {
               ))}
             </select>
           </div>
+          <div className="min-w-0 flex-[1.25] lg:min-w-[16rem]">
+            <label
+              className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400"
+              htmlFor="file-manager-search"
+            >
+              {t('files.search_field_label')}
+            </label>
+            <div className="flex flex-wrap items-stretch gap-2 sm:flex-nowrap">
+              <input
+                id="file-manager-search"
+                className="input min-h-[38px] min-w-0 flex-1 py-2 text-sm sm:min-w-[12rem]"
+                value={searchQ}
+                disabled={domainId === ''}
+                onChange={(e) => setSearchQ(e.target.value)}
+                placeholder={t('files.toolbar_search_placeholder')}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && searchQ.trim().length >= 2) {
+                    searchM.mutate(searchQ.trim())
+                  }
+                }}
+              />
+              <button
+                type="button"
+                role="switch"
+                aria-checked={searchIncludeSubdirs}
+                title={t('files.search_include_subdirs')}
+                disabled={domainId === ''}
+                onClick={() => setSearchIncludeSubdirs((v) => !v)}
+                className={clsx(
+                  'inline-flex min-h-[38px] shrink-0 items-center justify-center gap-1 rounded-lg border px-2.5 text-xs font-semibold transition-colors sm:px-3',
+                  searchIncludeSubdirs
+                    ? 'border-primary-500/60 bg-primary-50 text-primary-800 shadow-sm dark:border-primary-500/40 dark:bg-primary-950/45 dark:text-primary-200'
+                    : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800',
+                  domainId === '' && 'cursor-not-allowed opacity-45',
+                )}
+              >
+                <Folder className="h-3.5 w-3.5 shrink-0 opacity-80" aria-hidden />
+                <span className="max-w-[4.5rem] truncate sm:max-w-none">{t('files.search_subdirs_short')}</span>
+              </button>
+              <button
+                type="button"
+                className="btn-primary inline-flex min-h-[38px] shrink-0 items-center justify-center px-3"
+                disabled={domainId === '' || searchQ.trim().length < 2 || searchM.isPending}
+                onClick={() => searchM.mutate(searchQ.trim())}
+                title={t('files.search_run')}
+              >
+                <Search className="h-4 w-4 sm:mr-1" />
+                <span className="hidden sm:inline">{t('files.search_run')}</span>
+              </button>
+            </div>
+          </div>
           <button
             type="button"
-            className="btn-secondary inline-flex shrink-0 items-center justify-center self-start p-2 sm:self-center"
+            className="btn-secondary inline-flex h-[38px] shrink-0 items-center justify-center self-start px-3 lg:self-end"
             onClick={() => {
               void domainsQ.refetch()
               void filesQ.refetch()
@@ -1269,36 +1397,6 @@ export default function FileManagerPage() {
               >
                 <RefreshCw className={clsx('h-4 w-4', filesQ.isFetching && 'animate-spin')} />
               </button>
-              <div className="flex w-full flex-wrap items-center gap-2 sm:ml-auto sm:w-auto">
-                <input
-                  className="input min-w-[140px] flex-1 py-1.5 text-sm sm:flex-none sm:min-w-[180px]"
-                  value={searchQ}
-                  onChange={(e) => setSearchQ(e.target.value)}
-                  placeholder={t('files.toolbar_search_placeholder')}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && searchQ.trim().length >= 2) {
-                      searchM.mutate(searchQ.trim())
-                    }
-                  }}
-                />
-                <label className="inline-flex items-center gap-1.5 whitespace-nowrap text-xs text-gray-600 dark:text-gray-400">
-                  <input
-                    type="checkbox"
-                    checked={searchIncludeSubdirs}
-                    onChange={(e) => setSearchIncludeSubdirs(e.target.checked)}
-                  />
-                  {t('files.search_include_subdirs')}
-                </label>
-                <button
-                  type="button"
-                  className="btn-primary inline-flex items-center justify-center p-2 sm:px-3"
-                  disabled={searchQ.trim().length < 2 || searchM.isPending}
-                  onClick={() => searchM.mutate(searchQ.trim())}
-                  title={t('files.search_run')}
-                >
-                  <Search className="h-4 w-4" />
-                </button>
-              </div>
             </div>
 
             <div className="flex flex-wrap items-center gap-2 border-b border-gray-100 dark:border-gray-800 px-2 py-1.5 sm:px-3 sm:py-2">
@@ -1370,6 +1468,19 @@ export default function FileManagerPage() {
                     >
                       <RefreshCw className="h-4 w-4" />
                       {t('files.op_refresh')}
+                    </button>
+                    <div className="my-1 border-t border-gray-100 dark:border-gray-800" />
+                    <button
+                      type="button"
+                      disabled={selectedIds.size === 0 || bulkTrashMoveM.isPending}
+                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40 dark:text-red-300 dark:hover:bg-red-950/30"
+                      onClick={() => {
+                        setFileOpsOpen(false)
+                        confirmBulkTrashSelection()
+                      }}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      {t('files.op_bulk_delete', { count: selectedIds.size })}
                     </button>
                     <button
                       type="button"
@@ -1451,25 +1562,37 @@ export default function FileManagerPage() {
                   {t('files.recycle_bin')}
                 </button>
                 {selectedIds.size > 0 && (
-                  <button
-                    type="button"
-                    className="btn-secondary py-1.5 text-sm"
-                    onClick={() => {
-                      const mode = window.prompt(t('files.bulk_chmod_prompt'), '755')
-                      if (!mode?.trim() || !/^[0-7]{3,4}$/.test(mode.trim())) {
-                        toast.error(t('files.invalid_mode'))
-                        return
-                      }
-                      const paths = entries
-                        .filter((e) => selectedIds.has(rowKey(e)))
-                        .map((e) => joinRel(path, e.name))
-                        .filter((p) => isSafeRelativePath(p))
-                      if (paths.length === 0) return
-                      bulkChmodM.mutate({ paths, mode: mode.trim() })
-                    }}
-                  >
-                    {t('files.bulk_chmod_btn', { count: selectedIds.size })}
-                  </button>
+                  <>
+                    <button
+                      type="button"
+                      className="btn-secondary py-1.5 text-sm"
+                      disabled={bulkChmodM.isPending}
+                      onClick={() => {
+                        const mode = window.prompt(t('files.bulk_chmod_prompt'), '755')
+                        if (!mode?.trim() || !/^[0-7]{3,4}$/.test(mode.trim())) {
+                          toast.error(t('files.invalid_mode'))
+                          return
+                        }
+                        const paths = entries
+                          .filter((e) => selectedIds.has(rowKey(e)))
+                          .map((e) => joinRel(path, e.name))
+                          .filter((p) => isSafeRelativePath(p))
+                        if (paths.length === 0) return
+                        bulkChmodM.mutate({ paths, mode: mode.trim() })
+                      }}
+                    >
+                      {t('files.bulk_chmod_btn', { count: selectedIds.size })}
+                    </button>
+                    <button
+                      type="button"
+                      className="inline-flex items-center gap-1.5 rounded-md border border-red-200 bg-red-50 px-3 py-1.5 text-sm font-medium text-red-800 hover:bg-red-100 disabled:opacity-50 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-200 dark:hover:bg-red-950/60"
+                      disabled={bulkTrashMoveM.isPending}
+                      onClick={confirmBulkTrashSelection}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      {t('files.bulk_delete_btn', { count: selectedIds.size })}
+                    </button>
+                  </>
                 )}
                 <div className="inline-flex overflow-hidden rounded-md border border-gray-200 dark:border-gray-600">
                   <button
@@ -1831,7 +1954,7 @@ export default function FileManagerPage() {
                           setSelected(e.name)
                         }}
                         className={clsx(
-                          'flex flex-col items-center gap-1 rounded-lg border p-3 text-center text-sm outline-none',
+                          'relative flex flex-col items-center gap-1 rounded-lg border p-3 pt-7 text-center text-sm outline-none',
                           selected === e.name
                             ? 'border-primary-400 bg-primary-50/80 dark:bg-primary-900/20'
                             : 'border-gray-200 bg-white hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900/40 dark:hover:bg-gray-800',
@@ -1857,6 +1980,26 @@ export default function FileManagerPage() {
                           }
                         }}
                       >
+                        <label
+                          className="absolute left-2 top-2 z-10 flex cursor-pointer items-center rounded p-0.5 hover:bg-black/5 dark:hover:bg-white/10"
+                          onClick={(ev) => ev.stopPropagation()}
+                          onKeyDown={(ev) => ev.stopPropagation()}
+                        >
+                          <input
+                            type="checkbox"
+                            className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-gray-600"
+                            checked={selectedIds.has(rk)}
+                            aria-label={t('files.select_for_bulk', { name: e.name })}
+                            onChange={() => {
+                              setSelectedIds((prev) => {
+                                const next = new Set(prev)
+                                if (next.has(rk)) next.delete(rk)
+                                else next.add(rk)
+                                return next
+                              })
+                            }}
+                          />
+                        </label>
                         {e.is_dir ? (
                           <Folder className="h-8 w-8 text-amber-500" />
                         ) : (
@@ -2828,6 +2971,8 @@ export default function FileManagerPage() {
           </div>
         </div>
       )}
+
+      <FileUploadProgressOverlay open={uploadProgressView !== null} state={uploadProgressView} />
     </div>
   )
 }

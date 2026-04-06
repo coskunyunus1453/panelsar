@@ -5,6 +5,10 @@ server:
   secret_key: "change-me-in-production"
   prometheus_enabled: false
   prometheus_path: "/metrics"
+  # Panel → engine dosya yükleme; 15s gibi düşük timeout 502 yapar
+  read_timeout_seconds: 600
+  write_timeout_seconds: 600
+  idle_timeout_seconds: 120
 
 database:
   host: "localhost"

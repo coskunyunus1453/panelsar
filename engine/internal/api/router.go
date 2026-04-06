@@ -28,6 +28,8 @@ func NewRouter(cfg *config.Config, d *daemon.Daemon, log *logrus.Logger) *gin.En
 	}
 
 	r := gin.New()
+	// Büyük dosya yöneticisi yüklemeleri (varsayılan Gin ~32MB bellek eşiği)
+	r.MaxMultipartMemory = 128 << 20
 	r.Use(gin.Recovery())
 	r.Use(middleware.Logger(log))
 	r.Use(middleware.CORS(cfg))

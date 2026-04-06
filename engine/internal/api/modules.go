@@ -1792,7 +1792,12 @@ func handleFileDownload(cfg *config.Config) gin.HandlerFunc {
 }
 
 func handleFileUpload(cfg *config.Config) gin.HandlerFunc {
+	const maxMultipartMem = int64(128 << 20)
 	return func(c *gin.Context) {
+		if err := c.Request.ParseMultipartForm(maxMultipartMem); err != nil {
+			c.JSON(http.StatusRequestEntityTooLarge, gin.H{"error": "request too large or invalid multipart: " + err.Error()})
+			return
+		}
 		domain := c.PostForm("domain")
 		relDir := c.PostForm("path")
 		if domain == "" {

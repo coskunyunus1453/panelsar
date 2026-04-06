@@ -93,7 +93,7 @@ return [
 
     'limits' => [
         'max_upload_size_mb' => 256,
-        'max_file_manager_size_mb' => 50,
+        'max_file_manager_size_mb' => (int) env('HOSTVIM_MAX_FILE_MANAGER_SIZE_MB', 50),
         /** SQL yedeği içe aktarma (MB) */
         'max_db_import_mb' => (int) env('HOSTVIM_MAX_DB_IMPORT_MB', 512),
         /** Zip açarken kota: arşiv boyutu × çarpan (tahmini çıkarılan veri) */

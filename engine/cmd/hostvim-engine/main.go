@@ -36,12 +36,25 @@ func main() {
 
 	router := api.NewRouter(cfg, d, log)
 
+	readSec := cfg.Server.ReadTimeoutSeconds
+	if readSec <= 0 {
+		readSec = 600
+	}
+	writeSec := cfg.Server.WriteTimeoutSeconds
+	if writeSec <= 0 {
+		writeSec = 600
+	}
+	idleSec := cfg.Server.IdleTimeoutSeconds
+	if idleSec <= 0 {
+		idleSec = 120
+	}
+
 	srv := &http.Server{
 		Addr:         fmt.Sprintf(":%d", cfg.Server.Port),
 		Handler:      router,
-		ReadTimeout:  15 * time.Second,
-		WriteTimeout: 15 * time.Second,
-		IdleTimeout:  60 * time.Second,
+		ReadTimeout:  time.Duration(readSec) * time.Second,
+		WriteTimeout: time.Duration(writeSec) * time.Second,
+		IdleTimeout:  time.Duration(idleSec) * time.Second,
 	}
 
 	go func() {
