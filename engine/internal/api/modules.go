@@ -349,12 +349,23 @@ func registerModuleRoutes(cfg *config.Config, d *daemon.Daemon, api *gin.RouterG
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
+		autoInstalled := false
 		enabled, err := security.SetEnabled("fail2ban", req.Enabled)
+		// UX fix: "Aç" denince paket yoksa otomatik kurup tekrar dene.
+		if err != nil && req.Enabled {
+			low := strings.ToLower(err.Error())
+			if strings.Contains(low, "not installed") {
+				if ierr := security.InstallFail2ban(); ierr == nil {
+					autoInstalled = true
+					enabled, err = security.SetEnabled("fail2ban", req.Enabled)
+				}
+			}
+		}
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		c.JSON(http.StatusOK, gin.H{"message": "fail2ban updated", "enabled": enabled})
+		c.JSON(http.StatusOK, gin.H{"message": "fail2ban updated", "enabled": enabled, "auto_installed": autoInstalled})
 	})
 	api.POST("/security/fail2ban/install", func(c *gin.Context) {
 		if err := security.InstallFail2ban(); err != nil {
@@ -387,12 +398,23 @@ func registerModuleRoutes(cfg *config.Config, d *daemon.Daemon, api *gin.RouterG
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
+		autoInstalled := false
 		enabled, err := security.SetEnabled("modsec", req.Enabled)
+		// UX fix: "Aç" denince modsecurity config eksikse otomatik kurup tekrar dene.
+		if err != nil && req.Enabled {
+			low := strings.ToLower(err.Error())
+			if strings.Contains(low, "missing modsecurity config") || strings.Contains(low, "not installed") {
+				if ierr := security.InstallModSecurity(); ierr == nil {
+					autoInstalled = true
+					enabled, err = security.SetEnabled("modsec", req.Enabled)
+				}
+			}
+		}
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		c.JSON(http.StatusOK, gin.H{"message": "modsecurity updated", "enabled": enabled})
+		c.JSON(http.StatusOK, gin.H{"message": "modsecurity updated", "enabled": enabled, "auto_installed": autoInstalled})
 	})
 	api.POST("/security/modsecurity/install", func(c *gin.Context) {
 		if err := security.InstallModSecurity(); err != nil {

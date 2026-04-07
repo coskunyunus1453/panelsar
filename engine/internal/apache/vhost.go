@@ -18,12 +18,16 @@ const tplHTTP = `# Hostvim — {{.Domain}} (Apache HTTP)
     ServerName {{.Domain}}
     ServerAlias {{.ServerAliasLine}}
     DocumentRoot {{.DocRoot}}
+    RewriteEngine On
+    RewriteRule ^/admin/assets/(.*)$ /assets/$1 [L]
 
     <Directory {{.DocRoot}}>
         Options -Indexes +FollowSymLinks
         AllowOverride All
         Require all granted
     </Directory>
+
+    SetEnvIfNoCase Authorization "(.+)" HTTP_AUTHORIZATION=$1
 
     <FilesMatch "\.php$">
         SetHandler "proxy:unix:{{.PHPSocket}}|fcgi://localhost"
@@ -45,6 +49,8 @@ const tplHTTPS = `# Hostvim — {{.Domain}} (Apache HTTPS)
     ServerName {{.Domain}}
     ServerAlias {{.ServerAliasLine}}
     DocumentRoot {{.DocRoot}}
+    RewriteEngine On
+    RewriteRule ^/admin/assets/(.*)$ /assets/$1 [L]
 
     SSLEngine on
     SSLCertificateFile {{.SSLFullChain}}
@@ -57,6 +63,8 @@ const tplHTTPS = `# Hostvim — {{.Domain}} (Apache HTTPS)
         AllowOverride All
         Require all granted
     </Directory>
+
+    SetEnvIfNoCase Authorization "(.+)" HTTP_AUTHORIZATION=$1
 
     <FilesMatch "\.php$">
         SetHandler "proxy:unix:{{.PHPSocket}}|fcgi://localhost"

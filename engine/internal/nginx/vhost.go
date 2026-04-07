@@ -116,9 +116,18 @@ server {
         try_files $uri $uri/ /index.php?$query_string;
     }
 
+    # SPA static fallback: if build produced relative asset paths and user is on /admin/*
+    # serve /admin/assets/* from actual /assets/* to avoid 404 on hashed bundles.
+    location ^~ /admin/assets/ {
+        rewrite ^/admin/assets/(.*)$ /assets/$1 break;
+        try_files $uri =404;
+        access_log off;
+    }
+
     location ~ \.php$ {
         include fastcgi_params;
         fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+        fastcgi_param HTTP_AUTHORIZATION $http_authorization;
         fastcgi_pass unix:{{.PHPSocket}};
     }
 
@@ -163,6 +172,14 @@ server {
         try_files $uri $uri/ /index.php?$query_string;
     }
 
+    # SPA static fallback: if build produced relative asset paths and user is on /admin/*
+    # serve /admin/assets/* from actual /assets/* to avoid 404 on hashed bundles.
+    location ^~ /admin/assets/ {
+        rewrite ^/admin/assets/(.*)$ /assets/$1 break;
+        try_files $uri =404;
+        access_log off;
+    }
+
     # Let's Encrypt HTTP-01 challenge endpoint.
     location ^~ /.well-known/acme-challenge/ {
         default_type "text/plain";
@@ -174,6 +191,7 @@ server {
     location ~ \.php$ {
         include fastcgi_params;
         fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+        fastcgi_param HTTP_AUTHORIZATION $http_authorization;
         fastcgi_pass unix:{{.PHPSocket}};
     }
 
