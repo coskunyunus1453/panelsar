@@ -1,10 +1,18 @@
 import axios from 'axios'
 import i18n from '../i18n'
+import { inferPublicPathPrefix } from '../lib/publicPath'
 
 function resolvePanelApiBase(): string {
   if (typeof window !== 'undefined') {
     try {
-      return new URL('index.php/api', window.location.href).href.replace(/\/+$/, '')
+      const inferredPrefix = inferPublicPathPrefix().replace(/\/+$/, '')
+      if (inferredPrefix) {
+        const appRootPath = `${inferredPrefix.replace(/\/admin$/, '')}/`
+        return new URL('index.php/api', `${window.location.origin}${appRootPath}`).href.replace(/\/+$/, '')
+      }
+      const current = new URL(window.location.href)
+      const rootPath = current.pathname.replace(/\/admin(?:\/.*)?$/, '/')
+      return new URL('index.php/api', `${current.origin}${rootPath}`).href.replace(/\/+$/, '')
     } catch {
       /* fallthrough */
     }
