@@ -64,6 +64,8 @@ source "$SCRIPT_DIR/ensure-php-packages.sh"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 # Varsayılan: klon/kök dizin = repo (HOSTVIM_HOME uyarısı olmaması için). Üretimde isterseniz /var/www/hostvim verin.
 HOSTVIM_HOME="${HOSTVIM_HOME:-${PANELSAR_HOME:-$REPO_ROOT}}"
+HOSTVIM_BRANCH="${HOSTVIM_BRANCH:-${PANELSAR_BRANCH:-main}}"
+HOSTVIM_AUTO_SYNC_GIT="${HOSTVIM_AUTO_SYNC_GIT:-1}"
 SERVER_NAME="${SERVER_NAME:-_}"
 LETS_ENCRYPT_EMAIL="${LETS_ENCRYPT_EMAIL:-admin@localhost}"
 APP_PROFILE="${APP_PROFILE:-customer}"
@@ -79,6 +81,29 @@ fi
 
 if [[ "$HOSTVIM_HOME" != "$REPO_ROOT" ]]; then
   echo "Uyarı: HOSTVIM_HOME ($HOSTVIM_HOME) ile repo ($REPO_ROOT) farklı. Aynı yapın önerilir." >&2
+fi
+
+# Tek komut güncelleme garantisi: install-production doğrudan çalıştırılsa bile önce repo güncellensin.
+# Varsayılan açık (HOSTVIM_AUTO_SYNC_GIT=1). Kapatmak için: HOSTVIM_AUTO_SYNC_GIT=0
+if [[ "$HOSTVIM_AUTO_SYNC_GIT" == "1" ]] || [[ "$HOSTVIM_AUTO_SYNC_GIT" == "yes" ]]; then
+  if [[ -d "$REPO_ROOT/.git" ]]; then
+    echo "==> Git otomatik senkron: branch=$HOSTVIM_BRANCH"
+    git config --system --add safe.directory "$REPO_ROOT" 2>/dev/null || true
+    if git -C "$REPO_ROOT" fetch origin "$HOSTVIM_BRANCH" --depth 1 >/dev/null 2>&1; then
+      if git -C "$REPO_ROOT" show-ref --verify --quiet "refs/remotes/origin/$HOSTVIM_BRANCH"; then
+        git -C "$REPO_ROOT" checkout "$HOSTVIM_BRANCH" >/dev/null 2>&1 || true
+        if git -C "$REPO_ROOT" merge --ff-only "origin/$HOSTVIM_BRANCH" >/dev/null 2>&1; then
+          echo "==> Git senkron tamam: $(git -C "$REPO_ROOT" rev-parse --short HEAD)"
+        else
+          echo "Uyarı: FF merge yapılamadı; mevcut checkout ile devam ediliyor." >&2
+        fi
+      else
+        echo "Uyarı: origin/$HOSTVIM_BRANCH bulunamadı; mevcut checkout ile devam." >&2
+      fi
+    else
+      echo "Uyarı: git fetch başarısız; mevcut checkout ile devam." >&2
+    fi
+  fi
 fi
 
 export DEBIAN_FRONTEND=noninteractive

@@ -14,9 +14,18 @@ var registerOnce sync.Once
 // Init registers process and Go runtime collectors on the default registry (once).
 func Init() {
 	registerOnce.Do(func() {
-		prometheus.MustRegister(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
-		prometheus.MustRegister(collectors.NewGoCollector())
+		registerCollector(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
+		registerCollector(collectors.NewGoCollector())
 	})
+}
+
+func registerCollector(c prometheus.Collector) {
+	if err := prometheus.Register(c); err != nil {
+		if _, ok := err.(prometheus.AlreadyRegisteredError); ok {
+			return
+		}
+		panic(err)
+	}
 }
 
 // Handler returns a Gin handler that serves Prometheus metrics.
