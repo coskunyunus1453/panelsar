@@ -44,6 +44,18 @@ sanitize_domain() {
 }
 
 case "$ACTION" in
+  reboot)
+    if command -v systemctl >/dev/null 2>&1; then
+      systemctl reboot
+      exit 0
+    fi
+    if command -v shutdown >/dev/null 2>&1; then
+      shutdown -r now
+      exit 0
+    fi
+    echo "reboot command not available on this host" >&2
+    exit 1
+    ;;
   fail2ban-jail-get)
     CONF="/etc/fail2ban/jail.local"
     if [[ ! -f "$CONF" ]]; then
@@ -322,7 +334,7 @@ EOF
     echo "ok"
     ;;
   *)
-    echo "usage: hostvim-security fail2ban-status|fail2ban-set <on|off>|fail2ban-install|fail2ban-jail-get|fail2ban-jail-set <bantime> <findtime> <maxretry>|clamav-status|clamav-set <on|off>|clamav-scan <abs-dir>|modsec-status|modsec-set <on|off>|modsec-install|apache-modules-list|apache-module-set <module> <on|off>|nginx-config-get <main|panel>|nginx-config-set <main|panel> <tmpfile> <reload:0|1>|mail-stack-setup <domain>" >&2
+    echo "usage: hostvim-security reboot|fail2ban-status|fail2ban-set <on|off>|fail2ban-install|fail2ban-jail-get|fail2ban-jail-set <bantime> <findtime> <maxretry>|clamav-status|clamav-set <on|off>|clamav-scan <abs-dir>|modsec-status|modsec-set <on|off>|modsec-install|apache-modules-list|apache-module-set <module> <on|off>|nginx-config-get <main|panel>|nginx-config-set <main|panel> <tmpfile> <reload:0|1>|mail-stack-setup <domain>" >&2
     exit 1
     ;;
 esac

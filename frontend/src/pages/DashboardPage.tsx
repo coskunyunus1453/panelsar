@@ -1,16 +1,17 @@
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
-import { useMutation, useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '../store/authStore'
 import api from '../services/api'
-import type { DashboardData } from '../types'
+import type { DashboardData, ServiceInfo } from '../types'
 import { isHostingSuperAdmin, isServerAdminUI } from '../lib/authRoles'
-import { Globe, Database, Mail, HardDrive, Plus, Users, Power, RefreshCcw } from 'lucide-react'
+import { Globe, Database, Mail, HardDrive, Plus, Users, Power, RefreshCcw, RotateCw, Server } from 'lucide-react'
 import toast from 'react-hot-toast'
 import ResourceChartsSection from '../components/dashboard/ResourceChartsSection'
 
 export default function DashboardPage() {
   const { t } = useTranslation()
+  const qc = useQueryClient()
   const user = useAuthStore((s) => s.user)
   const isSuper = isHostingSuperAdmin(user)
   const serverUI = isServerAdminUI(user)
@@ -23,6 +24,22 @@ export default function DashboardPage() {
 
   const d = dashQ.data
   const sys = d?.system_stats
+  const serviceShortcutsSupported = (sys?.os ?? '').toLowerCase().includes('linux')
+
+  const servicesQ = useQuery({
+    queryKey: ['dashboard-services'],
+    queryFn: async () => (await api.get('/system/services')).data.services as ServiceInfo[],
+    enabled: !!serverUI,
+    refetchInterval: serverUI ? 15_000 : false,
+  })
+
+  const parseApiErrorMessage = (err: unknown, fallback: string): string => {
+    const ax = err as { response?: { data?: { message?: string; error?: string; details?: string } } }
+    const message = ax.response?.data?.message || ax.response?.data?.error || ''
+    const details = ax.response?.data?.details || ''
+    const merged = [message, details].filter(Boolean).join(' - ').trim()
+    return merged || fallback
+  }
 
   const rebootM = useMutation({
     mutationFn: async () => api.post('/system/reboot'),
@@ -32,8 +49,26 @@ export default function DashboardPage() {
       toast.success(t('dashboard.reboot_requested'))
     },
     onError: (err: unknown) => {
-      const ax = err as { response?: { data?: { message?: string } } }
-      toast.error(ax.response?.data?.message ?? String(err))
+      toast.error(parseApiErrorMessage(err, t('dashboard.reboot_failed')))
+    },
+  })
+
+  const restartServiceM = useMutation({
+    mutationFn: async (name: string) => api.post(`/system/services/${encodeURIComponent(name)}`, { action: 'restart' }),
+    onSuccess: (_, name) => {
+      toast.success(t('dashboard.service_restart_success', { service: name }))
+      void qc.invalidateQueries({ queryKey: ['dashboard-services'] })
+      // Servisler restart sırasında kısa süre "error/unknown" dönebilir;
+      // birkaç kez yeniden sorgulayarak kartı stabil hale getir.
+      setTimeout(() => {
+        void qc.invalidateQueries({ queryKey: ['dashboard-services'] })
+      }, 2000)
+      setTimeout(() => {
+        void qc.invalidateQueries({ queryKey: ['dashboard-services'] })
+      }, 6000)
+    },
+    onError: (err: unknown) => {
+      toast.error(parseApiErrorMessage(err, t('dashboard.service_restart_failed')))
     },
   })
 
@@ -122,6 +157,17 @@ export default function DashboardPage() {
       ]
     : []
   const nearLimit = limitRows.some((x) => x.max > 0 && x.used >= x.max)
+  const servicePriority = ['nginx', 'apache2', 'openlitespeed']
+  const serviceRows = ((servicesQ.data ?? []) as ServiceInfo[])
+    .filter((svc) => servicePriority.includes(svc.name) || /^php[0-9.]+-fpm$/i.test(svc.name))
+    .sort((a, b) => {
+      const ai = servicePriority.indexOf(a.name)
+      const bi = servicePriority.indexOf(b.name)
+      if (ai >= 0 && bi >= 0) return ai - bi
+      if (ai >= 0) return -1
+      if (bi >= 0) return 1
+      return a.name.localeCompare(b.name)
+    })
 
   return (
     <div className="space-y-6">
@@ -218,6 +264,55 @@ export default function DashboardPage() {
         </div>
 
         <div className="card p-6 space-y-5">
+          {serverUI && (
+            <div className="rounded-xl border border-gray-200 p-4 dark:border-gray-700">
+              <div className="flex items-center gap-2">
+                <Server className="h-4 w-4 text-primary-500" />
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-white">{t('dashboard.service_shortcuts')}</h3>
+              </div>
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{t('dashboard.service_shortcuts_hint')}</p>
+              <div className="mt-3 space-y-2">
+                {!serviceShortcutsSupported && (
+                  <p className="text-xs text-amber-600 dark:text-amber-400">
+                    Yerel macOS/XAMPP ortaminda servis kisayollari systemd gerektirdigi icin durumlar yanlis gorunebilir.
+                  </p>
+                )}
+                {serviceRows.length === 0 && (
+                  <p className="text-xs text-gray-500 dark:text-gray-400">{t('dashboard.service_shortcuts_empty')}</p>
+                )}
+                {serviceShortcutsSupported && serviceRows.map((svc) => (
+                  <div
+                    key={svc.name}
+                    className="flex items-center justify-between rounded-lg border border-gray-200 px-2.5 py-2 dark:border-gray-700"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-xs font-medium text-gray-900 dark:text-white">{svc.name}</p>
+                      <p
+                        className={`text-[11px] ${
+                          svc.status === 'running'
+                            ? 'text-emerald-600 dark:text-emerald-400'
+                            : svc.status === 'stopped'
+                              ? 'text-gray-500 dark:text-gray-400'
+                              : 'text-amber-600 dark:text-amber-400'
+                        }`}
+                      >
+                        {svc.status}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      className="inline-flex items-center gap-1 rounded-md border border-primary-200 px-2 py-1 text-[11px] font-medium text-primary-700 hover:bg-primary-50 dark:border-primary-800 dark:text-primary-300 dark:hover:bg-primary-900/20 disabled:opacity-50"
+                      onClick={() => restartServiceM.mutate(svc.name)}
+                      disabled={restartServiceM.isPending}
+                    >
+                      <RotateCw className="h-3 w-3" />
+                      {t('dashboard.restart')}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
           {pkg && (
             <div className="rounded-xl border border-gray-200 p-4 dark:border-gray-700">
               <h3 className="text-sm font-semibold text-gray-900 dark:text-white">{t('dashboard.package_limits')}</h3>

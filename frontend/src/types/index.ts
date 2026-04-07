@@ -142,6 +142,13 @@ export interface SystemStats {
   swap_total?: number
   swap_used?: number
   swap_percent?: number
+  load1?: number
+  load5?: number
+  load15?: number
+  disk_read_bytes_per_sec?: number
+  disk_write_bytes_per_sec?: number
+  net_rx_bytes_per_sec?: number
+  net_tx_bytes_per_sec?: number
   top_cpu_processes?: ProcessTopRow[]
   top_memory_processes?: ProcessTopRow[]
   top_disk_mounts?: MountTopRow[]

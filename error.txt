@@ -1,199 +1,185 @@
-tail -n 200 storage/logs/laravel.log
-#39 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/InvokeDeferredCallbacks.php(22): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():184}:185}()
-#40 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Foundation\\Http\\Middleware\\InvokeDeferredCallbacks->handle()
-#41 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(127): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():184}:185}()
-#42 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Foundation/Http/Kernel.php(176): Illuminate\\Pipeline\\Pipeline->then()
-#43 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Foundation/Http/Kernel.php(145): Illuminate\\Foundation\\Http\\Kernel->sendRequestThroughRouter()
-#44 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Foundation/Application.php(1220): Illuminate\\Foundation\\Http\\Kernel->handle()
-#45 /var/www/panelsar/panel/public/index.php(22): Illuminate\\Foundation\\Application->handleRequest()
-#46 {main}
-"} 
-[2026-03-30 15:24:48] production.ERROR: SQLSTATE[42000]: Syntax error or access violation: 1044 Access denied for user 'panelsar_provision'@'localhost' to database 'ps_1_sssss' {"userId":1,"exception":"[object] (PDOException(code: 42000): SQLSTATE[42000]: Syntax error or access violation: 1044 Access denied for user 'panelsar_provision'@'localhost' to database 'ps_1_sssss' at /var/www/panelsar/panel/app/Services/MysqlProvisioner.php:37)
-[stacktrace]
-#0 /var/www/panelsar/panel/app/Services/MysqlProvisioner.php(37): PDO->exec()
-#1 /var/www/panelsar/panel/app/Services/DatabaseService.php(44): App\\Services\\MysqlProvisioner->provision()
-#2 /var/www/panelsar/panel/app/Http/Controllers/Api/DatabaseController.php(39): App\\Services\\DatabaseService->create()
-#3 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Routing/ControllerDispatcher.php(47): App\\Http\\Controllers\\Api\\DatabaseController->store()
-#4 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Routing/Route.php(266): Illuminate\\Routing\\ControllerDispatcher->dispatch()
-#5 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Routing/Route.php(212): Illuminate\\Routing\\Route->runController()
-#6 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Routing/Router.php(808): Illuminate\\Routing\\Route->run()
-#7 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(170): Illuminate\\Routing\\Router->{closure:Illuminate\\Routing\\Router::runRouteWithinStack():807}()
-#8 /var/www/panelsar/panel/vendor/laravel/sanctum/src/Http/Middleware/CheckAbilities.php(32): Illuminate\\Pipeline\\Pipeline->{closure:Illuminate\\Pipeline\\Pipeline::prepareDestination():168}()
-#9 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Laravel\\Sanctum\\Http\\Middleware\\CheckAbilities->handle()
-#10 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Routing/Middleware/SubstituteBindings.php(51): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():184}:185}()
-#11 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Routing\\Middleware\\SubstituteBindings->handle()
-#12 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Routing/Middleware/ThrottleRequests.php(161): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():184}:185}()
-#13 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Routing/Middleware/ThrottleRequests.php(127): Illuminate\\Routing\\Middleware\\ThrottleRequests->handleRequest()
-#14 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Routing/Middleware/ThrottleRequests.php(89): Illuminate\\Routing\\Middleware\\ThrottleRequests->handleRequestUsingNamedLimiter()
-#15 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Routing\\Middleware\\ThrottleRequests->handle()
-#16 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Auth/Middleware/Authenticate.php(64): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():184}:185}()
-#17 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Auth\\Middleware\\Authenticate->handle()
-#18 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(127): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():184}:185}()
-#19 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Routing/Router.php(807): Illuminate\\Pipeline\\Pipeline->then()
-#20 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Routing/Router.php(786): Illuminate\\Routing\\Router->runRouteWithinStack()
-#21 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Routing/Router.php(750): Illuminate\\Routing\\Router->runRoute()
-#22 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Routing/Router.php(739): Illuminate\\Routing\\Router->dispatchToRoute()
-#23 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Foundation/Http/Kernel.php(201): Illuminate\\Routing\\Router->dispatch()
-#24 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(170): Illuminate\\Foundation\\Http\\Kernel->{closure:Illuminate\\Foundation\\Http\\Kernel::dispatchToRouter():198}()
-#25 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/TransformsRequest.php(21): Illuminate\\Pipeline\\Pipeline->{closure:Illuminate\\Pipeline\\Pipeline::prepareDestination():168}()
-#26 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/ConvertEmptyStringsToNull.php(31): Illuminate\\Foundation\\Http\\Middleware\\TransformsRequest->handle()
-#27 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Foundation\\Http\\Middleware\\ConvertEmptyStringsToNull->handle()
-#28 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/TransformsRequest.php(21): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():184}:185}()
-#29 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/TrimStrings.php(51): Illuminate\\Foundation\\Http\\Middleware\\TransformsRequest->handle()
-#30 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Foundation\\Http\\Middleware\\TrimStrings->handle()
-#31 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Http/Middleware/ValidatePostSize.php(27): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():184}:185}()
-#32 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Http\\Middleware\\ValidatePostSize->handle()
-#33 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/PreventRequestsDuringMaintenance.php(110): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():184}:185}()
-#34 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Foundation\\Http\\Middleware\\PreventRequestsDuringMaintenance->handle()
-#35 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Http/Middleware/HandleCors.php(62): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():184}:185}()
-#36 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Http\\Middleware\\HandleCors->handle()
-#37 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Http/Middleware/TrustProxies.php(58): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():184}:185}()
-#38 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Http\\Middleware\\TrustProxies->handle()
-#39 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/InvokeDeferredCallbacks.php(22): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():184}:185}()
-#40 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Foundation\\Http\\Middleware\\InvokeDeferredCallbacks->handle()
-#41 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(127): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():184}:185}()
-#42 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Foundation/Http/Kernel.php(176): Illuminate\\Pipeline\\Pipeline->then()
-#43 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Foundation/Http/Kernel.php(145): Illuminate\\Foundation\\Http\\Kernel->sendRequestThroughRouter()
-#44 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Foundation/Application.php(1220): Illuminate\\Foundation\\Http\\Kernel->handle()
-#45 /var/www/panelsar/panel/public/index.php(22): Illuminate\\Foundation\\Application->handleRequest()
-#46 {main}
-"} 
-[2026-03-30 15:28:50] production.ERROR: Call to undefined method App\Http\Controllers\Api\DomainController::authorize() {"userId":1,"exception":"[object] (Error(code: 0): Call to undefined method App\\Http\\Controllers\\Api\\DomainController::authorize() at /var/www/panelsar/panel/app/Http/Controllers/Api/DomainController.php:155)
-[stacktrace]
-#0 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Routing/ControllerDispatcher.php(47): App\\Http\\Controllers\\Api\\DomainController->switchPhp()
-#1 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Routing/Route.php(266): Illuminate\\Routing\\ControllerDispatcher->dispatch()
-#2 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Routing/Route.php(212): Illuminate\\Routing\\Route->runController()
-#3 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Routing/Router.php(808): Illuminate\\Routing\\Route->run()
-#4 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(170): Illuminate\\Routing\\Router->{closure:Illuminate\\Routing\\Router::runRouteWithinStack():807}()
-#5 /var/www/panelsar/panel/vendor/laravel/sanctum/src/Http/Middleware/CheckAbilities.php(32): Illuminate\\Pipeline\\Pipeline->{closure:Illuminate\\Pipeline\\Pipeline::prepareDestination():168}()
-#6 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Laravel\\Sanctum\\Http\\Middleware\\CheckAbilities->handle()
-#7 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Routing/Middleware/SubstituteBindings.php(51): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():184}:185}()
-#8 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Routing\\Middleware\\SubstituteBindings->handle()
-#9 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Routing/Middleware/ThrottleRequests.php(161): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():184}:185}()
-#10 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Routing/Middleware/ThrottleRequests.php(127): Illuminate\\Routing\\Middleware\\ThrottleRequests->handleRequest()
-#11 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Routing/Middleware/ThrottleRequests.php(89): Illuminate\\Routing\\Middleware\\ThrottleRequests->handleRequestUsingNamedLimiter()
-#12 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Routing\\Middleware\\ThrottleRequests->handle()
-#13 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Auth/Middleware/Authenticate.php(64): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():184}:185}()
-#14 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Auth\\Middleware\\Authenticate->handle()
-#15 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(127): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():184}:185}()
-#16 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Routing/Router.php(807): Illuminate\\Pipeline\\Pipeline->then()
-#17 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Routing/Router.php(786): Illuminate\\Routing\\Router->runRouteWithinStack()
-#18 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Routing/Router.php(750): Illuminate\\Routing\\Router->runRoute()
-#19 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Routing/Router.php(739): Illuminate\\Routing\\Router->dispatchToRoute()
-#20 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Foundation/Http/Kernel.php(201): Illuminate\\Routing\\Router->dispatch()
-#21 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(170): Illuminate\\Foundation\\Http\\Kernel->{closure:Illuminate\\Foundation\\Http\\Kernel::dispatchToRouter():198}()
-#22 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/TransformsRequest.php(21): Illuminate\\Pipeline\\Pipeline->{closure:Illuminate\\Pipeline\\Pipeline::prepareDestination():168}()
-#23 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/ConvertEmptyStringsToNull.php(31): Illuminate\\Foundation\\Http\\Middleware\\TransformsRequest->handle()
-#24 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Foundation\\Http\\Middleware\\ConvertEmptyStringsToNull->handle()
-#25 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/TransformsRequest.php(21): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():184}:185}()
-#26 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/TrimStrings.php(51): Illuminate\\Foundation\\Http\\Middleware\\TransformsRequest->handle()
-#27 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Foundation\\Http\\Middleware\\TrimStrings->handle()
-#28 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Http/Middleware/ValidatePostSize.php(27): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():184}:185}()
-#29 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Http\\Middleware\\ValidatePostSize->handle()
-#30 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/PreventRequestsDuringMaintenance.php(110): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():184}:185}()
-#31 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Foundation\\Http\\Middleware\\PreventRequestsDuringMaintenance->handle()
-#32 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Http/Middleware/HandleCors.php(62): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():184}:185}()
-#33 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Http\\Middleware\\HandleCors->handle()
-#34 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Http/Middleware/TrustProxies.php(58): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():184}:185}()
-#35 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Http\\Middleware\\TrustProxies->handle()
-#36 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/InvokeDeferredCallbacks.php(22): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():184}:185}()
-#37 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Foundation\\Http\\Middleware\\InvokeDeferredCallbacks->handle()
-#38 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(127): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():184}:185}()
-#39 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Foundation/Http/Kernel.php(176): Illuminate\\Pipeline\\Pipeline->then()
-#40 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Foundation/Http/Kernel.php(145): Illuminate\\Foundation\\Http\\Kernel->sendRequestThroughRouter()
-#41 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Foundation/Application.php(1220): Illuminate\\Foundation\\Http\\Kernel->handle()
-#42 /var/www/panelsar/panel/public/index.php(22): Illuminate\\Foundation\\Application->handleRequest()
-#43 {main}
-"} 
-[2026-03-30 15:28:54] production.ERROR: Call to undefined method App\Http\Controllers\Api\DomainController::authorize() {"userId":1,"exception":"[object] (Error(code: 0): Call to undefined method App\\Http\\Controllers\\Api\\DomainController::authorize() at /var/www/panelsar/panel/app/Http/Controllers/Api/DomainController.php:125)
-[stacktrace]
-#0 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Routing/ControllerDispatcher.php(47): App\\Http\\Controllers\\Api\\DomainController->switchServer()
-#1 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Routing/Route.php(266): Illuminate\\Routing\\ControllerDispatcher->dispatch()
-#2 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Routing/Route.php(212): Illuminate\\Routing\\Route->runController()
-#3 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Routing/Router.php(808): Illuminate\\Routing\\Route->run()
-#4 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(170): Illuminate\\Routing\\Router->{closure:Illuminate\\Routing\\Router::runRouteWithinStack():807}()
-#5 /var/www/panelsar/panel/vendor/laravel/sanctum/src/Http/Middleware/CheckAbilities.php(32): Illuminate\\Pipeline\\Pipeline->{closure:Illuminate\\Pipeline\\Pipeline::prepareDestination():168}()
-#6 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Laravel\\Sanctum\\Http\\Middleware\\CheckAbilities->handle()
-#7 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Routing/Middleware/SubstituteBindings.php(51): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():184}:185}()
-#8 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Routing\\Middleware\\SubstituteBindings->handle()
-#9 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Routing/Middleware/ThrottleRequests.php(161): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():184}:185}()
-#10 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Routing/Middleware/ThrottleRequests.php(127): Illuminate\\Routing\\Middleware\\ThrottleRequests->handleRequest()
-#11 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Routing/Middleware/ThrottleRequests.php(89): Illuminate\\Routing\\Middleware\\ThrottleRequests->handleRequestUsingNamedLimiter()
-#12 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Routing\\Middleware\\ThrottleRequests->handle()
-#13 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Auth/Middleware/Authenticate.php(64): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():184}:185}()
-#14 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Auth\\Middleware\\Authenticate->handle()
-#15 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(127): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():184}:185}()
-#16 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Routing/Router.php(807): Illuminate\\Pipeline\\Pipeline->then()
-#17 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Routing/Router.php(786): Illuminate\\Routing\\Router->runRouteWithinStack()
-#18 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Routing/Router.php(750): Illuminate\\Routing\\Router->runRoute()
-#19 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Routing/Router.php(739): Illuminate\\Routing\\Router->dispatchToRoute()
-#20 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Foundation/Http/Kernel.php(201): Illuminate\\Routing\\Router->dispatch()
-#21 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(170): Illuminate\\Foundation\\Http\\Kernel->{closure:Illuminate\\Foundation\\Http\\Kernel::dispatchToRouter():198}()
-#22 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/TransformsRequest.php(21): Illuminate\\Pipeline\\Pipeline->{closure:Illuminate\\Pipeline\\Pipeline::prepareDestination():168}()
-#23 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/ConvertEmptyStringsToNull.php(31): Illuminate\\Foundation\\Http\\Middleware\\TransformsRequest->handle()
-#24 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Foundation\\Http\\Middleware\\ConvertEmptyStringsToNull->handle()
-#25 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/TransformsRequest.php(21): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():184}:185}()
-#26 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/TrimStrings.php(51): Illuminate\\Foundation\\Http\\Middleware\\TransformsRequest->handle()
-#27 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Foundation\\Http\\Middleware\\TrimStrings->handle()
-#28 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Http/Middleware/ValidatePostSize.php(27): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():184}:185}()
-#29 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Http\\Middleware\\ValidatePostSize->handle()
-#30 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/PreventRequestsDuringMaintenance.php(110): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():184}:185}()
-#31 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Foundation\\Http\\Middleware\\PreventRequestsDuringMaintenance->handle()
-#32 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Http/Middleware/HandleCors.php(62): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():184}:185}()
-#33 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Http\\Middleware\\HandleCors->handle()
-#34 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Http/Middleware/TrustProxies.php(58): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():184}:185}()
-#35 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Http\\Middleware\\TrustProxies->handle()
-#36 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/InvokeDeferredCallbacks.php(22): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():184}:185}()
-#37 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Foundation\\Http\\Middleware\\InvokeDeferredCallbacks->handle()
-#38 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(127): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():184}:185}()
-#39 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Foundation/Http/Kernel.php(176): Illuminate\\Pipeline\\Pipeline->then()
-#40 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Foundation/Http/Kernel.php(145): Illuminate\\Foundation\\Http\\Kernel->sendRequestThroughRouter()
-#41 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Foundation/Application.php(1220): Illuminate\\Foundation\\Http\\Kernel->handle()
-#42 /var/www/panelsar/panel/public/index.php(22): Illuminate\\Foundation\\Application->handleRequest()
-#43 {main}
-"} 
-[2026-03-30 15:29:20] production.ERROR: Call to undefined method App\Http\Controllers\Api\DatabaseController::authorize() {"userId":1,"exception":"[object] (Error(code: 0): Call to undefined method App\\Http\\Controllers\\Api\\DatabaseController::authorize() at /var/www/panelsar/panel/app/Http/Controllers/Api/DatabaseController.php:105)
-[stacktrace]
-#0 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Routing/ControllerDispatcher.php(47): App\\Http\\Controllers\\Api\\DatabaseController->rotatePassword()
-#1 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Routing/Route.php(266): Illuminate\\Routing\\ControllerDispatcher->dispatch()
-#2 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Routing/Route.php(212): Illuminate\\Routing\\Route->runController()
-#3 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Routing/Router.php(808): Illuminate\\Routing\\Route->run()
-#4 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(170): Illuminate\\Routing\\Router->{closure:Illuminate\\Routing\\Router::runRouteWithinStack():807}()
-#5 /var/www/panelsar/panel/vendor/laravel/sanctum/src/Http/Middleware/CheckAbilities.php(32): Illuminate\\Pipeline\\Pipeline->{closure:Illuminate\\Pipeline\\Pipeline::prepareDestination():168}()
-#6 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Laravel\\Sanctum\\Http\\Middleware\\CheckAbilities->handle()
-#7 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Routing/Middleware/SubstituteBindings.php(51): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():184}:185}()
-#8 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Routing\\Middleware\\SubstituteBindings->handle()
-#9 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Routing/Middleware/ThrottleRequests.php(161): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():184}:185}()
-#10 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Routing/Middleware/ThrottleRequests.php(127): Illuminate\\Routing\\Middleware\\ThrottleRequests->handleRequest()
-#11 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Routing/Middleware/ThrottleRequests.php(89): Illuminate\\Routing\\Middleware\\ThrottleRequests->handleRequestUsingNamedLimiter()
-#12 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Routing\\Middleware\\ThrottleRequests->handle()
-#13 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Auth/Middleware/Authenticate.php(64): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():184}:185}()
-#14 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Auth\\Middleware\\Authenticate->handle()
-#15 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(127): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():184}:185}()
-#16 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Routing/Router.php(807): Illuminate\\Pipeline\\Pipeline->then()
-#17 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Routing/Router.php(786): Illuminate\\Routing\\Router->runRouteWithinStack()
-#18 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Routing/Router.php(750): Illuminate\\Routing\\Router->runRoute()
-#19 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Routing/Router.php(739): Illuminate\\Routing\\Router->dispatchToRoute()
-#20 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Foundation/Http/Kernel.php(201): Illuminate\\Routing\\Router->dispatch()
-#21 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(170): Illuminate\\Foundation\\Http\\Kernel->{closure:Illuminate\\Foundation\\Http\\Kernel::dispatchToRouter():198}()
-#22 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/TransformsRequest.php(21): Illuminate\\Pipeline\\Pipeline->{closure:Illuminate\\Pipeline\\Pipeline::prepareDestination():168}()
-#23 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/ConvertEmptyStringsToNull.php(31): Illuminate\\Foundation\\Http\\Middleware\\TransformsRequest->handle()
-#24 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Foundation\\Http\\Middleware\\ConvertEmptyStringsToNull->handle()
-#25 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/TransformsRequest.php(21): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():184}:185}()
-#26 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/TrimStrings.php(51): Illuminate\\Foundation\\Http\\Middleware\\TransformsRequest->handle()
-#27 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Foundation\\Http\\Middleware\\TrimStrings->handle()
-#28 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Http/Middleware/ValidatePostSize.php(27): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():184}:185}()
-#29 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Http\\Middleware\\ValidatePostSize->handle()
-#30 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/PreventRequestsDuringMaintenance.php(110): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():184}:185}()
-#31 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Foundation\\Http\\Middleware\\PreventRequestsDuringMaintenance->handle()
-#32 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Http/Middleware/HandleCors.php(62): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():184}:185}()
-#33 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Http\\Middleware\\HandleCors->handle()
-#34 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Http/Middleware/TrustProxies.php(58): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():184}:185}()
-#35 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Http\\Middleware\\TrustProxies->handle()
-#36 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/InvokeDeferredCallbacks.php(22): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():184}:185}()
-#37 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Foundation\\Http\\Middleware\\InvokeDeferredCallbacks->handle()
-#38 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(127): Illuminate\\Pipeline\\Pipeline->{closure:{closure:Illuminate\\Pipeline\\Pipeline::carry():184}:185}()
-#39 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Foundation/Http/Kernel.php(176): Illuminate\\Pipeline\\Pipeline->then()
-#40 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Foundation/Http/Kernel.php(145): Illuminate\\Foundation\\Http\\Kernel->sendRequestThroughRouter()
-#41 /var/www/panelsar/panel/vendor/laravel/framework/src/Illuminate/Foundation/Application.php(1220): Illuminate\\Foundation\\Http\\Kernel->handle()
-#42 /var/www/panelsar/panel/public/index.php(22): Illuminate\\Foundation\\Application->handleRequest()
+root@vmi2616585:/var/www/hostvim# sudo systemctl status hostvim-engine php8.4-fpm nginx --no-pager -l
+curl -i http://127.0.0.1:9090/health
+sudo nginx -t
+sudo journalctl -u nginx -u hostvim-engine -u php8.4-fpm -n 120 --no-pager
+● hostvim-engine.service - Hostvim Engine (hosting API)
+     Loaded: loaded (/etc/systemd/system/hostvim-engine.service; enabled; vendor preset: enabled)
+     Active: activating (auto-restart) (Result: exit-code) since Tue 2026-04-07 19:13:11 CEST; 3s ago
+    Process: 1314103 ExecStart=/usr/local/bin/hostvim-engine (code=exited, status=1/FAILURE)
+   Main PID: 1314103 (code=exited, status=1/FAILURE)
+        CPU: 108ms
+
+● php8.4-fpm.service - The PHP 8.4 FastCGI Process Manager
+     Loaded: loaded (/lib/systemd/system/php8.4-fpm.service; enabled; vendor preset: enabled)
+     Active: active (running) since Tue 2026-04-07 17:28:52 CEST; 1h 44min ago
+       Docs: man:php-fpm8.4(8)
+   Main PID: 1288478 (php-fpm8.4)
+     Status: "Processes active: 0, idle: 2, Requests: 163, slow: 0, Traffic: 0.10req/sec"
+      Tasks: 3 (limit: 9475)
+     Memory: 47.3M
+        CPU: 13.987s
+     CGroup: /system.slice/php8.4-fpm.service
+             ├─1288478 "php-fpm: master process (/etc/php/8.4/fpm/php-fpm.conf)" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" ""
+             ├─1288480 "php-fpm: pool www" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" ""
+             └─1288481 "php-fpm: pool www" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" ""
+
+Apr 07 17:28:52 vmi2616585 systemd[1]: Starting The PHP 8.4 FastCGI Process Manager...
+Apr 07 17:28:52 vmi2616585 systemd[1]: Started The PHP 8.4 FastCGI Process Manager.
+
+● nginx.service - A high performance web server and a reverse proxy server
+     Loaded: loaded (/lib/systemd/system/nginx.service; enabled; vendor preset: enabled)
+     Active: active (running) since Mon 2026-03-30 17:30:10 CEST; 1 week 1 day ago
+       Docs: man:nginx(8)
+   Main PID: 66333 (nginx)
+      Tasks: 5 (limit: 9475)
+     Memory: 13.6M
+        CPU: 6min 45.344s
+     CGroup: /system.slice/nginx.service
+             ├─  66333 "nginx: master process /usr/sbin/nginx -g daemon on; master_process on;"
+             ├─1302680 "nginx: worker process" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" ""
+             ├─1302681 "nginx: worker process" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" ""
+             ├─1302682 "nginx: worker process" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" ""
+             └─1302683 "nginx: worker process" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" "" ""
+
+Apr 07 14:52:56 vmi2616585 systemd[1]: Reloading A high performance web server and a reverse proxy server...
+Apr 07 14:52:56 vmi2616585 systemd[1]: Reloaded A high performance web server and a reverse proxy server.
+Apr 07 14:57:53 vmi2616585 systemd[1]: Reloading A high performance web server and a reverse proxy server...
+Apr 07 14:57:53 vmi2616585 systemd[1]: Reloaded A high performance web server and a reverse proxy server.
+Apr 07 15:02:21 vmi2616585 systemd[1]: Reloading A high performance web server and a reverse proxy server...
+Apr 07 15:02:21 vmi2616585 systemd[1]: Reloaded A high performance web server and a reverse proxy server.
+Apr 07 15:11:06 vmi2616585 systemd[1]: Reloading A high performance web server and a reverse proxy server...
+Apr 07 15:11:06 vmi2616585 systemd[1]: Reloaded A high performance web server and a reverse proxy server.
+Apr 07 17:31:37 vmi2616585 systemd[1]: Reloading A high performance web server and a reverse proxy server...
+Apr 07 17:31:37 vmi2616585 systemd[1]: Reloaded A high performance web server and a reverse proxy server.
+HTTP/1.1 200 OK
+Access-Control-Allow-Headers: Origin, Content-Type, Accept, Authorization, X-Requested-With
+Access-Control-Allow-Methods: GET, POST, PUT, PATCH, DELETE, OPTIONS
+Access-Control-Allow-Origin: *
+Access-Control-Max-Age: 86400
+Content-Type: application/json; charset=utf-8
+Date: Tue, 07 Apr 2026 17:13:16 GMT
+Content-Length: 73
+
+{"engine":"panelsar","running":true,"status":"healthy","version":"0.1.0"}nginx: the configuration file /etc/nginx/nginx.conf syntax is ok
+nginx: configuration file /etc/nginx/nginx.conf test is successful
+Apr 07 19:12:22 vmi2616585 systemd[1]: Stopped Hostvim Engine (hosting API).
+Apr 07 19:12:22 vmi2616585 systemd[1]: Started Hostvim Engine (hosting API).
+Apr 07 19:12:22 vmi2616585 hostvim-engine[1313942]: time="2026-04-07 19:12:22" level=info msg="Starting Hostvim Engine v0.1.0"
+Apr 07 19:12:22 vmi2616585 hostvim-engine[1313942]: time="2026-04-07 19:12:22" level=info msg="Initializing daemon..."
+Apr 07 19:12:23 vmi2616585 hostvim-engine[1313942]: time="2026-04-07 19:12:23" level=info msg="Discovered 8 services"
+Apr 07 19:12:23 vmi2616585 hostvim-engine[1313942]: time="2026-04-07 19:12:23" level=info msg="Daemon initialized successfully"
+Apr 07 19:12:23 vmi2616585 hostvim-engine[1313942]: time="2026-04-07 19:12:23" level=info msg="Engine API listening on port 9090"
+Apr 07 19:12:23 vmi2616585 hostvim-engine[1313942]: time="2026-04-07 19:12:23" level=fatal msg="Server error: listen tcp :9090: bind: address already in use"
+Apr 07 19:12:23 vmi2616585 systemd[1]: hostvim-engine.service: Main process exited, code=exited, status=1/FAILURE
+Apr 07 19:12:23 vmi2616585 systemd[1]: hostvim-engine.service: Failed with result 'exit-code'.
+Apr 07 19:12:28 vmi2616585 systemd[1]: hostvim-engine.service: Scheduled restart job, restart counter is at 3538.
+Apr 07 19:12:28 vmi2616585 systemd[1]: Stopped Hostvim Engine (hosting API).
+Apr 07 19:12:28 vmi2616585 systemd[1]: Started Hostvim Engine (hosting API).
+Apr 07 19:12:28 vmi2616585 hostvim-engine[1313958]: time="2026-04-07 19:12:28" level=info msg="Starting Hostvim Engine v0.1.0"
+Apr 07 19:12:28 vmi2616585 hostvim-engine[1313958]: time="2026-04-07 19:12:28" level=info msg="Initializing daemon..."
+Apr 07 19:12:28 vmi2616585 hostvim-engine[1313958]: time="2026-04-07 19:12:28" level=info msg="Discovered 8 services"
+Apr 07 19:12:28 vmi2616585 hostvim-engine[1313958]: time="2026-04-07 19:12:28" level=info msg="Daemon initialized successfully"
+Apr 07 19:12:28 vmi2616585 hostvim-engine[1313958]: time="2026-04-07 19:12:28" level=info msg="Engine API listening on port 9090"
+Apr 07 19:12:28 vmi2616585 hostvim-engine[1313958]: time="2026-04-07 19:12:28" level=fatal msg="Server error: listen tcp :9090: bind: address already in use"
+Apr 07 19:12:28 vmi2616585 systemd[1]: hostvim-engine.service: Main process exited, code=exited, status=1/FAILURE
+Apr 07 19:12:28 vmi2616585 systemd[1]: hostvim-engine.service: Failed with result 'exit-code'.
+Apr 07 19:12:33 vmi2616585 systemd[1]: hostvim-engine.service: Scheduled restart job, restart counter is at 3539.
+Apr 07 19:12:33 vmi2616585 systemd[1]: Stopped Hostvim Engine (hosting API).
+Apr 07 19:12:33 vmi2616585 systemd[1]: Started Hostvim Engine (hosting API).
+Apr 07 19:12:33 vmi2616585 hostvim-engine[1313975]: time="2026-04-07 19:12:33" level=info msg="Starting Hostvim Engine v0.1.0"
+Apr 07 19:12:33 vmi2616585 hostvim-engine[1313975]: time="2026-04-07 19:12:33" level=info msg="Initializing daemon..."
+Apr 07 19:12:33 vmi2616585 hostvim-engine[1313975]: time="2026-04-07 19:12:33" level=info msg="Discovered 8 services"
+Apr 07 19:12:33 vmi2616585 hostvim-engine[1313975]: time="2026-04-07 19:12:33" level=info msg="Daemon initialized successfully"
+Apr 07 19:12:33 vmi2616585 hostvim-engine[1313975]: time="2026-04-07 19:12:33" level=info msg="Engine API listening on port 9090"
+Apr 07 19:12:33 vmi2616585 hostvim-engine[1313975]: time="2026-04-07 19:12:33" level=fatal msg="Server error: listen tcp :9090: bind: address already in use"
+Apr 07 19:12:33 vmi2616585 systemd[1]: hostvim-engine.service: Main process exited, code=exited, status=1/FAILURE
+Apr 07 19:12:33 vmi2616585 systemd[1]: hostvim-engine.service: Failed with result 'exit-code'.
+Apr 07 19:12:38 vmi2616585 systemd[1]: hostvim-engine.service: Scheduled restart job, restart counter is at 3540.
+Apr 07 19:12:38 vmi2616585 systemd[1]: Stopped Hostvim Engine (hosting API).
+Apr 07 19:12:38 vmi2616585 systemd[1]: Started Hostvim Engine (hosting API).
+Apr 07 19:12:38 vmi2616585 hostvim-engine[1313990]: time="2026-04-07 19:12:38" level=info msg="Starting Hostvim Engine v0.1.0"
+Apr 07 19:12:38 vmi2616585 hostvim-engine[1313990]: time="2026-04-07 19:12:38" level=info msg="Initializing daemon..."
+Apr 07 19:12:39 vmi2616585 hostvim-engine[1313990]: time="2026-04-07 19:12:39" level=info msg="Discovered 8 services"
+Apr 07 19:12:39 vmi2616585 hostvim-engine[1313990]: time="2026-04-07 19:12:39" level=info msg="Daemon initialized successfully"
+Apr 07 19:12:39 vmi2616585 hostvim-engine[1313990]: time="2026-04-07 19:12:39" level=info msg="Engine API listening on port 9090"
+Apr 07 19:12:39 vmi2616585 hostvim-engine[1313990]: time="2026-04-07 19:12:39" level=fatal msg="Server error: listen tcp :9090: bind: address already in use"
+Apr 07 19:12:39 vmi2616585 systemd[1]: hostvim-engine.service: Main process exited, code=exited, status=1/FAILURE
+Apr 07 19:12:39 vmi2616585 systemd[1]: hostvim-engine.service: Failed with result 'exit-code'.
+Apr 07 19:12:44 vmi2616585 systemd[1]: hostvim-engine.service: Scheduled restart job, restart counter is at 3541.
+Apr 07 19:12:44 vmi2616585 systemd[1]: Stopped Hostvim Engine (hosting API).
+Apr 07 19:12:44 vmi2616585 systemd[1]: Started Hostvim Engine (hosting API).
+Apr 07 19:12:44 vmi2616585 hostvim-engine[1314006]: time="2026-04-07 19:12:44" level=info msg="Starting Hostvim Engine v0.1.0"
+Apr 07 19:12:44 vmi2616585 hostvim-engine[1314006]: time="2026-04-07 19:12:44" level=info msg="Initializing daemon..."
+Apr 07 19:12:44 vmi2616585 hostvim-engine[1314006]: time="2026-04-07 19:12:44" level=info msg="Discovered 8 services"
+Apr 07 19:12:44 vmi2616585 hostvim-engine[1314006]: time="2026-04-07 19:12:44" level=info msg="Daemon initialized successfully"
+Apr 07 19:12:44 vmi2616585 hostvim-engine[1314006]: time="2026-04-07 19:12:44" level=info msg="Engine API listening on port 9090"
+Apr 07 19:12:44 vmi2616585 hostvim-engine[1314006]: time="2026-04-07 19:12:44" level=fatal msg="Server error: listen tcp :9090: bind: address already in use"
+Apr 07 19:12:44 vmi2616585 systemd[1]: hostvim-engine.service: Main process exited, code=exited, status=1/FAILURE
+Apr 07 19:12:44 vmi2616585 systemd[1]: hostvim-engine.service: Failed with result 'exit-code'.
+Apr 07 19:12:49 vmi2616585 systemd[1]: hostvim-engine.service: Scheduled restart job, restart counter is at 3542.
+Apr 07 19:12:49 vmi2616585 systemd[1]: Stopped Hostvim Engine (hosting API).
+Apr 07 19:12:49 vmi2616585 systemd[1]: Started Hostvim Engine (hosting API).
+Apr 07 19:12:49 vmi2616585 hostvim-engine[1314023]: time="2026-04-07 19:12:49" level=info msg="Starting Hostvim Engine v0.1.0"
+Apr 07 19:12:49 vmi2616585 hostvim-engine[1314023]: time="2026-04-07 19:12:49" level=info msg="Initializing daemon..."
+Apr 07 19:12:49 vmi2616585 hostvim-engine[1314023]: time="2026-04-07 19:12:49" level=info msg="Discovered 8 services"
+Apr 07 19:12:49 vmi2616585 hostvim-engine[1314023]: time="2026-04-07 19:12:49" level=info msg="Daemon initialized successfully"
+Apr 07 19:12:49 vmi2616585 hostvim-engine[1314023]: time="2026-04-07 19:12:49" level=info msg="Engine API listening on port 9090"
+Apr 07 19:12:49 vmi2616585 hostvim-engine[1314023]: time="2026-04-07 19:12:49" level=fatal msg="Server error: listen tcp :9090: bind: address already in use"
+Apr 07 19:12:49 vmi2616585 systemd[1]: hostvim-engine.service: Main process exited, code=exited, status=1/FAILURE
+Apr 07 19:12:49 vmi2616585 systemd[1]: hostvim-engine.service: Failed with result 'exit-code'.
+Apr 07 19:12:54 vmi2616585 systemd[1]: hostvim-engine.service: Scheduled restart job, restart counter is at 3543.
+Apr 07 19:12:54 vmi2616585 systemd[1]: Stopped Hostvim Engine (hosting API).
+Apr 07 19:12:54 vmi2616585 systemd[1]: Started Hostvim Engine (hosting API).
+Apr 07 19:12:54 vmi2616585 hostvim-engine[1314040]: time="2026-04-07 19:12:54" level=info msg="Starting Hostvim Engine v0.1.0"
+Apr 07 19:12:54 vmi2616585 hostvim-engine[1314040]: time="2026-04-07 19:12:54" level=info msg="Initializing daemon..."
+Apr 07 19:12:55 vmi2616585 hostvim-engine[1314040]: time="2026-04-07 19:12:55" level=info msg="Discovered 8 services"
+Apr 07 19:12:55 vmi2616585 hostvim-engine[1314040]: time="2026-04-07 19:12:55" level=info msg="Daemon initialized successfully"
+Apr 07 19:12:55 vmi2616585 hostvim-engine[1314040]: time="2026-04-07 19:12:55" level=info msg="Engine API listening on port 9090"
+Apr 07 19:12:55 vmi2616585 hostvim-engine[1314040]: time="2026-04-07 19:12:55" level=fatal msg="Server error: listen tcp :9090: bind: address already in use"
+Apr 07 19:12:55 vmi2616585 systemd[1]: hostvim-engine.service: Main process exited, code=exited, status=1/FAILURE
+Apr 07 19:12:55 vmi2616585 systemd[1]: hostvim-engine.service: Failed with result 'exit-code'.
+Apr 07 19:13:00 vmi2616585 systemd[1]: hostvim-engine.service: Scheduled restart job, restart counter is at 3544.
+Apr 07 19:13:00 vmi2616585 systemd[1]: Stopped Hostvim Engine (hosting API).
+Apr 07 19:13:00 vmi2616585 systemd[1]: Started Hostvim Engine (hosting API).
+Apr 07 19:13:00 vmi2616585 hostvim-engine[1314056]: time="2026-04-07 19:13:00" level=info msg="Starting Hostvim Engine v0.1.0"
+Apr 07 19:13:00 vmi2616585 hostvim-engine[1314056]: time="2026-04-07 19:13:00" level=info msg="Initializing daemon..."
+Apr 07 19:13:00 vmi2616585 hostvim-engine[1314056]: time="2026-04-07 19:13:00" level=info msg="Discovered 8 services"
+Apr 07 19:13:00 vmi2616585 hostvim-engine[1314056]: time="2026-04-07 19:13:00" level=info msg="Daemon initialized successfully"
+Apr 07 19:13:00 vmi2616585 hostvim-engine[1314056]: time="2026-04-07 19:13:00" level=info msg="Engine API listening on port 9090"
+Apr 07 19:13:00 vmi2616585 hostvim-engine[1314056]: time="2026-04-07 19:13:00" level=fatal msg="Server error: listen tcp :9090: bind: address already in use"
+Apr 07 19:13:00 vmi2616585 systemd[1]: hostvim-engine.service: Main process exited, code=exited, status=1/FAILURE
+Apr 07 19:13:00 vmi2616585 systemd[1]: hostvim-engine.service: Failed with result 'exit-code'.
+Apr 07 19:13:05 vmi2616585 systemd[1]: hostvim-engine.service: Scheduled restart job, restart counter is at 3545.
+Apr 07 19:13:05 vmi2616585 systemd[1]: Stopped Hostvim Engine (hosting API).
+Apr 07 19:13:05 vmi2616585 systemd[1]: Started Hostvim Engine (hosting API).
+Apr 07 19:13:05 vmi2616585 hostvim-engine[1314087]: time="2026-04-07 19:13:05" level=info msg="Starting Hostvim Engine v0.1.0"
+Apr 07 19:13:05 vmi2616585 hostvim-engine[1314087]: time="2026-04-07 19:13:05" level=info msg="Initializing daemon..."
+Apr 07 19:13:05 vmi2616585 hostvim-engine[1314087]: time="2026-04-07 19:13:05" level=info msg="Discovered 8 services"
+Apr 07 19:13:05 vmi2616585 hostvim-engine[1314087]: time="2026-04-07 19:13:05" level=info msg="Daemon initialized successfully"
+Apr 07 19:13:05 vmi2616585 hostvim-engine[1314087]: time="2026-04-07 19:13:05" level=info msg="Engine API listening on port 9090"
+Apr 07 19:13:05 vmi2616585 hostvim-engine[1314087]: time="2026-04-07 19:13:05" level=fatal msg="Server error: listen tcp :9090: bind: address already in use"
+Apr 07 19:13:05 vmi2616585 systemd[1]: hostvim-engine.service: Main process exited, code=exited, status=1/FAILURE
+Apr 07 19:13:05 vmi2616585 systemd[1]: hostvim-engine.service: Failed with result 'exit-code'.
+Apr 07 19:13:10 vmi2616585 systemd[1]: hostvim-engine.service: Scheduled restart job, restart counter is at 3546.
+Apr 07 19:13:10 vmi2616585 systemd[1]: Stopped Hostvim Engine (hosting API).
+Apr 07 19:13:10 vmi2616585 systemd[1]: Started Hostvim Engine (hosting API).
+Apr 07 19:13:10 vmi2616585 hostvim-engine[1314103]: time="2026-04-07 19:13:10" level=info msg="Starting Hostvim Engine v0.1.0"
+Apr 07 19:13:10 vmi2616585 hostvim-engine[1314103]: time="2026-04-07 19:13:10" level=info msg="Initializing daemon..."
+Apr 07 19:13:11 vmi2616585 hostvim-engine[1314103]: time="2026-04-07 19:13:11" level=info msg="Discovered 8 services"
+Apr 07 19:13:11 vmi2616585 hostvim-engine[1314103]: time="2026-04-07 19:13:11" level=info msg="Daemon initialized successfully"
+Apr 07 19:13:11 vmi2616585 hostvim-engine[1314103]: time="2026-04-07 19:13:11" level=info msg="Engine API listening on port 9090"
+Apr 07 19:13:11 vmi2616585 hostvim-engine[1314103]: time="2026-04-07 19:13:11" level=fatal msg="Server error: listen tcp :9090: bind: address already in use"
+Apr 07 19:13:11 vmi2616585 systemd[1]: hostvim-engine.service: Main process exited, code=exited, status=1/FAILURE
+Apr 07 19:13:11 vmi2616585 systemd[1]: hostvim-engine.service: Failed with result 'exit-code'.
+Apr 07 19:13:16 vmi2616585 systemd[1]: hostvim-engine.service: Scheduled restart job, restart counter is at 3547.
+Apr 07 19:13:16 vmi2616585 systemd[1]: Stopped Hostvim Engine (hosting API).
+Apr 07 19:13:16 vmi2616585 systemd[1]: Started Hostvim Engine (hosting API).
+Apr 07 19:13:16 vmi2616585 hostvim-engine[1314123]: time="2026-04-07 19:13:16" level=info msg="Starting Hostvim Engine v0.1.0"
+Apr 07 19:13:16 vmi2616585 hostvim-engine[1314123]: time="2026-04-07 19:13:16" level=info msg="Initializing daemon..."
+Apr 07 19:13:16 vmi2616585 hostvim-engine[1314123]: time="2026-04-07 19:13:16" level=info msg="Discovered 8 services"
+Apr 07 19:13:16 vmi2616585 hostvim-engine[1314123]: time="2026-04-07 19:13:16" level=info msg="Daemon initialized successfully"
+Apr 07 19:13:16 vmi2616585 hostvim-engine[1314123]: time="2026-04-07 19:13:16" level=info msg="Engine API listening on port 9090"
+Apr 07 19:13:16 vmi2616585 hostvim-engine[1314123]: time="2026-04-07 19:13:16" level=fatal msg="Server error: listen tcp :9090: bind: address already in use"
+Apr 07 19:13:16 vmi2616585 systemd[1]: hostvim-engine.service: Main process exited, code=exited, status=1/FAILURE
+Apr 07 19:13:16 vmi2616585 systemd[1]: hostvim-engine.service: Failed with result 'exit-code'.
+root@vmi2616585:/var/www/hostvim# 

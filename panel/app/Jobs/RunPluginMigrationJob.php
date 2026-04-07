@@ -6,6 +6,7 @@ use App\Models\Domain;
 use App\Models\PluginModule;
 use App\Models\PluginMigrationRun;
 use App\Services\DatabaseService;
+use App\Support\MigrationCliResolver;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -221,8 +222,13 @@ class RunPluginMigrationJob implements ShouldQueue
                 escapeshellarg($run->source_user.'@'.$run->source_host),
                 escapeshellarg(sprintf('mysqldump -h%s -P%d -u%s -p%s %s', $srcHost, $srcPort, $srcUser, $srcPass, $srcDb))
             );
+            $mysqlBin = MigrationCliResolver::mysql();
+            if ($mysqlBin === null) {
+                throw new \RuntimeException('Panel sunucusunda mysql istemcisi bulunamadi (.env MYSQL_CLIENT_PATH veya XAMPP mysql yolu).');
+            }
             $import = sprintf(
-                'mysql -h%s -P%d -u%s -p%s %s',
+                '%s -h%s -P%d -u%s -p%s %s',
+                escapeshellarg($mysqlBin),
                 escapeshellarg((string) $dstDb->host),
                 (int) $dstDb->port,
                 escapeshellarg((string) $dstDb->username),

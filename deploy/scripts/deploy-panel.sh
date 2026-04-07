@@ -61,6 +61,14 @@ if [[ -d "$FRONTEND_ROOT" ]] && [[ -f "$FRONTEND_ROOT/package.json" ]]; then
     "$FRONTEND_ROOT/dist/" "$PANEL_ROOT/public/"
 fi
 
+FIX_SCRIPT="$REPO_ROOT/deploy/scripts/fix-panel-permissions.sh"
+if [[ -f "$FIX_SCRIPT" ]] && [[ -f "$PANEL_ROOT/artisan" ]]; then
+  echo "==> hostvim:fix-permissions"
+  sudo -u "$RUN_USER" php "$PANEL_ROOT/artisan" hostvim:fix-permissions || true
+  echo "==> panel storage/bootstrap izinleri ($RUN_USER)"
+  sudo env RUN_USER="$RUN_USER" RUN_GROUP="${RUN_GROUP:-$RUN_USER}" bash "$FIX_SCRIPT" "$PANEL_ROOT"
+fi
+
 echo "==> hostvim:install-check"
 sudo -u "$RUN_USER" php artisan hostvim:install-check || true
 

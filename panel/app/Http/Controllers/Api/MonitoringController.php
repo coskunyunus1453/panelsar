@@ -76,6 +76,8 @@ class MonitoringController extends Controller
 
             $score = 100.0;
             $reasons = [];
+            $knownMetrics = 0;
+            $totalMetrics = 6;
 
             // CPU (20)
             $cpuPenalty = max(0.0, min(20.0, ($cpu - 60.0) * 0.5));
@@ -83,9 +85,11 @@ class MonitoringController extends Controller
             $reasons[] = [
                 'key' => 'cpu',
                 'ok' => $cpuPenalty < 4,
+                'unknown' => false,
                 'label' => $cpuPenalty < 4 ? 'CPU normal' : 'CPU yuksek',
                 'detail' => sprintf('CPU: %.1f%%', $cpu),
             ];
+            $knownMetrics++;
 
             // RAM (20)
             $ramPenalty = max(0.0, min(20.0, ($ram - 65.0) * 0.57));
@@ -93,19 +97,23 @@ class MonitoringController extends Controller
             $reasons[] = [
                 'key' => 'ram',
                 'ok' => $ramPenalty < 4,
+                'unknown' => false,
                 'label' => $ramPenalty < 4 ? 'RAM normal' : 'RAM yuksek',
                 'detail' => sprintf('RAM: %.1f%%', $ram),
             ];
+            $knownMetrics++;
 
             // Disk (15)
             $diskPenalty = max(0.0, min(15.0, ($disk - 70.0) * 0.5));
             $score -= $diskPenalty;
             $reasons[] = [
                 'key' => 'disk',
-                'ok' => $diskPenalty < 3,
+                'ok' => $disk < 70.0,
+                'unknown' => false,
                 'label' => $diskPenalty < 3 ? 'Disk normal' : 'Disk doluluk yuksek',
                 'detail' => sprintf('Disk: %.1f%%', $disk),
             ];
+            $knownMetrics++;
 
             // Response time (15)
             $rtBase = $siteResponseMs ?? $responseMs;
@@ -114,11 +122,13 @@ class MonitoringController extends Controller
             $reasons[] = [
                 'key' => 'rt',
                 'ok' => $rtPenalty < 3,
+                'unknown' => false,
                 'label' => $rtPenalty < 3 ? 'Response iyi' : 'Response yavas',
                 'detail' => $selectedDomain
                     ? ("Site: {$selectedDomain->name} ~ ".($siteResponseMs ?? 0).' ms')
                     : ("Engine API: {$responseMs} ms"),
             ];
+            $knownMetrics++;
 
             // Error rate (20): son 20 run
             if ($selectedDomain) {
@@ -141,15 +151,28 @@ class MonitoringController extends Controller
             $statuses = $inst->pluck('status')->concat($dep->pluck('status'))->concat($bak->pluck('status'))->concat($cron->pluck('status'));
             $totalRuns = $statuses->count();
             $failed = $statuses->filter(fn ($s) => in_array(strtolower((string) $s), ['failed', 'error'], true))->count();
-            $errRate = $totalRuns > 0 ? ($failed / $totalRuns) * 100.0 : 0.0;
-            $errPenalty = min(20.0, $errRate * 0.5);
-            $score -= $errPenalty;
-            $reasons[] = [
-                'key' => 'errors',
-                'ok' => $errPenalty < 4,
-                'label' => $errPenalty < 4 ? 'Error rate normal' : 'Error rate yuksek',
-                'detail' => $totalRuns > 0 ? sprintf('Fail: %d/%d (%.1f%%)', $failed, $totalRuns, $errRate) : 'Son run verisi yok',
-            ];
+            if ($totalRuns > 0) {
+                $errRate = ($failed / $totalRuns) * 100.0;
+                $errPenalty = min(20.0, $errRate * 0.5);
+                $score -= $errPenalty;
+                $reasons[] = [
+                    'key' => 'errors',
+                    'ok' => $errPenalty < 4,
+                    'unknown' => false,
+                    'label' => $errPenalty < 4 ? 'Error rate normal' : 'Error rate yuksek',
+                    'detail' => sprintf('Fail: %d/%d (%.1f%%)', $failed, $totalRuns, $errRate),
+                ];
+                $knownMetrics++;
+            } else {
+                $errRate = 0.0;
+                $reasons[] = [
+                    'key' => 'errors',
+                    'ok' => false,
+                    'unknown' => true,
+                    'label' => 'Error rate bilinmiyor',
+                    'detail' => 'Son run verisi yok',
+                ];
+            }
 
             // SSL (10)
             if ($selectedDomain) {
@@ -174,14 +197,26 @@ class MonitoringController extends Controller
                             ->orWhereNotNull('expires_at')->where('expires_at', '<', now()->addDays(7));
                     })->count();
             }
-            $sslPenalty = $sslTotal > 0 ? min(10.0, ($sslBad / max(1, $sslTotal)) * 10.0) : 0.0;
-            $score -= $sslPenalty;
-            $reasons[] = [
-                'key' => 'ssl',
-                'ok' => $sslPenalty < 2,
-                'label' => $sslPenalty < 2 ? 'SSL OK' : 'SSL riski var',
-                'detail' => $sslTotal > 0 ? sprintf('Problemli SSL: %d/%d', $sslBad, $sslTotal) : 'SSL kaydi yok',
-            ];
+            if ($sslTotal > 0) {
+                $sslPenalty = min(10.0, ($sslBad / max(1, $sslTotal)) * 10.0);
+                $score -= $sslPenalty;
+                $reasons[] = [
+                    'key' => 'ssl',
+                    'ok' => $sslPenalty < 2,
+                    'unknown' => false,
+                    'label' => $sslPenalty < 2 ? 'SSL OK' : 'SSL riski var',
+                    'detail' => sprintf('Problemli SSL: %d/%d', $sslBad, $sslTotal),
+                ];
+                $knownMetrics++;
+            } else {
+                $reasons[] = [
+                    'key' => 'ssl',
+                    'ok' => false,
+                    'unknown' => true,
+                    'label' => 'SSL bilinmiyor',
+                    'detail' => 'SSL kaydi yok',
+                ];
+            }
 
             // Service availability bonus/penalty
             $serviceBy = collect($services)->keyBy(fn ($s) => strtolower((string) ($s['name'] ?? '')));
@@ -217,6 +252,9 @@ class MonitoringController extends Controller
                     'disk' => round($disk, 1),
                     'error_rate' => round($errRate, 1),
                 ],
+                'metrics_total' => $totalMetrics,
+                'metrics_known' => $knownMetrics,
+                'coverage_percent' => (int) round(($knownMetrics / max(1, $totalMetrics)) * 100),
                 'reasons' => array_slice($reasons, 0, 8),
             ];
         });

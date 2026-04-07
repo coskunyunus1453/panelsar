@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Concerns\AuthorizesUserDomain;
 use App\Http\Controllers\Controller;
 use App\Models\Domain;
+use App\Models\PanelSetting;
 use App\Services\EngineApiService;
 use App\Services\HostingQuotaService;
 use App\Services\SafeAuditLogger;
@@ -466,7 +467,7 @@ class FileManagerController extends Controller
         if (! $this->userOwnsDomain($request, $domain)) {
             abort(403);
         }
-        $maxKb = max(1, (int) config('hostvim.limits.max_file_manager_size_mb', 50)) * 1024;
+        $maxKb = $this->fileManagerMaxUploadKb();
         $validated = $request->validate([
             'path' => 'nullable|string',
             'file' => 'required|file|max:'.$maxKb,
@@ -487,6 +488,15 @@ class FileManagerController extends Controller
             $this->logFileAction($request, $domain, 'upload', $relPath, null, false, $e->getMessage());
             throw $e;
         }
+    }
+
+    private function fileManagerMaxUploadKb(): int
+    {
+        $configured = (int) config('hostvim.limits.max_file_manager_size_mb', 50);
+        $panelOverride = (int) (PanelSetting::query()->where('key', 'limits.max_file_manager_size_mb')->value('value') ?? 0);
+        $mb = max(1, $panelOverride > 0 ? $panelOverride : $configured);
+
+        return $mb * 1024;
     }
 
     public function rename(Request $request, Domain $domain): JsonResponse

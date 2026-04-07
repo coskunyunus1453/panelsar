@@ -79,6 +79,22 @@ class DomainController extends Controller
         return response()->json($result);
     }
 
+    public function traffic(Request $request, Domain $domain): JsonResponse
+    {
+        $this->authorize('view', $domain);
+        $lines = (int) $request->integer('lines', 8000);
+        $lines = max(100, min(20000, $lines));
+
+        $result = $this->engine->getSiteTraffic($domain->name, $lines);
+        if (! empty($result['error'])) {
+            return response()->json([
+                'message' => (string) $result['error'],
+            ], 502);
+        }
+
+        return response()->json($result);
+    }
+
     public function destroy(Request $request, Domain $domain): JsonResponse
     {
         $this->authorize('delete', $domain);

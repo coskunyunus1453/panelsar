@@ -6,6 +6,7 @@ import api from '../services/api'
 import toast from 'react-hot-toast'
 import clsx from 'clsx'
 import {
+  BarChart2,
   ExternalLink,
   FileText,
   Globe,
@@ -17,6 +18,15 @@ import {
   ShieldCheck,
   Trash2,
 } from 'lucide-react'
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts'
 import DomainDeleteConfirmModal from '../components/domains/DomainDeleteConfirmModal'
 import DomainQuickSettingsModal from '../components/domains/DomainQuickSettingsModal'
 import { safeDomainUrl } from '../lib/urlSafety'
@@ -48,6 +58,30 @@ type DomainHealthRow = {
   reasons: string[]
 }
 
+type SiteTraffic = {
+  source?: string
+  log_path?: string
+  lines_analyzed?: number
+  requests_total?: number
+  bytes_total?: number
+  status_2xx?: number
+  status_3xx?: number
+  status_4xx?: number
+  status_5xx?: number
+  hourly_requests?: { hour: string; count: number }[]
+  requests_per_minute?: number
+  window_start?: string
+  window_end?: string
+}
+
+function formatTrafficBytes(n?: number): string {
+  if (n == null || !Number.isFinite(n) || n < 0) return '—'
+  if (n < 1024) return `${n} B`
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`
+  if (n < 1024 * 1024 * 1024) return `${(n / (1024 * 1024)).toFixed(1)} MB`
+  return `${(n / (1024 * 1024 * 1024)).toFixed(2)} GB`
+}
+
 type Busy = {
   php?: boolean
   server?: boolean
@@ -69,6 +103,7 @@ export default function DomainsPage() {
   const [busy, setBusy] = useState<Record<number, Busy>>({})
   const [sslProgress, setSslProgress] = useState<Record<number, SslProgress>>({})
   const [logTarget, setLogTarget] = useState<DomainRow | null>(null)
+  const [trafficTarget, setTrafficTarget] = useState<DomainRow | null>(null)
   const [logLines, setLogLines] = useState(200)
   const sslTimers = useRef<Record<number, number>>({})
 
@@ -229,6 +264,17 @@ export default function DomainsPage() {
     },
   })
 
+  const trafficQ = useQuery({
+    queryKey: ['domain-traffic', trafficTarget?.id ?? 0],
+    enabled: !!trafficTarget?.id,
+    queryFn: async () => {
+      const { data } = await api.get<{ domain: string; traffic: SiteTraffic }>(
+        `/domains/${trafficTarget?.id}/traffic`,
+      )
+      return data
+    },
+  })
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -260,6 +306,113 @@ export default function DomainsPage() {
         domain={quickTarget}
         onClose={() => setQuickTarget(null)}
       />
+
+      {trafficTarget && (
+        <div className="fixed inset-0 z-[56] flex items-center justify-center bg-black/50 p-4">
+          <div className="card max-h-[92vh] w-full max-w-4xl overflow-y-auto bg-white p-6 dark:bg-gray-900">
+            <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{t('domains.traffic_title')}</h2>
+                <p className="font-mono text-xs text-gray-500">{trafficTarget.name}</p>
+                <p className="mt-1 max-w-xl text-xs text-gray-500 dark:text-gray-400">{t('domains.traffic_hint')}</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button type="button" className="btn-secondary text-sm" onClick={() => void trafficQ.refetch()}>
+                  {t('domains.logs_refresh')}
+                </button>
+                <button type="button" className="btn-secondary text-sm" onClick={() => setTrafficTarget(null)}>
+                  {t('common.cancel')}
+                </button>
+              </div>
+            </div>
+
+            {trafficQ.isLoading && <p className="py-6 text-sm text-gray-500">{t('common.loading')}</p>}
+
+            {!trafficQ.isLoading && trafficQ.data && (
+              <>
+                {(!trafficQ.data.traffic?.lines_analyzed || trafficQ.data.traffic.lines_analyzed === 0) && (
+                  <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
+                    {t('domains.traffic_no_log')}
+                  </p>
+                )}
+
+                {!!trafficQ.data.traffic?.lines_analyzed && trafficQ.data.traffic.lines_analyzed > 0 && (
+                  <>
+                    <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                      <div className="rounded-xl border border-gray-200 bg-gradient-to-br from-primary-50/80 to-white p-4 dark:border-gray-700 dark:from-primary-950/30 dark:to-gray-900">
+                        <p className="text-[11px] font-medium uppercase tracking-wide text-gray-500">{t('domains.traffic_requests')}</p>
+                        <p className="mt-1 text-2xl font-bold tabular-nums text-gray-900 dark:text-white">
+                          {trafficQ.data.traffic.requests_total ?? 0}
+                        </p>
+                      </div>
+                      <div className="rounded-xl border border-gray-200 bg-gradient-to-br from-violet-50/80 to-white p-4 dark:border-gray-700 dark:from-violet-950/25 dark:to-gray-900">
+                        <p className="text-[11px] font-medium uppercase tracking-wide text-gray-500">{t('domains.traffic_bytes')}</p>
+                        <p className="mt-1 text-2xl font-bold tabular-nums text-gray-900 dark:text-white">
+                          {formatTrafficBytes(trafficQ.data.traffic.bytes_total)}
+                        </p>
+                      </div>
+                      <div className="rounded-xl border border-gray-200 bg-gradient-to-br from-emerald-50/80 to-white p-4 dark:border-gray-700 dark:from-emerald-950/25 dark:to-gray-900">
+                        <p className="text-[11px] font-medium uppercase tracking-wide text-gray-500">{t('domains.traffic_rpm')}</p>
+                        <p className="mt-1 text-2xl font-bold tabular-nums text-gray-900 dark:text-white">
+                          {(trafficQ.data.traffic.requests_per_minute ?? 0).toFixed(1)}
+                        </p>
+                      </div>
+                      <div className="rounded-xl border border-gray-200 bg-gray-50/90 p-4 dark:border-gray-700 dark:bg-gray-800/50">
+                        <p className="text-[11px] font-medium uppercase tracking-wide text-gray-500">{t('domains.traffic_source')}</p>
+                        <p className="mt-1 font-mono text-sm text-gray-800 dark:text-gray-200">
+                          {trafficQ.data.traffic.source ?? '—'}
+                        </p>
+                        <p className="mt-1 truncate font-mono text-[10px] text-gray-500" title={trafficQ.data.traffic.log_path}>
+                          {trafficQ.data.traffic.log_path ?? ''}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="mb-6 flex flex-wrap gap-2">
+                      {[
+                        { k: '2xx', v: trafficQ.data.traffic.status_2xx ?? 0, c: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200' },
+                        { k: '3xx', v: trafficQ.data.traffic.status_3xx ?? 0, c: 'bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-200' },
+                        { k: '4xx', v: trafficQ.data.traffic.status_4xx ?? 0, c: 'bg-amber-100 text-amber-900 dark:bg-amber-900/40 dark:text-amber-200' },
+                        { k: '5xx', v: trafficQ.data.traffic.status_5xx ?? 0, c: 'bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-200' },
+                      ].map((x) => (
+                        <span key={x.k} className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ${x.c}`}>
+                          HTTP {x.k}: {x.v}
+                        </span>
+                      ))}
+                    </div>
+
+                    {(trafficQ.data.traffic.hourly_requests?.length ?? 0) > 0 && (
+                      <div className="rounded-xl border border-gray-200 p-4 dark:border-gray-700">
+                        <h3 className="mb-3 text-sm font-semibold text-gray-900 dark:text-white">{t('domains.traffic_hourly')}</h3>
+                        <div className="h-[240px]">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <BarChart
+                              data={(trafficQ.data.traffic.hourly_requests ?? []).map((h) => ({
+                                label: h.hour.slice(5, 16),
+                                count: h.count,
+                              }))}
+                              margin={{ top: 8, right: 8, left: 0, bottom: 0 }}
+                            >
+                              <CartesianGrid strokeDasharray="3 3" className="stroke-gray-200 dark:stroke-gray-700" />
+                              <XAxis dataKey="label" tick={{ fontSize: 10 }} />
+                              <YAxis width={36} tick={{ fontSize: 10 }} />
+                              <Tooltip
+                                contentStyle={{ borderRadius: 12 }}
+                                formatter={(v: number) => [v, t('domains.traffic_requests')]}
+                              />
+                              <Bar dataKey="count" fill="#6366f1" radius={[6, 6, 0, 0]} name={t('domains.traffic_requests')} />
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       {logTarget && (
         <div className="fixed inset-0 z-[55] flex items-center justify-center bg-black/50 p-4">
@@ -669,6 +822,14 @@ export default function DomainsPage() {
                             onClick={() => setLogTarget(domain)}
                           >
                             <FileText className="h-4 w-4" />
+                          </button>
+                          <button
+                            type="button"
+                            title={t('domains.traffic_button')}
+                            className="p-1.5 rounded-lg hover:bg-fuchsia-50 dark:hover:bg-fuchsia-950/40 text-fuchsia-600 dark:text-fuchsia-400"
+                            onClick={() => setTrafficTarget(domain)}
+                          >
+                            <BarChart2 className="h-4 w-4" />
                           </button>
                         </div>
                       </td>

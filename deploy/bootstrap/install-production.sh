@@ -120,6 +120,55 @@ detect_php_fpm_sock() {
   echo "/run/php/php${pv}-fpm.sock"
 }
 
+ensure_engine_port_free() {
+  local pids pid comm foreign
+  pids="$(lsof -ti :9090 2>/dev/null || true)"
+  [[ -n "$pids" ]] || return 0
+
+  echo "==> Uyarı: 9090 portu kullanımda. Çakışan süreçler kontrol ediliyor..."
+  echo "$pids" | xargs -r ps -o pid=,user=,comm= -p || true
+
+  # Önce servisleri durdur (varsa)
+  systemctl stop hostvim-engine 2>/dev/null || true
+  systemctl stop panelsar-engine 2>/dev/null || true
+  sleep 1
+
+  pids="$(lsof -ti :9090 2>/dev/null || true)"
+  [[ -n "$pids" ]] || return 0
+
+  foreign=0
+  for pid in $pids; do
+    comm="$(ps -p "$pid" -o comm= 2>/dev/null | tr -d '[:space:]')"
+    if [[ "$comm" =~ ^(hostvim-engine|panelsar-engine|go)$ ]]; then
+      kill -TERM "$pid" 2>/dev/null || true
+    else
+      foreign=1
+      echo "Hata: 9090 portunu Hostvim dışı süreç kullanıyor (pid=$pid, comm=$comm)." >&2
+    fi
+  done
+  sleep 1
+
+  pids="$(lsof -ti :9090 2>/dev/null || true)"
+  if [[ -n "$pids" ]]; then
+    foreign=0
+    for pid in $pids; do
+      comm="$(ps -p "$pid" -o comm= 2>/dev/null | tr -d '[:space:]')"
+      if [[ "$comm" =~ ^(hostvim-engine|panelsar-engine|go)$ ]]; then
+        kill -KILL "$pid" 2>/dev/null || true
+      else
+        foreign=1
+        echo "Hata: 9090 portu hâlâ Hostvim dışı süreçte (pid=$pid, comm=$comm)." >&2
+      fi
+    done
+    sleep 1
+    pids="$(lsof -ti :9090 2>/dev/null || true)"
+    if [[ -n "$pids" ]] || [[ "$foreign" -eq 1 ]]; then
+      echo "Kurulum durduruldu: 9090 portu boşaltılamadı. Güvenlik için dış süreçler öldürülmedi." >&2
+      return 1
+    fi
+  fi
+}
+
 # http(s)://host[:port]/yol -> host (FQDN). IP / localhost ise bos cikis (hata kodu 1).
 hostvim_url_hostname() {
   local raw="${1:-}"
@@ -388,8 +437,12 @@ sed \
   "$REPO_ROOT/deploy/systemd/hostvim-engine.service" > /etc/systemd/system/hostvim-engine.service
 systemctl daemon-reload
 if [[ -x /usr/local/bin/hostvim-engine ]]; then
+  ensure_engine_port_free
   systemctl enable hostvim-engine
-  systemctl restart hostvim-engine || true
+  if ! systemctl restart hostvim-engine; then
+    echo "Hata: hostvim-engine başlatılamadı. Son loglar:" >&2
+    journalctl -u hostvim-engine -n 80 --no-pager >&2 || true
+  fi
 fi
 
 # Engine www-data iken nginx sites-enabled'a yazamaz; sudo ile izinli betikler

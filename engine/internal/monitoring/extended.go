@@ -9,6 +9,7 @@ import (
 
 	"github.com/shirou/gopsutil/v3/cpu"
 	"github.com/shirou/gopsutil/v3/disk"
+	"github.com/shirou/gopsutil/v3/load"
 	"github.com/shirou/gopsutil/v3/mem"
 	"github.com/shirou/gopsutil/v3/process"
 )
@@ -33,15 +34,22 @@ type MountUsage struct {
 // ExtendedSnapshot Collect + CPU/RAM/disk detay ve top listeler.
 type ExtendedSnapshot struct {
 	SystemSnapshot
-	CPUModel           string         `json:"cpu_model"`
-	CPUCoresLogical    int            `json:"cpu_cores_logical"`
-	MemoryAvailable    uint64         `json:"memory_available"`
-	SwapTotal          uint64         `json:"swap_total"`
-	SwapUsed           uint64         `json:"swap_used"`
-	SwapPercent        float64        `json:"swap_percent"`
-	TopCPUProcesses    []ProcessTop   `json:"top_cpu_processes"`
-	TopMemoryProcesses []ProcessTop   `json:"top_memory_processes"`
-	TopDiskMounts      []MountUsage   `json:"top_disk_mounts"`
+	CPUModel             string       `json:"cpu_model"`
+	CPUCoresLogical      int          `json:"cpu_cores_logical"`
+	MemoryAvailable      uint64       `json:"memory_available"`
+	SwapTotal            uint64       `json:"swap_total"`
+	SwapUsed             uint64       `json:"swap_used"`
+	SwapPercent          float64      `json:"swap_percent"`
+	Load1                float64      `json:"load1"`
+	Load5                float64      `json:"load5"`
+	Load15               float64      `json:"load15"`
+	DiskReadBytesPerSec  float64      `json:"disk_read_bytes_per_sec"`
+	DiskWriteBytesPerSec float64      `json:"disk_write_bytes_per_sec"`
+	NetRxBytesPerSec     float64      `json:"net_rx_bytes_per_sec"`
+	NetTxBytesPerSec     float64      `json:"net_tx_bytes_per_sec"`
+	TopCPUProcesses      []ProcessTop `json:"top_cpu_processes"`
+	TopMemoryProcesses   []ProcessTop `json:"top_memory_processes"`
+	TopDiskMounts        []MountUsage `json:"top_disk_mounts"`
 }
 
 func skipMountFstype(fs string) bool {
@@ -72,6 +80,16 @@ func CollectExtended(rootPath string) ExtendedSnapshot {
 		out.SwapUsed = s.Used
 		out.SwapPercent = s.UsedPercent
 	}
+	if avg, err := load.Avg(); err == nil && avg != nil {
+		out.Load1 = avg.Load1
+		out.Load5 = avg.Load5
+		out.Load15 = avg.Load15
+	}
+	dr, dw, rx, tx := ComputeIORates()
+	out.DiskReadBytesPerSec = dr
+	out.DiskWriteBytesPerSec = dw
+	out.NetRxBytesPerSec = rx
+	out.NetTxBytesPerSec = tx
 
 	out.TopCPUProcesses = topCPUProcesses(3)
 	out.TopMemoryProcesses = topMemoryProcesses(3)

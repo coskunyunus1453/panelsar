@@ -880,6 +880,16 @@ class EngineApiService
     }
 
     /**
+     * @return array<string, mixed>
+     */
+    public function getSiteTraffic(string $domain, int $lines = 8000): array
+    {
+        $lines = max(100, min(20000, $lines));
+
+        return $this->get('/api/v1/sites/'.rawurlencode($domain).'/traffic?lines='.$lines);
+    }
+
+    /**
      * @return list<array<string, mixed>>
      */
     public function getStackModules(): array

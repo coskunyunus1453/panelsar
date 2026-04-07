@@ -16,23 +16,23 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/sirupsen/logrus"
+	"hostvim/engine/internal/backup"
 	"hostvim/engine/internal/config"
 	"hostvim/engine/internal/daemon"
-	"hostvim/engine/internal/middleware"
-	"hostvim/engine/internal/backup"
 	"hostvim/engine/internal/files"
 	"hostvim/engine/internal/hosting"
 	"hostvim/engine/internal/installer"
+	"hostvim/engine/internal/middleware"
 	"hostvim/engine/internal/monitoring"
 	"hostvim/engine/internal/nginx"
 	"hostvim/engine/internal/panelmirror"
 	"hostvim/engine/internal/phpfpm"
 	"hostvim/engine/internal/phpini"
-	"hostvim/engine/internal/sites"
 	"hostvim/engine/internal/security"
+	"hostvim/engine/internal/sites"
 	"hostvim/engine/internal/stack"
 	"hostvim/engine/internal/tools"
-	"github.com/sirupsen/logrus"
 )
 
 func registerModuleRoutes(cfg *config.Config, d *daemon.Daemon, api *gin.RouterGroup, log *logrus.Logger) {
@@ -42,25 +42,32 @@ func registerModuleRoutes(cfg *config.Config, d *daemon.Daemon, api *gin.RouterG
 		ext := monitoring.CollectExtended(cfg.Paths.WebRoot)
 		c.JSON(http.StatusOK, gin.H{
 			"data": gin.H{
-				"cpu_usage":            ext.CPUUsagePercent,
-				"memory_total":         ext.MemoryTotal,
-				"memory_used":          ext.MemoryUsed,
-				"memory_percent":       ext.MemoryPercent,
-				"disk_total":           ext.DiskTotal,
-				"disk_used":            ext.DiskUsed,
-				"disk_percent":         ext.DiskPercent,
-				"uptime":               ext.Uptime,
-				"hostname":             ext.Hostname,
-				"os":                   ext.OS,
-				"cpu_model":            ext.CPUModel,
-				"cpu_cores_logical":    ext.CPUCoresLogical,
-				"memory_available":     ext.MemoryAvailable,
-				"swap_total":           ext.SwapTotal,
-				"swap_used":            ext.SwapUsed,
-				"swap_percent":         ext.SwapPercent,
-				"top_cpu_processes":    ext.TopCPUProcesses,
-				"top_memory_processes": ext.TopMemoryProcesses,
-				"top_disk_mounts":      ext.TopDiskMounts,
+				"cpu_usage":                ext.CPUUsagePercent,
+				"memory_total":             ext.MemoryTotal,
+				"memory_used":              ext.MemoryUsed,
+				"memory_percent":           ext.MemoryPercent,
+				"disk_total":               ext.DiskTotal,
+				"disk_used":                ext.DiskUsed,
+				"disk_percent":             ext.DiskPercent,
+				"uptime":                   ext.Uptime,
+				"hostname":                 ext.Hostname,
+				"os":                       ext.OS,
+				"cpu_model":                ext.CPUModel,
+				"cpu_cores_logical":        ext.CPUCoresLogical,
+				"memory_available":         ext.MemoryAvailable,
+				"swap_total":               ext.SwapTotal,
+				"swap_used":                ext.SwapUsed,
+				"swap_percent":             ext.SwapPercent,
+				"load1":                    ext.Load1,
+				"load5":                    ext.Load5,
+				"load15":                   ext.Load15,
+				"disk_read_bytes_per_sec":  ext.DiskReadBytesPerSec,
+				"disk_write_bytes_per_sec": ext.DiskWriteBytesPerSec,
+				"net_rx_bytes_per_sec":     ext.NetRxBytesPerSec,
+				"net_tx_bytes_per_sec":     ext.NetTxBytesPerSec,
+				"top_cpu_processes":        ext.TopCPUProcesses,
+				"top_memory_processes":     ext.TopMemoryProcesses,
+				"top_disk_mounts":          ext.TopDiskMounts,
 			},
 		})
 	})
@@ -148,6 +155,24 @@ func registerModuleRoutes(cfg *config.Config, d *daemon.Daemon, api *gin.RouterG
 			return
 		}
 		c.JSON(http.StatusOK, gin.H{"domain": d, "bytes": n, "exists": true})
+	})
+
+	api.GET("/sites/:domain/traffic", func(c *gin.Context) {
+		d := strings.ToLower(strings.TrimSpace(c.Param("domain")))
+		if d == "" || strings.Contains(d, "..") || !nginx.DomainSafe(d) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid domain"})
+			return
+		}
+		lines := 8000
+		if q := strings.TrimSpace(c.Query("lines")); q != "" {
+			if qn, err := strconv.Atoi(q); err == nil {
+				lines = qn
+			}
+		}
+		nginxAccess := filepath.Join(cfg.Paths.LogDir, d+"_access.log")
+		apacheAccess := filepath.Join("/var/log/apache2", "hostvim-"+d+"-access.log")
+		sum := monitoring.AnalyzeSiteTraffic(nginxAccess, apacheAccess, lines)
+		c.JSON(http.StatusOK, gin.H{"domain": d, "traffic": sum})
 	})
 
 	api.GET("/dns/:domain", func(c *gin.Context) {
@@ -334,10 +359,10 @@ func registerModuleRoutes(cfg *config.Config, d *daemon.Daemon, api *gin.RouterG
 				"error":     msErrDisp,
 			},
 			"clamav": gin.H{
-				"enabled":    clamavOn,
-				"installed":  cvInstalled,
-				"last_scan":  nullIfEmpty(clamavLast),
-				"error":      cvErrDisp,
+				"enabled":   clamavOn,
+				"installed": cvInstalled,
+				"last_scan": nullIfEmpty(clamavLast),
+				"error":     cvErrDisp,
 			},
 		})
 	})
@@ -669,21 +694,21 @@ func registerModuleRoutes(cfg *config.Config, d *daemon.Daemon, api *gin.RouterG
 	api.GET("/webserver/settings", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
 			"settings": gin.H{
-				"nginx_manage_vhosts":       cfg.Hosting.NginxManageVhosts,
-				"nginx_reload_after_vhost":  cfg.Hosting.NginxReloadAfterVhost,
-				"apache_manage_vhosts":      cfg.Hosting.ApacheManageVhosts,
-				"apache_reload_after_vhost": cfg.Hosting.ApacheReloadAfterVhost,
-				"openlitespeed_manage_vhosts":       cfg.Hosting.OLSManageVhosts,
-				"openlitespeed_conf_root":           strings.TrimSpace(cfg.Hosting.OLSConfRoot),
-				"openlitespeed_reload_after_vhost":  cfg.Hosting.OLSReloadAfterVhost,
-				"openlitespeed_ctrl_path":           strings.TrimSpace(cfg.Hosting.OLSCtrlPath),
-				"php_fpm_manage_pools":      cfg.Hosting.PHPFPMmanagePools,
-				"php_fpm_reload_after_pool": cfg.Hosting.PHPFPMreloadAfterPool,
-				"php_fpm_socket":            cfg.Hosting.PHPFPMsocket,
-				"php_fpm_listen_dir":        cfg.Hosting.PHPFPMlistenDir,
-				"php_fpm_pool_dir_template": cfg.Hosting.PHPFPMpoolDirTemplate,
-				"php_fpm_pool_user":         cfg.Hosting.PHPFPMpoolUser,
-				"php_fpm_pool_group":        cfg.Hosting.PHPFPMpoolGroup,
+				"nginx_manage_vhosts":              cfg.Hosting.NginxManageVhosts,
+				"nginx_reload_after_vhost":         cfg.Hosting.NginxReloadAfterVhost,
+				"apache_manage_vhosts":             cfg.Hosting.ApacheManageVhosts,
+				"apache_reload_after_vhost":        cfg.Hosting.ApacheReloadAfterVhost,
+				"openlitespeed_manage_vhosts":      cfg.Hosting.OLSManageVhosts,
+				"openlitespeed_conf_root":          strings.TrimSpace(cfg.Hosting.OLSConfRoot),
+				"openlitespeed_reload_after_vhost": cfg.Hosting.OLSReloadAfterVhost,
+				"openlitespeed_ctrl_path":          strings.TrimSpace(cfg.Hosting.OLSCtrlPath),
+				"php_fpm_manage_pools":             cfg.Hosting.PHPFPMmanagePools,
+				"php_fpm_reload_after_pool":        cfg.Hosting.PHPFPMreloadAfterPool,
+				"php_fpm_socket":                   cfg.Hosting.PHPFPMsocket,
+				"php_fpm_listen_dir":               cfg.Hosting.PHPFPMlistenDir,
+				"php_fpm_pool_dir_template":        cfg.Hosting.PHPFPMpoolDirTemplate,
+				"php_fpm_pool_user":                cfg.Hosting.PHPFPMpoolUser,
+				"php_fpm_pool_group":               cfg.Hosting.PHPFPMpoolGroup,
 			},
 		})
 	})
@@ -719,9 +744,9 @@ func registerModuleRoutes(cfg *config.Config, d *daemon.Daemon, api *gin.RouterG
 
 			c.JSON(http.StatusOK, gin.H{
 				"services": gin.H{
-					"nginx":           check("nginx"),
-					"apache":          check("apache2"),
-					"openlitespeed":   gin.H{"installed": olsInstalled, "active": olsActive},
+					"nginx":         check("nginx"),
+					"apache":        check("apache2"),
+					"openlitespeed": gin.H{"installed": olsInstalled, "active": olsActive},
 				},
 			})
 			return
@@ -779,22 +804,22 @@ func registerModuleRoutes(cfg *config.Config, d *daemon.Daemon, api *gin.RouterG
 
 	api.PATCH("/webserver/settings", func(c *gin.Context) {
 		var req struct {
-			NginxManageVhosts      *bool   `json:"nginx_manage_vhosts"`
-			NginxReloadAfterVhost  *bool   `json:"nginx_reload_after_vhost"`
-			ApacheManageVhosts     *bool   `json:"apache_manage_vhosts"`
-			ApacheReloadAfterVhost *bool   `json:"apache_reload_after_vhost"`
+			NginxManageVhosts             *bool   `json:"nginx_manage_vhosts"`
+			NginxReloadAfterVhost         *bool   `json:"nginx_reload_after_vhost"`
+			ApacheManageVhosts            *bool   `json:"apache_manage_vhosts"`
+			ApacheReloadAfterVhost        *bool   `json:"apache_reload_after_vhost"`
 			OpenLiteSpeedManageVhosts     *bool   `json:"openlitespeed_manage_vhosts"`
 			OpenLiteSpeedConfRoot         *string `json:"openlitespeed_conf_root"`
 			OpenLiteSpeedReloadAfterVhost *bool   `json:"openlitespeed_reload_after_vhost"`
 			OpenLiteSpeedCtrlPath         *string `json:"openlitespeed_ctrl_path"`
-			PhpFpmManagePools      *bool   `json:"php_fpm_manage_pools"`
-			PhpFpmReloadAfterPool  *bool   `json:"php_fpm_reload_after_pool"`
-			PhpFpmSocket           *string `json:"php_fpm_socket"`
-			PhpFpmListenDir        *string `json:"php_fpm_listen_dir"`
-			PhpFpmPoolDirTemplate  *string `json:"php_fpm_pool_dir_template"`
-			PhpFpmPoolUser         *string `json:"php_fpm_pool_user"`
-			PhpFpmPoolGroup        *string `json:"php_fpm_pool_group"`
-			Reload                 *bool   `json:"reload"`
+			PhpFpmManagePools             *bool   `json:"php_fpm_manage_pools"`
+			PhpFpmReloadAfterPool         *bool   `json:"php_fpm_reload_after_pool"`
+			PhpFpmSocket                  *string `json:"php_fpm_socket"`
+			PhpFpmListenDir               *string `json:"php_fpm_listen_dir"`
+			PhpFpmPoolDirTemplate         *string `json:"php_fpm_pool_dir_template"`
+			PhpFpmPoolUser                *string `json:"php_fpm_pool_user"`
+			PhpFpmPoolGroup               *string `json:"php_fpm_pool_group"`
+			Reload                        *bool   `json:"reload"`
 		}
 		if err := c.ShouldBindJSON(&req); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -909,21 +934,21 @@ func registerModuleRoutes(cfg *config.Config, d *daemon.Daemon, api *gin.RouterG
 		c.JSON(http.StatusOK, gin.H{
 			"message": "webserver settings updated",
 			"settings": gin.H{
-				"nginx_manage_vhosts":       cfg.Hosting.NginxManageVhosts,
-				"nginx_reload_after_vhost":  cfg.Hosting.NginxReloadAfterVhost,
-				"apache_manage_vhosts":      cfg.Hosting.ApacheManageVhosts,
-				"apache_reload_after_vhost": cfg.Hosting.ApacheReloadAfterVhost,
-				"openlitespeed_manage_vhosts":       cfg.Hosting.OLSManageVhosts,
-				"openlitespeed_conf_root":           strings.TrimSpace(cfg.Hosting.OLSConfRoot),
-				"openlitespeed_reload_after_vhost":  cfg.Hosting.OLSReloadAfterVhost,
-				"openlitespeed_ctrl_path":           strings.TrimSpace(cfg.Hosting.OLSCtrlPath),
-				"php_fpm_manage_pools":      cfg.Hosting.PHPFPMmanagePools,
-				"php_fpm_reload_after_pool": cfg.Hosting.PHPFPMreloadAfterPool,
-				"php_fpm_socket":            cfg.Hosting.PHPFPMsocket,
-				"php_fpm_listen_dir":        cfg.Hosting.PHPFPMlistenDir,
-				"php_fpm_pool_dir_template": cfg.Hosting.PHPFPMpoolDirTemplate,
-				"php_fpm_pool_user":         cfg.Hosting.PHPFPMpoolUser,
-				"php_fpm_pool_group":        cfg.Hosting.PHPFPMpoolGroup,
+				"nginx_manage_vhosts":              cfg.Hosting.NginxManageVhosts,
+				"nginx_reload_after_vhost":         cfg.Hosting.NginxReloadAfterVhost,
+				"apache_manage_vhosts":             cfg.Hosting.ApacheManageVhosts,
+				"apache_reload_after_vhost":        cfg.Hosting.ApacheReloadAfterVhost,
+				"openlitespeed_manage_vhosts":      cfg.Hosting.OLSManageVhosts,
+				"openlitespeed_conf_root":          strings.TrimSpace(cfg.Hosting.OLSConfRoot),
+				"openlitespeed_reload_after_vhost": cfg.Hosting.OLSReloadAfterVhost,
+				"openlitespeed_ctrl_path":          strings.TrimSpace(cfg.Hosting.OLSCtrlPath),
+				"php_fpm_manage_pools":             cfg.Hosting.PHPFPMmanagePools,
+				"php_fpm_reload_after_pool":        cfg.Hosting.PHPFPMreloadAfterPool,
+				"php_fpm_socket":                   cfg.Hosting.PHPFPMsocket,
+				"php_fpm_listen_dir":               cfg.Hosting.PHPFPMlistenDir,
+				"php_fpm_pool_dir_template":        cfg.Hosting.PHPFPMpoolDirTemplate,
+				"php_fpm_pool_user":                cfg.Hosting.PHPFPMpoolUser,
+				"php_fpm_pool_group":               cfg.Hosting.PHPFPMpoolGroup,
 			},
 			"reload": reloadResult,
 		})
@@ -1357,14 +1382,16 @@ func registerModuleRoutes(cfg *config.Config, d *daemon.Daemon, api *gin.RouterG
 		})
 
 		engineInternal.POST("/system/reboot", func(c *gin.Context) {
-			// Basit ve açık: sistem bazlı reboot. Çoğu dağıtımda systemctl reboot veya shutdown -r now çalışır.
-			go func() {
-				if _, err := exec.LookPath("systemctl"); err == nil {
-					_ = exec.Command("systemctl", "reboot").Run()
-					return
-				}
-				_ = exec.Command("shutdown", "-r", "now").Run()
-			}()
+			cmd := exec.Command("sudo", "-n", "/usr/local/sbin/hostvim-security", "reboot")
+			out, err := cmd.CombinedOutput()
+			if err != nil {
+				log.WithError(err).WithField("output", strings.TrimSpace(string(out))).Warn("system reboot request failed")
+				c.JSON(http.StatusBadGateway, gin.H{
+					"error":   "reboot request failed",
+					"details": strings.TrimSpace(string(out)),
+				})
+				return
+			}
 			c.JSON(http.StatusAccepted, gin.H{"message": "reboot requested"})
 		})
 

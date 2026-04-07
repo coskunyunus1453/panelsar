@@ -96,6 +96,7 @@ Route::middleware(['auth:sanctum', 'abilities:access:customer-panel'])->group(fu
         Route::get('domains', [DomainController::class, 'index']);
         Route::get('domains/{domain}', [DomainController::class, 'show']);
         Route::get('domains/{domain}/logs', [DomainController::class, 'logs']);
+        Route::get('domains/{domain}/traffic', [DomainController::class, 'traffic']);
     });
     Route::middleware('ability:domains:write')->group(function () {
         Route::post('domains', [DomainController::class, 'store']);
@@ -281,6 +282,8 @@ Route::middleware(['auth:sanctum', 'abilities:access:customer-panel'])->group(fu
     Route::middleware(['role:admin|vendor_admin|vendor_support|vendor_finance|vendor_devops', 'require_admin_2fa'])->prefix('system')->group(function () {
         Route::get('stats', [SystemController::class, 'stats']);
         Route::get('services', [SystemController::class, 'services']);
+        Route::get('panel/health', [SystemController::class, 'panelHealth']);
+        Route::post('panel/repair', [SystemController::class, 'panelRepair']);
         Route::get('processes', [SystemController::class, 'processes']);
         Route::post('processes/kill', [SystemController::class, 'killProcess']);
         Route::post('services/{name}', [SystemController::class, 'serviceAction']);
@@ -340,6 +343,7 @@ Route::middleware(['auth:sanctum', 'abilities:access:customer-panel'])->group(fu
     Route::prefix('admin')->middleware(['role:admin', 'require_admin_2fa', 'ability:php:write'])->group(function () {
         Route::put('settings/php/{version}/ini', [PhpSettingsController::class, 'updateIni']);
         Route::patch('settings/php/{version}/modules', [PhpSettingsController::class, 'updateModules']);
+        Route::post('settings/php/sync-nginx-upload-limit', [PhpSettingsController::class, 'syncNginxUploadLimit']);
     });
 
     Route::middleware('role:reseller|admin|vendor_admin')->prefix('reseller')->group(function () {

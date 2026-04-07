@@ -17,7 +17,15 @@ type PhpModule = {
   enabled: boolean
 }
 
-type IniResponse = { path?: string; ini: string }
+type LimitsSync = {
+  php_upload_max_filesize_mb?: number
+  php_post_max_size_mb?: number
+  effective_php_limit_mb?: number
+  file_manager_limit_mb?: number
+  nginx_hint_client_max_body_size_mb?: number
+  message?: string
+}
+type IniResponse = { path?: string; ini: string; file_manager_limit_mb?: number; limits_sync?: LimitsSync }
 type ModulesResponse = { path?: string; modules: PhpModule[] }
 type VersionsResponse = { versions: string[] }
 
@@ -113,9 +121,16 @@ export default function AdminPhpSettingsPage() {
 
   const [iniText, setIniText] = useState('')
   const [moduleState, setModuleState] = useState<PhpModule[]>([])
+  const [limitsSync, setLimitsSync] = useState<LimitsSync | null>(null)
 
   useEffect(() => {
     if (iniQ.data?.ini != null) setIniText(iniQ.data.ini)
+    if (iniQ.data?.file_manager_limit_mb != null) {
+      setLimitsSync((prev) => ({
+        ...prev,
+        file_manager_limit_mb: iniQ.data?.file_manager_limit_mb,
+      }))
+    }
   }, [iniQ.data])
 
   useEffect(() => {
@@ -156,15 +171,39 @@ export default function AdminPhpSettingsPage() {
   const saveIniM = useMutation({
     mutationFn: async () => {
       if (!version) return
-      return api.put(`/admin/settings/php/${encodeURIComponent(version)}/ini`, {
+      const { data } = await api.put(`/admin/settings/php/${encodeURIComponent(version)}/ini`, {
         reload: true,
         ini: iniText,
       })
+      return data as IniResponse
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       toast.success(t('php_settings.ini_saved'))
+      if (data?.limits_sync) {
+        setLimitsSync(data.limits_sync)
+      }
       void modulesQ.refetch()
       void iniQ.refetch()
+    },
+    onError: (err: unknown) => {
+      const ax = err as { response?: { data?: { message?: string } } }
+      toast.error(ax.response?.data?.message ?? String(err))
+    },
+  })
+
+  const syncNginxLimitM = useMutation({
+    mutationFn: async () => {
+      const targetMb = limitsSync?.nginx_hint_client_max_body_size_mb
+      if (!targetMb || targetMb < 1) {
+        throw new Error(t('php_settings.upload_sync.no_target'))
+      }
+      await api.post('/admin/settings/php/sync-nginx-upload-limit', {
+        limit_mb: targetMb,
+        scope: 'panel',
+      })
+    },
+    onSuccess: () => {
+      toast.success(t('php_settings.upload_sync.nginx_saved'))
     },
     onError: (err: unknown) => {
       const ax = err as { response?: { data?: { message?: string } } }
@@ -196,6 +235,15 @@ export default function AdminPhpSettingsPage() {
   const saveIniDisabled = disabled || saveIniM.isPending || iniQ.isLoading || !hasAnyLoaded
 
   const canEditIni = useMemo(() => canWrite, [canWrite])
+  const effectiveLimits = useMemo(() => {
+    const upload = limitsSync?.php_upload_max_filesize_mb
+    const post = limitsSync?.php_post_max_size_mb
+    const phpEffective = limitsSync?.effective_php_limit_mb
+    const appLimit = limitsSync?.file_manager_limit_mb
+    const nginxHint = limitsSync?.nginx_hint_client_max_body_size_mb
+    const hasData = [upload, post, phpEffective, appLimit, nginxHint].some((v) => typeof v === 'number' && v > 0)
+    return { upload, post, phpEffective, appLimit, nginxHint, hasData }
+  }, [limitsSync])
 
   const tabs: { id: TabId; icon: typeof SlidersHorizontal; label: string }[] = [
     { id: 'quick', icon: SlidersHorizontal, label: t('php_settings.tabs.quick') },
@@ -274,6 +322,48 @@ export default function AdminPhpSettingsPage() {
       <div className="min-h-[12rem]" role="tabpanel">
         {activeTab === 'quick' && (
           <div className="card p-4 sm:p-6 space-y-6">
+            {effectiveLimits.hasData && (
+              <div className="rounded-xl border border-primary-200/70 dark:border-primary-900/50 bg-primary-50/60 dark:bg-primary-950/20 p-4">
+                <p className="text-sm font-semibold text-primary-800 dark:text-primary-300">
+                  {t('php_settings.upload_sync.title')}
+                </p>
+                <p className="mt-1 text-xs text-primary-700/80 dark:text-primary-300/80">
+                  {limitsSync?.message || t('php_settings.upload_sync.hint')}
+                </p>
+                <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 text-xs">
+                  <div className="rounded-lg bg-white/70 dark:bg-gray-900/40 px-3 py-2">
+                    <span className="text-gray-500 dark:text-gray-400">{t('php_settings.upload_sync.upload')}</span>
+                    <div className="font-semibold text-gray-900 dark:text-gray-200">{effectiveLimits.upload ?? '—'} MB</div>
+                  </div>
+                  <div className="rounded-lg bg-white/70 dark:bg-gray-900/40 px-3 py-2">
+                    <span className="text-gray-500 dark:text-gray-400">{t('php_settings.upload_sync.post')}</span>
+                    <div className="font-semibold text-gray-900 dark:text-gray-200">{effectiveLimits.post ?? '—'} MB</div>
+                  </div>
+                  <div className="rounded-lg bg-white/70 dark:bg-gray-900/40 px-3 py-2">
+                    <span className="text-gray-500 dark:text-gray-400">{t('php_settings.upload_sync.effective')}</span>
+                    <div className="font-semibold text-gray-900 dark:text-gray-200">{effectiveLimits.phpEffective ?? '—'} MB</div>
+                  </div>
+                  <div className="rounded-lg bg-white/70 dark:bg-gray-900/40 px-3 py-2">
+                    <span className="text-gray-500 dark:text-gray-400">{t('php_settings.upload_sync.app')}</span>
+                    <div className="font-semibold text-gray-900 dark:text-gray-200">{effectiveLimits.appLimit ?? '—'} MB</div>
+                  </div>
+                  <div className="rounded-lg bg-white/70 dark:bg-gray-900/40 px-3 py-2">
+                    <span className="text-gray-500 dark:text-gray-400">{t('php_settings.upload_sync.nginx')}</span>
+                    <div className="font-semibold text-gray-900 dark:text-gray-200">{effectiveLimits.nginxHint ?? '—'} MB</div>
+                  </div>
+                </div>
+                <div className="mt-3">
+                  <button
+                    type="button"
+                    className="btn-secondary min-h-[40px]"
+                    disabled={!canWrite || syncNginxLimitM.isPending || !effectiveLimits.nginxHint}
+                    onClick={() => syncNginxLimitM.mutate()}
+                  >
+                    {t('php_settings.upload_sync.sync_nginx')}
+                  </button>
+                </div>
+              </div>
+            )}
             <PhpQuickSettingsPanel
               iniText={iniText}
               setIniText={setIniText}

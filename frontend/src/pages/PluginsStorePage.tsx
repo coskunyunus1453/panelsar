@@ -38,6 +38,7 @@ type DiscoverResponse = {
   path_candidates?: { path: string; ok: boolean }[]
   db_names?: string[]
   db_users?: string[]
+  suggested_db_user?: string | null
 }
 
 export default function PluginsStorePage() {
@@ -59,10 +60,17 @@ export default function PluginsStorePage() {
   const [dbHost, setDbHost] = useState('127.0.0.1')
   const [dbPort, setDbPort] = useState('3306')
   const [dryRun, setDryRun] = useState(true)
+  const [skipDbPreflight, setSkipDbPreflight] = useState(true)
   const [wizardStep, setWizardStep] = useState<1 | 2 | 3>(1)
   const [preflight, setPreflight] = useState<PreflightResponse | null>(null)
   const [discoverData, setDiscoverData] = useState<DiscoverResponse | null>(null)
   const [sourcePreset, setSourcePreset] = useState<'cpanel' | 'plesk' | 'aapanel' | 'custom'>('custom')
+  const [sourceDomain, setSourceDomain] = useState('')
+
+  const pluginSource = configModule?.config?.source as 'cpanel' | 'plesk' | 'aapanel' | undefined
+  const isPresetMigration =
+    pluginSource === 'cpanel' || pluginSource === 'plesk' || pluginSource === 'aapanel'
+  const isSimplePanel = isPresetMigration
 
   const q = useQuery({
     queryKey: ['plugins-store'],
@@ -77,6 +85,42 @@ export default function PluginsStorePage() {
     queryKey: ['domains-lite'],
     queryFn: async () => (await api.get('/domains')).data.data as DomainRow[],
   })
+
+  const targetDomainName = useMemo(() => {
+    if (targetDomainId === '') return ''
+    const d = domainsQ.data?.find((x) => x.id === targetDomainId)
+    return (d?.name ?? '').trim()
+  }, [targetDomainId, domainsQ.data])
+
+  const effectiveSiteDomain = useMemo(() => {
+    const o = sourceDomain.trim()
+    if (o) return o
+    return targetDomainName
+  }, [sourceDomain, targetDomainName])
+
+  const standardPath = useMemo(() => {
+    if (!pluginSource) return ''
+    const u = sourceUser.trim()
+    const dom = effectiveSiteDomain.trim()
+    switch (pluginSource) {
+      case 'cpanel':
+        return u ? `/home/${u}/public_html` : ''
+      case 'plesk':
+        return dom ? `/var/www/vhosts/${dom}/httpdocs` : ''
+      case 'aapanel':
+        return dom ? `/www/wwwroot/${dom}` : ''
+      default:
+        return ''
+    }
+  }, [pluginSource, sourceUser, effectiveSiteDomain])
+
+  const resolvedSourcePath = useMemo(
+    () =>
+      sourcePath.trim() ||
+      discoverData?.suggested_source_path?.trim() ||
+      (isPresetMigration ? standardPath : ''),
+    [sourcePath, discoverData?.suggested_source_path, isPresetMigration, standardPath]
+  )
 
   const installM = useMutation({
     mutationFn: async (id: number) => api.post(`/plugins/${id}/install`),
@@ -107,7 +151,7 @@ export default function PluginsStorePage() {
         source_host: sourceHost,
         source_port: Number(sourcePort || 22),
         source_user: sourceUser,
-        source_path: sourcePath,
+        source_path: resolvedSourcePath,
         target_domain_id: Number(targetDomainId),
         auth_type: authType,
         password: authType === 'password' ? secret : null,
@@ -133,7 +177,7 @@ export default function PluginsStorePage() {
         source_host: sourceHost,
         source_port: Number(sourcePort || 22),
         source_user: sourceUser,
-        source_path: sourcePath,
+        source_path: resolvedSourcePath,
         target_domain_id: Number(targetDomainId),
         auth_type: authType,
         ssh_private_key: authType === 'ssh_key' ? secret : null,
@@ -142,6 +186,7 @@ export default function PluginsStorePage() {
         source_db_password: dbPass || null,
         source_db_host: dbHost || null,
         source_db_port: Number(dbPort || 3306),
+        skip_db: skipDbPreflight,
       })).data as PreflightResponse,
     onSuccess: (data) => {
       setPreflight(data)
@@ -154,14 +199,22 @@ export default function PluginsStorePage() {
         source_host: sourceHost,
         source_port: Number(sourcePort || 22),
         source_user: sourceUser,
+        source_domain:
+          pluginSource === 'plesk' ||
+          sourcePreset === 'plesk' ||
+          pluginSource === 'aapanel' ||
+          sourcePreset === 'aapanel'
+            ? effectiveSiteDomain || null
+            : null,
         auth_type: 'ssh_key',
         ssh_private_key: secret,
       })).data as DiscoverResponse,
     onSuccess: (data) => {
       setDiscoverData(data)
       if (data.suggested_source_path) setSourcePath(data.suggested_source_path)
-      if ((data.db_names?.length ?? 0) > 0 && !dbName) setDbName(data.db_names![0])
-      if ((data.db_users?.length ?? 0) > 0 && !dbUser) setDbUser(data.db_users![0])
+      setDbName((prev) => prev.trim() || data.db_names?.[0] || '')
+      const su = data.suggested_db_user || data.db_users?.[0]
+      setDbUser((prev) => prev.trim() || su || '')
       toast.success(t('plugins.discover_done'))
     },
   })
@@ -183,13 +236,30 @@ export default function PluginsStorePage() {
   const step1Missing = useMemo(() => {
     const missing: string[] = []
     if (!sourceHost.trim()) missing.push(t('plugins.source_host'))
-    if (!sourcePath.trim()) missing.push(t('plugins.source_path'))
+    if (!resolvedSourcePath) {
+      if (isPresetMigration && (pluginSource === 'plesk' || pluginSource === 'aapanel') && !effectiveSiteDomain.trim()) {
+        missing.push(t('plugins.need_target_or_domain'))
+      } else {
+        missing.push(t('plugins.source_path'))
+      }
+    }
     if (targetDomainId === '') missing.push(t('plugins.target_domain'))
     if (!sourceUser.trim()) missing.push(t('plugins.source_user'))
     if (!sourcePort.trim()) missing.push(t('plugins.source_port'))
     if (!secret.trim()) missing.push(t('plugins.secret'))
     return missing
-  }, [secret, sourceHost, sourcePath, sourcePort, sourceUser, targetDomainId, t])
+  }, [
+    secret,
+    sourceHost,
+    resolvedSourcePath,
+    sourcePort,
+    sourceUser,
+    targetDomainId,
+    isPresetMigration,
+    pluginSource,
+    effectiveSiteDomain,
+    t,
+  ])
 
   const step2HasBlockingError = useMemo(() => preflight !== null && preflight.ok === false, [preflight])
   const requiredFieldSet = useMemo(() => new Set(step1Missing), [step1Missing])
@@ -331,9 +401,13 @@ export default function PluginsStorePage() {
                           setDbHost('127.0.0.1')
                           setDbPort('3306')
                           setDryRun(true)
+                          setSkipDbPreflight(false)
                           setPreflight(null)
                           setDiscoverData(null)
-                          setSourcePreset('custom')
+                          setSourceDomain('')
+                          const src = m.config?.source
+                          if (src === 'cpanel' || src === 'plesk' || src === 'aapanel') setSourcePreset(src)
+                          else setSourcePreset('custom')
                           setWizardStep(1)
                         }}
                       >
@@ -378,21 +452,27 @@ export default function PluginsStorePage() {
               </div>
               {wizardStep === 1 && (
                 <>
+              {isPresetMigration && (
+                <p className="rounded-md border border-primary-200 bg-primary-50/80 px-2 py-1.5 text-xs text-primary-900 dark:border-primary-900/40 dark:bg-primary-950/30 dark:text-primary-200">
+                  {t('plugins.migration_ssh_only_hint')}
+                </p>
+              )}
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-xs text-gray-500">{t('plugins.source_preset')}:</span>
-                <button type="button" className={`rounded-md border px-2 py-1 text-xs ${sourcePreset === 'cpanel' ? 'border-primary-500 bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-200' : 'border-gray-200 dark:border-gray-700'}`} onClick={() => { setSourcePreset('cpanel'); setSourcePort('22'); if (!sourcePath) setSourcePath('/home/USER/public_html') }}>cPanel</button>
-                <button type="button" className={`rounded-md border px-2 py-1 text-xs ${sourcePreset === 'plesk' ? 'border-primary-500 bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-200' : 'border-gray-200 dark:border-gray-700'}`} onClick={() => { setSourcePreset('plesk'); setSourcePort('22'); if (!sourcePath) setSourcePath('/var/www/vhosts/example.com/httpdocs') }}>Plesk</button>
-                <button type="button" className={`rounded-md border px-2 py-1 text-xs ${sourcePreset === 'aapanel' ? 'border-primary-500 bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-200' : 'border-gray-200 dark:border-gray-700'}`} onClick={() => { setSourcePreset('aapanel'); setSourcePort('22'); if (!sourcePath) setSourcePath('/www/wwwroot/example.com') }}>aaPanel</button>
+                {pluginSource ? (
+                  <span className="rounded-md border border-primary-200 bg-primary-50 px-2 py-1 text-xs capitalize text-primary-800 dark:border-primary-800 dark:bg-primary-900/40 dark:text-primary-200">
+                    {pluginSource}
+                  </span>
+                ) : (
+                  <>
+                    <button type="button" className={`rounded-md border px-2 py-1 text-xs ${sourcePreset === 'cpanel' ? 'border-primary-500 bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-200' : 'border-gray-200 dark:border-gray-700'}`} onClick={() => { setSourcePreset('cpanel'); setSourcePort('22'); if (!sourcePath) setSourcePath('/home/USER/public_html') }}>cPanel</button>
+                    <button type="button" className={`rounded-md border px-2 py-1 text-xs ${sourcePreset === 'plesk' ? 'border-primary-500 bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-200' : 'border-gray-200 dark:border-gray-700'}`} onClick={() => { setSourcePreset('plesk'); setSourcePort('22'); if (!sourcePath) setSourcePath('') }}>Plesk</button>
+                    <button type="button" className={`rounded-md border px-2 py-1 text-xs ${sourcePreset === 'aapanel' ? 'border-primary-500 bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-200' : 'border-gray-200 dark:border-gray-700'}`} onClick={() => { setSourcePreset('aapanel'); setSourcePort('22'); if (!sourcePath) setSourcePath('/www/wwwroot/example.com') }}>aaPanel</button>
+                  </>
+                )}
               </div>
               <input className={`input w-full ${requiredFieldSet.has(t('plugins.source_host')) ? 'border-red-500 focus:border-red-500 focus:ring-red-200' : ''}`} placeholder={t('plugins.source_host')} value={sourceHost} onChange={(e) => setSourceHost(e.target.value)} />
               {requiredFieldSet.has(t('plugins.source_host')) && <p className="text-xs text-red-600">{t('plugins.required_field_hint')}</p>}
-              <input className={`input w-full ${requiredFieldSet.has(t('plugins.source_path')) ? 'border-red-500 focus:border-red-500 focus:ring-red-200' : ''}`} placeholder={t('plugins.source_path')} value={sourcePath} onChange={(e) => setSourcePath(e.target.value)} />
-              {requiredFieldSet.has(t('plugins.source_path')) && <p className="text-xs text-red-600">{t('plugins.required_field_hint')}</p>}
-              <select className={`input w-full ${requiredFieldSet.has(t('plugins.target_domain')) ? 'border-red-500 focus:border-red-500 focus:ring-red-200' : ''}`} value={targetDomainId} onChange={(e) => setTargetDomainId(e.target.value ? Number(e.target.value) : '')}>
-                <option value="">{t('plugins.target_domain')}</option>
-                {(domainsQ.data ?? []).map((d) => (<option key={d.id} value={d.id}>{d.name}</option>))}
-              </select>
-              {requiredFieldSet.has(t('plugins.target_domain')) && <p className="text-xs text-red-600">{t('plugins.required_field_hint')}</p>}
               <div className="grid grid-cols-2 gap-2">
                 <input className={`input w-full ${requiredFieldSet.has(t('plugins.source_port')) ? 'border-red-500 focus:border-red-500 focus:ring-red-200' : ''}`} placeholder={t('plugins.source_port')} value={sourcePort} onChange={(e) => setSourcePort(e.target.value)} />
                 <input className={`input w-full ${requiredFieldSet.has(t('plugins.source_user')) ? 'border-red-500 focus:border-red-500 focus:ring-red-200' : ''}`} placeholder={t('plugins.source_user')} value={sourceUser} onChange={(e) => setSourceUser(e.target.value)} />
@@ -400,15 +480,75 @@ export default function PluginsStorePage() {
               {(requiredFieldSet.has(t('plugins.source_port')) || requiredFieldSet.has(t('plugins.source_user'))) && (
                 <p className="text-xs text-red-600">{t('plugins.required_field_hint')}</p>
               )}
-              <div className="grid grid-cols-2 gap-2">
-                <select className="input w-full" value={authType} onChange={(e) => setAuthType(e.target.value as 'password' | 'token' | 'ssh_key')}>
-                  <option value="password">{t('plugins.auth_password')}</option>
-                  <option value="token">{t('plugins.auth_token')}</option>
-                  <option value="ssh_key">{t('plugins.auth_ssh_key')}</option>
-                </select>
-                <input type="password" className={`input w-full ${requiredFieldSet.has(t('plugins.secret')) ? 'border-red-500 focus:border-red-500 focus:ring-red-200' : ''}`} placeholder={t('plugins.secret')} value={secret} onChange={(e) => setSecret(e.target.value)} />
-              </div>
+              <select className={`input w-full ${requiredFieldSet.has(t('plugins.target_domain')) ? 'border-red-500 focus:border-red-500 focus:ring-red-200' : ''}`} value={targetDomainId} onChange={(e) => setTargetDomainId(e.target.value ? Number(e.target.value) : '')}>
+                <option value="">{t('plugins.target_domain')}</option>
+                {(domainsQ.data ?? []).map((d) => (<option key={d.id} value={d.id}>{d.name}</option>))}
+              </select>
+              {requiredFieldSet.has(t('plugins.target_domain')) && <p className="text-xs text-red-600">{t('plugins.required_field_hint')}</p>}
+              {(pluginSource === 'plesk' || sourcePreset === 'plesk' || pluginSource === 'aapanel' || sourcePreset === 'aapanel') && (
+                <input className="input w-full" placeholder={t('plugins.source_domain_optional')} value={sourceDomain} onChange={(e) => setSourceDomain(e.target.value)} />
+              )}
+              {configModule.category === 'migration' ? (
+                <div className="space-y-1">
+                  <label className="text-xs text-gray-600 dark:text-gray-400">{t('plugins.auth_ssh_key')}</label>
+                  <textarea
+                    className={`input w-full min-h-[88px] resize-y font-mono text-xs ${requiredFieldSet.has(t('plugins.secret')) ? 'border-red-500 focus:border-red-500 focus:ring-red-200' : ''}`}
+                    placeholder={t('plugins.ssh_key_placeholder')}
+                    value={secret}
+                    onChange={(e) => setSecret(e.target.value)}
+                    spellCheck={false}
+                  />
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-2">
+                  <select className="input w-full" value={authType} onChange={(e) => setAuthType(e.target.value as 'password' | 'token' | 'ssh_key')}>
+                    <option value="password">{t('plugins.auth_password')}</option>
+                    <option value="token">{t('plugins.auth_token')}</option>
+                    <option value="ssh_key">{t('plugins.auth_ssh_key')}</option>
+                  </select>
+                  <input type="password" className={`input w-full ${requiredFieldSet.has(t('plugins.secret')) ? 'border-red-500 focus:border-red-500 focus:ring-red-200' : ''}`} placeholder={t('plugins.secret')} value={secret} onChange={(e) => setSecret(e.target.value)} />
+                </div>
+              )}
               {requiredFieldSet.has(t('plugins.secret')) && <p className="text-xs text-red-600">{t('plugins.required_field_hint')}</p>}
+              {isPresetMigration ? (
+                <div className="space-y-2 rounded-md border border-gray-200 bg-gray-50/80 p-2 dark:border-gray-700 dark:bg-gray-900/40">
+                  <div className="text-xs font-medium text-gray-700 dark:text-gray-200">{t('plugins.standard_path_label')}</div>
+                  <code className="block break-all text-xs text-gray-800 dark:text-gray-100">{resolvedSourcePath || t('plugins.standard_path_pending')}</code>
+                  <div className="flex flex-wrap gap-2">
+                    <button type="button" className="btn-secondary py-1.5 text-xs" disabled={discoverM.isPending} onClick={() => discoverM.mutate(configModule.id)}>
+                      {t('plugins.discover_step1')}
+                    </button>
+                  </div>
+                  <details className="text-xs">
+                    <summary className="cursor-pointer text-gray-600 dark:text-gray-400">{t('plugins.override_web_root')}</summary>
+                    <input
+                      className="input mt-2 w-full"
+                      placeholder={t('plugins.source_path')}
+                      value={sourcePath}
+                      onChange={(e) => setSourcePath(e.target.value)}
+                    />
+                  </details>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+                  <div className="min-w-0 flex-1 space-y-1">
+                    <label className="text-xs text-gray-600 dark:text-gray-400">{t('plugins.source_path')}</label>
+                    <input
+                      className={`input w-full ${requiredFieldSet.has(t('plugins.source_path')) ? 'border-red-500 focus:border-red-500 focus:ring-red-200' : ''}`}
+                      placeholder={t('plugins.source_path')}
+                      value={sourcePath}
+                      onChange={(e) => setSourcePath(e.target.value)}
+                    />
+                    {resolvedSourcePath && !sourcePath.trim() && (
+                      <p className="text-xs text-emerald-700 dark:text-emerald-300">{t('plugins.path_from_discover')}: {resolvedSourcePath}</p>
+                    )}
+                  </div>
+                  <button type="button" className="btn-secondary shrink-0 py-1.5 text-xs sm:mb-0" disabled={discoverM.isPending} onClick={() => discoverM.mutate(configModule.id)}>
+                    {t('plugins.discover_step1')}
+                  </button>
+                </div>
+              )}
+              {requiredFieldSet.has(t('plugins.source_path')) && <p className="text-xs text-red-600">{t('plugins.required_field_hint')}</p>}
               <div className="flex justify-end">
                 <button type="button" className="btn-primary py-1.5 text-xs" onClick={goStep2}>{t('plugins.next')}</button>
               </div>
@@ -416,16 +556,51 @@ export default function PluginsStorePage() {
               )}
               {wizardStep === 2 && (
                 <>
-              <div className="grid grid-cols-2 gap-2">
-                <input className="input w-full" placeholder={t('plugins.source_db_name')} value={dbName} onChange={(e) => setDbName(e.target.value)} />
-                <input className="input w-full" placeholder={t('plugins.source_db_user')} value={dbUser} onChange={(e) => setDbUser(e.target.value)} />
-                <input type="password" className="input w-full" placeholder={t('plugins.source_db_password')} value={dbPass} onChange={(e) => setDbPass(e.target.value)} />
-                <input className="input w-full" placeholder={t('plugins.source_db_host')} value={dbHost} onChange={(e) => setDbHost(e.target.value)} />
-              </div>
-              <input className="input w-full" placeholder={t('plugins.source_db_port')} value={dbPort} onChange={(e) => setDbPort(e.target.value)} />
+              <p className="text-xs text-gray-600 dark:text-gray-400">{isSimplePanel ? t('plugins.simple_db_hint') : t('plugins.db_root_hint')}</p>
+              {isSimplePanel ? (
+                <>
+                  <input
+                    className="input w-full"
+                    placeholder={t('plugins.source_db_name')}
+                    value={dbName}
+                    onChange={(e) => setDbName(e.target.value)}
+                    list="plugin-db-names"
+                  />
+                  <datalist id="plugin-db-names">
+                    {(discoverData?.db_names ?? []).map((n) => (
+                      <option key={n} value={n} />
+                    ))}
+                  </datalist>
+                  <div className="grid grid-cols-2 gap-2">
+                    <input className="input w-full" placeholder={t('plugins.source_db_user')} value={dbUser} onChange={(e) => setDbUser(e.target.value)} />
+                    <input type="password" className="input w-full" placeholder={t('plugins.source_db_password')} value={dbPass} onChange={(e) => setDbPass(e.target.value)} />
+                  </div>
+                  <details className="rounded-md border border-gray-200 p-2 text-xs dark:border-gray-700">
+                    <summary className="cursor-pointer text-gray-600 dark:text-gray-400">{t('plugins.advanced_db_settings')}</summary>
+                    <div className="mt-2 grid grid-cols-2 gap-2">
+                      <input className="input w-full" placeholder={t('plugins.source_db_host')} value={dbHost} onChange={(e) => setDbHost(e.target.value)} />
+                      <input className="input w-full" placeholder={t('plugins.source_db_port')} value={dbPort} onChange={(e) => setDbPort(e.target.value)} />
+                    </div>
+                  </details>
+                </>
+              ) : (
+                <>
+                  <div className="grid grid-cols-2 gap-2">
+                    <input className="input w-full" placeholder={t('plugins.source_db_name')} value={dbName} onChange={(e) => setDbName(e.target.value)} />
+                    <input className="input w-full" placeholder={t('plugins.source_db_user')} value={dbUser} onChange={(e) => setDbUser(e.target.value)} />
+                    <input type="password" className="input w-full" placeholder={t('plugins.source_db_password')} value={dbPass} onChange={(e) => setDbPass(e.target.value)} />
+                    <input className="input w-full" placeholder={t('plugins.source_db_host')} value={dbHost} onChange={(e) => setDbHost(e.target.value)} />
+                  </div>
+                  <input className="input w-full" placeholder={t('plugins.source_db_port')} value={dbPort} onChange={(e) => setDbPort(e.target.value)} />
+                </>
+              )}
               <label className="inline-flex items-center gap-2 text-xs text-gray-600 dark:text-gray-300">
                 <input type="checkbox" checked={dryRun} onChange={(e) => setDryRun(e.target.checked)} />
                 {t('plugins.dry_run')}
+              </label>
+              <label className="inline-flex items-center gap-2 text-xs text-gray-600 dark:text-gray-300">
+                <input type="checkbox" checked={skipDbPreflight} onChange={(e) => setSkipDbPreflight(e.target.checked)} />
+                {t('plugins.skip_db_preflight')}
               </label>
               <div className="flex flex-wrap gap-2">
                 <button type="button" className="btn-secondary py-1.5 text-xs" onClick={() => discoverM.mutate(configModule.id)}>{t('plugins.discover')}</button>
@@ -434,7 +609,13 @@ export default function PluginsStorePage() {
               {discoverData && (
                 <div className="rounded-md border border-gray-200 dark:border-gray-700 p-2 text-xs space-y-1">
                   <div className="text-gray-700 dark:text-gray-200">{t('plugins.discover_result')}</div>
-                  {discoverData.suggested_source_path && <div>Path: {discoverData.suggested_source_path}</div>}
+                  {discoverData.suggested_source_path && <div>{t('plugins.discovered_path_label')}: {discoverData.suggested_source_path}</div>}
+                  {!!discoverData.db_names?.length && (
+                    <div className="text-gray-600 dark:text-gray-300">
+                      {t('plugins.discovered_db_label')}: {discoverData.db_names.slice(0, 8).join(', ')}
+                      {discoverData.db_names.length > 8 ? '…' : ''}
+                    </div>
+                  )}
                   {!!discoverData.path_candidates?.length && (
                     <div className="text-gray-500">
                       {discoverData.path_candidates.map((c) => `${c.ok ? 'OK' : 'NO'} ${c.path}`).join(' | ')}
@@ -465,7 +646,7 @@ export default function PluginsStorePage() {
                   <p className="text-xs text-gray-500">{t('plugins.wizard_review_hint')}</p>
                   <div className="rounded-md border border-gray-200 p-2 text-xs dark:border-gray-700">
                     <div>{t('plugins.source_host')}: {sourceHost || '-'}</div>
-                    <div>{t('plugins.source_path')}: {sourcePath || '-'}</div>
+                    <div>{t('plugins.source_path')}: {resolvedSourcePath || '-'}</div>
                     <div>{t('plugins.target_domain')}: {targetDomainId || '-'}</div>
                   </div>
                   <div className="flex justify-between">

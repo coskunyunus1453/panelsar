@@ -24,6 +24,8 @@ import {
   CartesianGrid,
   Cell,
   Legend,
+  Line,
+  LineChart,
   Pie,
   PieChart,
   ResponsiveContainer,
@@ -39,7 +41,17 @@ import { tokenHasAbility } from '../lib/abilities'
 import { useDomainsList } from '../hooks/useDomains'
 import { useSearchParams } from 'react-router-dom'
 
-type HistoryPoint = { t: number; cpu: number; mem: number; disk: number }
+type HistoryPoint = {
+  t: number
+  cpu: number
+  mem: number
+  disk: number
+  load1: number
+  diskRead: number
+  diskWrite: number
+  netRx: number
+  netTx: number
+}
 
 type ServerStats = {
   cpu_usage?: number
@@ -58,6 +70,13 @@ type ServerStats = {
   swap_total?: number
   swap_used?: number
   swap_percent?: number
+  load1?: number
+  load5?: number
+  load15?: number
+  disk_read_bytes_per_sec?: number
+  disk_write_bytes_per_sec?: number
+  net_rx_bytes_per_sec?: number
+  net_tx_bytes_per_sec?: number
   top_cpu_processes?: {
     pid?: number
     name?: string
@@ -89,6 +108,18 @@ const PIE_COLORS = ['#3b82f6', '#8b5cf6', '#f59e0b', '#10b981']
 const CHART_CPU = '#3b82f6'
 const CHART_MEM = '#8b5cf6'
 const CHART_DISK = '#f59e0b'
+const CHART_LOAD = '#0ea5e9'
+const CHART_IO_R = '#22c55e'
+const CHART_IO_W = '#f97316'
+const CHART_NET_IN = '#a855f7'
+const CHART_NET_OUT = '#ec4899'
+
+function formatBps(n?: number | null): string {
+  if (n == null || !Number.isFinite(n) || n < 0) return '—'
+  if (n < 1024) return `${Math.round(n)} B/s`
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB/s`
+  return `${(n / (1024 * 1024)).toFixed(2)} MB/s`
+}
 
 function formatBytes(n?: number | null): string {
   if (n == null || !Number.isFinite(n) || n < 0) return '—'
@@ -164,12 +195,15 @@ export default function MonitoringPage() {
       ).data as {
         score: number
         grade: 'excellent' | 'good' | 'warning' | 'critical'
+        metrics_total?: number
+        metrics_known?: number
+        coverage_percent?: number
         response_ms: number
         site_response_ms?: number | null
         scope?: 'global' | 'domain'
         domain?: { id: number; name: string; status: string } | null
         snapshot: { cpu: number; ram: number; disk: number; error_rate: number }
-        reasons: Array<{ key: string; ok: boolean; label: string; detail: string }>
+        reasons: Array<{ key: string; ok: boolean; unknown?: boolean; label: string; detail: string }>
       },
     refetchInterval: 20_000,
   })
@@ -206,6 +240,11 @@ export default function MonitoringPage() {
         cpu: Math.min(100, Math.max(0, s.cpu_usage ?? 0)),
         mem: Math.min(100, Math.max(0, s.memory_percent ?? 0)),
         disk: Math.min(100, Math.max(0, s.disk_percent ?? 0)),
+        load1: Math.max(0, s.load1 ?? 0),
+        diskRead: Math.max(0, s.disk_read_bytes_per_sec ?? 0),
+        diskWrite: Math.max(0, s.disk_write_bytes_per_sec ?? 0),
+        netRx: Math.max(0, s.net_rx_bytes_per_sec ?? 0),
+        netTx: Math.max(0, s.net_tx_bytes_per_sec ?? 0),
       }
       const merged = [...prev, next]
       return merged.slice(-40)
@@ -232,6 +271,11 @@ export default function MonitoringPage() {
         cpu: Math.round(p.cpu * 10) / 10,
         mem: Math.round(p.mem * 10) / 10,
         disk: Math.round(p.disk * 10) / 10,
+        load1: Math.round(p.load1 * 100) / 100,
+        diskRead: Math.round(p.diskRead),
+        diskWrite: Math.round(p.diskWrite),
+        netRx: Math.round(p.netRx),
+        netTx: Math.round(p.netTx),
       })),
     [history],
   )
@@ -292,6 +336,7 @@ export default function MonitoringPage() {
   ]
   const health = healthQ.data
   const healthScore = Math.max(0, Math.min(100, health?.score ?? 0))
+  const coverage = health?.coverage_percent ?? 100
   const healthColor =
     healthScore >= 90
       ? 'from-emerald-500 to-emerald-400'
@@ -478,6 +523,7 @@ export default function MonitoringPage() {
               <div className="text-gray-900 dark:text-white font-semibold">
                 {healthScore >= 90 ? 'Mükemmel' : healthScore >= 75 ? 'İyi' : healthScore >= 60 ? 'Dikkat' : 'Kritik'}
               </div>
+              <div className="text-gray-500">Kapsam {health?.metrics_known ?? '—'}/{health?.metrics_total ?? '—'} ({coverage}%)</div>
               <div className="text-gray-500">CPU {health?.snapshot?.cpu ?? '—'}%</div>
               <div className="text-gray-500">RAM {health?.snapshot?.ram ?? '—'}%</div>
               <div className="text-gray-500">Disk {health?.snapshot?.disk ?? '—'}%</div>
@@ -486,7 +532,9 @@ export default function MonitoringPage() {
           <div className="lg:col-span-2 space-y-2">
             {(health?.reasons ?? []).slice(0, 6).map((r) => (
               <div key={r.key} className="flex items-start gap-2 rounded-lg border border-gray-100 dark:border-gray-800 px-3 py-2">
-                {r.ok ? (
+                {r.unknown ? (
+                  <AlertTriangle className="h-4 w-4 mt-0.5 text-slate-400" />
+                ) : r.ok ? (
                   <CheckCircle2 className="h-4 w-4 mt-0.5 text-emerald-500" />
                 ) : (
                   <AlertTriangle className="h-4 w-4 mt-0.5 text-amber-500" />
@@ -700,6 +748,199 @@ export default function MonitoringPage() {
                   </div>
                 </div>
               </div>
+
+              <div className="grid gap-4 lg:grid-cols-3">
+                <div className="card border-t-4 border-t-sky-500 p-5">
+                  <div className="mb-2 flex items-center justify-between">
+                    <span className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                      {t('monitoring.load_avg')}
+                    </span>
+                    <Gauge className="h-4 w-4 text-sky-500" />
+                  </div>
+                  <div className="flex flex-wrap gap-3 text-sm tabular-nums">
+                    <div>
+                      <span className="text-xs text-gray-500">{t('monitoring.load_1m')}</span>
+                      <p className="text-xl font-bold text-gray-900 dark:text-white">
+                        {(stats.load1 ?? 0).toFixed(2)}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="text-xs text-gray-500">{t('monitoring.load_5m')}</span>
+                      <p className="text-xl font-bold text-gray-900 dark:text-white">
+                        {(stats.load5 ?? 0).toFixed(2)}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="text-xs text-gray-500">{t('monitoring.load_15m')}</span>
+                      <p className="text-xl font-bold text-gray-900 dark:text-white">
+                        {(stats.load15 ?? 0).toFixed(2)}
+                      </p>
+                    </div>
+                  </div>
+                  <p className="mt-2 text-[11px] text-gray-500">{t('monitoring.load_hint')}</p>
+                </div>
+                <div className="card border-t-4 border-t-emerald-500 p-5">
+                  <div className="mb-2 flex items-center justify-between">
+                    <span className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                      {t('monitoring.disk_io_throughput')}
+                    </span>
+                    <HardDrive className="h-4 w-4 text-emerald-500" />
+                  </div>
+                  <p className="text-lg font-semibold tabular-nums text-gray-900 dark:text-white">
+                    <span className="text-emerald-600 dark:text-emerald-400">R</span>{' '}
+                    {formatBps(stats.disk_read_bytes_per_sec)}
+                  </p>
+                  <p className="text-lg font-semibold tabular-nums text-gray-900 dark:text-white">
+                    <span className="text-orange-500">W</span> {formatBps(stats.disk_write_bytes_per_sec)}
+                  </p>
+                </div>
+                <div className="card border-t-4 border-t-fuchsia-500 p-5">
+                  <div className="mb-2 flex items-center justify-between">
+                    <span className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                      {t('monitoring.net_io_throughput')}
+                    </span>
+                    <Server className="h-4 w-4 text-fuchsia-500" />
+                  </div>
+                  <p className="text-lg font-semibold tabular-nums text-gray-900 dark:text-white">
+                    <span className="text-violet-500">↓</span> {formatBps(stats.net_rx_bytes_per_sec)}
+                  </p>
+                  <p className="text-lg font-semibold tabular-nums text-gray-900 dark:text-white">
+                    <span className="text-pink-500">↑</span> {formatBps(stats.net_tx_bytes_per_sec)}
+                  </p>
+                </div>
+              </div>
+
+              {chartHistory.length >= 2 && (
+                <div className="grid gap-4 xl:grid-cols-3">
+                  <div className="card p-5">
+                    <h3 className="mb-3 text-sm font-semibold text-gray-900 dark:text-white">
+                      {t('monitoring.chart_load')}
+                    </h3>
+                    <div className="h-[200px]">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={chartHistory} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
+                          <XAxis dataKey="time" tick={{ fill: axisColor, fontSize: 9 }} />
+                          <YAxis width={36} tick={{ fill: axisColor, fontSize: 10 }} />
+                          <Tooltip
+                            contentStyle={{
+                              background: tooltipBg,
+                              border: `1px solid ${tooltipBorder}`,
+                              borderRadius: 12,
+                            }}
+                          />
+                          <Line
+                            type="monotone"
+                            dataKey="load1"
+                            name={t('monitoring.load_1m')}
+                            stroke={CHART_LOAD}
+                            strokeWidth={2}
+                            dot={false}
+                          />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+                  <div className="card p-5">
+                    <h3 className="mb-3 text-sm font-semibold text-gray-900 dark:text-white">
+                      {t('monitoring.chart_disk_io')}
+                    </h3>
+                    <div className="h-[200px]">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <AreaChart data={chartHistory} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+                          <defs>
+                            <linearGradient id="fillDr" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="0%" stopColor={CHART_IO_R} stopOpacity={0.3} />
+                              <stop offset="100%" stopColor={CHART_IO_R} stopOpacity={0.02} />
+                            </linearGradient>
+                            <linearGradient id="fillDw" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="0%" stopColor={CHART_IO_W} stopOpacity={0.3} />
+                              <stop offset="100%" stopColor={CHART_IO_W} stopOpacity={0.02} />
+                            </linearGradient>
+                          </defs>
+                          <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
+                          <XAxis dataKey="time" tick={{ fill: axisColor, fontSize: 9 }} />
+                          <YAxis width={44} tick={{ fill: axisColor, fontSize: 9 }} tickFormatter={(v) => formatBps(Number(v))} />
+                          <Tooltip
+                            contentStyle={{
+                              background: tooltipBg,
+                              border: `1px solid ${tooltipBorder}`,
+                              borderRadius: 12,
+                            }}
+                            formatter={(value) => formatBps(Number(value))}
+                          />
+                          <Legend wrapperStyle={{ fontSize: 11 }} />
+                          <Area
+                            type="monotone"
+                            dataKey="diskRead"
+                            name={t('monitoring.disk_read')}
+                            stroke={CHART_IO_R}
+                            fill="url(#fillDr)"
+                            strokeWidth={2}
+                          />
+                          <Area
+                            type="monotone"
+                            dataKey="diskWrite"
+                            name={t('monitoring.disk_write')}
+                            stroke={CHART_IO_W}
+                            fill="url(#fillDw)"
+                            strokeWidth={2}
+                          />
+                        </AreaChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+                  <div className="card p-5">
+                    <h3 className="mb-3 text-sm font-semibold text-gray-900 dark:text-white">
+                      {t('monitoring.chart_net_io')}
+                    </h3>
+                    <div className="h-[200px]">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <AreaChart data={chartHistory} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+                          <defs>
+                            <linearGradient id="fillNrx" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="0%" stopColor={CHART_NET_IN} stopOpacity={0.3} />
+                              <stop offset="100%" stopColor={CHART_NET_IN} stopOpacity={0.02} />
+                            </linearGradient>
+                            <linearGradient id="fillNtx" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="0%" stopColor={CHART_NET_OUT} stopOpacity={0.3} />
+                              <stop offset="100%" stopColor={CHART_NET_OUT} stopOpacity={0.02} />
+                            </linearGradient>
+                          </defs>
+                          <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
+                          <XAxis dataKey="time" tick={{ fill: axisColor, fontSize: 9 }} />
+                          <YAxis width={44} tick={{ fill: axisColor, fontSize: 9 }} tickFormatter={(v) => formatBps(Number(v))} />
+                          <Tooltip
+                            contentStyle={{
+                              background: tooltipBg,
+                              border: `1px solid ${tooltipBorder}`,
+                              borderRadius: 12,
+                            }}
+                            formatter={(value) => formatBps(Number(value))}
+                          />
+                          <Legend wrapperStyle={{ fontSize: 11 }} />
+                          <Area
+                            type="monotone"
+                            dataKey="netRx"
+                            name={t('monitoring.net_rx')}
+                            stroke={CHART_NET_IN}
+                            fill="url(#fillNrx)"
+                            strokeWidth={2}
+                          />
+                          <Area
+                            type="monotone"
+                            dataKey="netTx"
+                            name={t('monitoring.net_tx')}
+                            stroke={CHART_NET_OUT}
+                            fill="url(#fillNtx)"
+                            strokeWidth={2}
+                          />
+                        </AreaChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <div className="card p-6">
                 <h3 className="mb-1 text-lg font-semibold text-gray-900 dark:text-white">

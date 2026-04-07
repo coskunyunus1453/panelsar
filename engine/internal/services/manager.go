@@ -63,24 +63,28 @@ func (m *Manager) DiscoverServices() error {
 }
 
 func (m *Manager) GetAllServices() []ServiceInfo {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
+	m.mu.Lock()
+	defer m.mu.Unlock()
 
 	result := make([]ServiceInfo, 0, len(m.services))
 	for _, svc := range m.services {
+		// Dashboard kısayollarında stale "error" görünmemesi için
+		// her listelemede gerçek systemd durumunu tazele.
+		svc.Status = m.checkServiceStatus(svc.Name)
 		result = append(result, *svc)
 	}
 	return result
 }
 
 func (m *Manager) GetService(name string) (*ServiceInfo, error) {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
+	m.mu.Lock()
+	defer m.mu.Unlock()
 
 	svc, ok := m.services[name]
 	if !ok {
 		return nil, fmt.Errorf("service %s not found", name)
 	}
+	svc.Status = m.checkServiceStatus(svc.Name)
 	return svc, nil
 }
 

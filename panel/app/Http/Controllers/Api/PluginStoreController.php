@@ -9,6 +9,7 @@ use App\Models\PluginMigrationRun;
 use App\Models\PluginModule;
 use App\Models\UserPluginModule;
 use App\Services\SafeAuditLogger;
+use App\Support\MigrationCliResolver;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Bus;
@@ -276,6 +277,7 @@ class PluginStoreController extends Controller
             'source_db_password' => ['nullable', 'string', 'max:255'],
             'source_db_host' => ['nullable', 'string', 'max:255'],
             'source_db_port' => ['nullable', 'integer', 'between:1,65535'],
+            'skip_db' => ['sometimes', 'boolean'],
         ]);
 
         $targetDomain = Domain::query()
@@ -289,7 +291,16 @@ class PluginStoreController extends Controller
         $checks = [];
         $checks[] = $this->checkLocalBinary('rsync');
         $checks[] = $this->checkLocalBinary('ssh');
-        $checks[] = $this->checkLocalBinary('mysql');
+        $skipDb = (bool) ($v['skip_db'] ?? false);
+        if (! $skipDb) {
+            $checks[] = $this->checkMysqlClientResolved();
+        } else {
+            $checks[] = [
+                'key' => 'bin_mysql',
+                'ok' => true,
+                'message' => 'mysql client check skipped (files-only preflight)',
+            ];
+        }
 
         if (($v['auth_type'] ?? '') === 'ssh_key') {
             if (! filled($v['ssh_private_key'] ?? null)) {
@@ -335,6 +346,7 @@ class PluginStoreController extends Controller
             'source_host' => ['required', 'string', 'max:255'],
             'source_port' => ['nullable', 'integer', 'between:1,65535'],
             'source_user' => ['required', 'string', 'max:120'],
+            'source_domain' => ['nullable', 'string', 'max:255'],
             'auth_type' => ['required', 'in:ssh_key'],
             'ssh_private_key' => ['required', 'string', 'max:8192'],
         ]);
@@ -352,15 +364,14 @@ class PluginStoreController extends Controller
         try {
             $port = (int) ($v['source_port'] ?? 22);
             $userAtHost = $v['source_user'].'@'.$v['source_host'];
+            $domain = trim((string) ($v['source_domain'] ?? ''));
             $paths = match ($sourceType) {
                 'cpanel' => [
                     '/home/'.$v['source_user'].'/public_html',
                     '/home/'.$v['source_user'].'/www',
                 ],
-                'plesk' => [
-                    '/var/www/vhosts/'.$v['source_host'].'/httpdocs',
-                    '/var/www/vhosts/'.$v['source_host'].'/subdomains',
-                ],
+                'plesk' => $this->pleskDiscoverPathCandidates($domain, (string) $v['source_host']),
+                'aapanel' => $this->aapanelDiscoverPathCandidates($domain, (string) $v['source_host']),
                 default => [
                     '/www/wwwroot/'.$v['source_host'],
                     '/www/wwwroot',
@@ -375,14 +386,15 @@ class PluginStoreController extends Controller
             $bestPath = collect($pathChecks)->firstWhere('ok', true)['path'] ?? null;
 
             $dbNames = $this->remoteDiscoverDatabases($tmpKey, $port, $userAtHost);
-            $dbUsers = $this->remoteDiscoverDbUsers($tmpKey, $port, $userAtHost);
+            $suggestedDbUser = (string) $v['source_user'];
 
             return response()->json([
                 'source_type' => $sourceType,
                 'suggested_source_path' => $bestPath,
                 'path_candidates' => $pathChecks,
                 'db_names' => $dbNames,
-                'db_users' => $dbUsers,
+                'suggested_db_user' => $suggestedDbUser,
+                'db_users' => [$suggestedDbUser],
             ]);
         } finally {
             @unlink($tmpKey);
@@ -401,6 +413,27 @@ class PluginStoreController extends Controller
         ];
     }
 
+    /**
+     * @return array{key:string, ok:bool, message:string}
+     */
+    private function checkMysqlClientResolved(): array
+    {
+        $path = MigrationCliResolver::mysql();
+        if ($path !== null) {
+            return [
+                'key' => 'bin_mysql',
+                'ok' => true,
+                'message' => 'mysql client: '.$path,
+            ];
+        }
+
+        return [
+            'key' => 'bin_mysql',
+            'ok' => false,
+            'message' => 'mysql client missing (install mysql client or set MYSQL_CLIENT_PATH in .env; XAMPP: /Applications/XAMPP/xamppfiles/bin/mysql)',
+        ];
+    }
+
     private function checkRemotePath(string $host, int $port, string $user, string $path, string $privateKey): array
     {
         $tmpKey = storage_path('app/tmp/plugin-preflight-'.md5($user.$host.$path.microtime(true)).'.key');
@@ -413,16 +446,38 @@ class PluginStoreController extends Controller
                 'ssh',
                 '-i', $tmpKey,
                 '-o', 'StrictHostKeyChecking=accept-new',
+                '-o', 'ConnectTimeout=15',
                 '-p', (string) $port,
                 $user.'@'.$host,
                 $remoteCmd,
-            ], null, null, null, 20);
+            ], null, null, null, 25);
             $p->run();
+
+            $ok = $p->isSuccessful() && str_contains($p->getOutput(), 'OK');
+            $detail = '';
+            if (! $ok) {
+                $detail = trim($p->getErrorOutput() ?: '');
+                if ($detail === '') {
+                    $detail = trim($p->getOutput() ?: '');
+                }
+                if ($detail === 'OK') {
+                    $detail = '';
+                }
+                if ($detail !== '' && strlen($detail) > 280) {
+                    $detail = substr($detail, 0, 280).'…';
+                }
+            }
+
+            $hint = ' Hint: On the source server this SSH user must be able to access the path (often use root, '
+                .'or the user that owns the site files). aaPanel: folder name must match Website > Domain; '
+                .'otherwise set Custom web root in the wizard.';
 
             return [
                 'key' => 'remote_path',
-                'ok' => $p->isSuccessful() && str_contains($p->getOutput(), 'OK'),
-                'message' => $p->isSuccessful() ? 'remote path reachable' : 'remote path check failed',
+                'ok' => $ok,
+                'message' => $ok
+                    ? 'remote path reachable'
+                    : 'remote path check failed'.($detail !== '' ? ' — '.$detail : '').$hint,
             ];
         } finally {
             @unlink($tmpKey);
@@ -436,51 +491,84 @@ class PluginStoreController extends Controller
             'ssh',
             '-i', $keyPath,
             '-o', 'StrictHostKeyChecking=accept-new',
+            '-o', 'ConnectTimeout=15',
             '-p', (string) $port,
             $userAtHost,
             $remoteCmd,
-        ], null, null, null, 20);
+        ], null, null, null, 25);
         $p->run();
 
         return $p->isSuccessful() && str_contains($p->getOutput(), 'OK');
     }
 
-    private function remoteDiscoverDatabases(string $keyPath, int $port, string $userAtHost): array
+    /**
+     * @return list<string>
+     */
+    private function pleskDiscoverPathCandidates(string $domain, string $sourceHost): array
     {
-        $cmd = "ls -1 /var/lib/mysql 2>/dev/null | sed '/^mysql$/d;/^performance_schema$/d;/^information_schema$/d;/^sys$/d' | head -n 30";
-        $p = new Process([
-            'ssh',
-            '-i', $keyPath,
-            '-o', 'StrictHostKeyChecking=accept-new',
-            '-p', (string) $port,
-            $userAtHost,
-            $cmd,
-        ], null, null, null, 20);
-        $p->run();
-        if (! $p->isSuccessful()) {
-            return [];
+        $candidates = [];
+        if ($domain !== '') {
+            $candidates[] = '/var/www/vhosts/'.$domain.'/httpdocs';
+        }
+        if ($sourceHost !== '' && filter_var($sourceHost, FILTER_VALIDATE_IP) === false) {
+            $candidates[] = '/var/www/vhosts/'.$sourceHost.'/httpdocs';
+        }
+        if ($candidates === []) {
+            $candidates[] = '/var/www/vhosts/'.$sourceHost.'/httpdocs';
         }
 
-        return array_values(array_filter(array_map('trim', explode("\n", trim($p->getOutput())))));
+        return array_values(array_unique($candidates));
     }
 
-    private function remoteDiscoverDbUsers(string $keyPath, int $port, string $userAtHost): array
+    /**
+     * aaPanel: site genelde /www/wwwroot/{alan_adi}
+     *
+     * @return list<string>
+     */
+    private function aapanelDiscoverPathCandidates(string $domain, string $sourceHost): array
     {
-        $cmd = "awk -F: '{print $1}' /etc/passwd | head -n 30";
-        $p = new Process([
-            'ssh',
-            '-i', $keyPath,
-            '-o', 'StrictHostKeyChecking=accept-new',
-            '-p', (string) $port,
-            $userAtHost,
-            $cmd,
-        ], null, null, null, 20);
-        $p->run();
-        if (! $p->isSuccessful()) {
-            return [];
+        $candidates = [];
+        if ($domain !== '') {
+            $candidates[] = '/www/wwwroot/'.$domain;
+            $candidates[] = '/www/wwwroot/'.$domain.'/public';
+        }
+        if ($sourceHost !== '' && filter_var($sourceHost, FILTER_VALIDATE_IP) === false) {
+            $candidates[] = '/www/wwwroot/'.$sourceHost;
+            $candidates[] = '/www/wwwroot/'.$sourceHost.'/public';
+        }
+        $candidates[] = '/www/wwwroot';
+
+        return array_values(array_unique($candidates));
+    }
+
+    private function remoteDiscoverDatabases(string $keyPath, int $port, string $userAtHost): array
+    {
+        $filter = "sed '/^information_schema\$/d;/^performance_schema\$/d;/^mysql\$/d;/^sys\$/d' | head -n 50";
+        $cmds = [
+            "mysql -N -e 'SHOW DATABASES' 2>/dev/null | ".$filter,
+            "mariadb -N -e 'SHOW DATABASES' 2>/dev/null | ".$filter,
+            "ls -1 /var/lib/mysql 2>/dev/null | sed '/^mysql\$/d;/^performance_schema\$/d;/^information_schema\$/d;/^sys\$/d' | head -n 50",
+        ];
+        foreach ($cmds as $cmd) {
+            $p = new Process([
+                'ssh',
+                '-i', $keyPath,
+                '-o', 'StrictHostKeyChecking=accept-new',
+                '-p', (string) $port,
+                $userAtHost,
+                $cmd,
+            ], null, null, null, 25);
+            $p->run();
+            if (! $p->isSuccessful()) {
+                continue;
+            }
+            $lines = array_values(array_filter(array_map('trim', explode("\n", trim($p->getOutput())))));
+            if ($lines !== []) {
+                return $lines;
+            }
         }
 
-        return array_values(array_filter(array_map('trim', explode("\n", trim($p->getOutput())))));
+        return [];
     }
 
     private function ensureCatalog(): void

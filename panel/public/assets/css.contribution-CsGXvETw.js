@@ -1,0 +1,1 @@
+import{_ as s}from"./index-CKDKWnd_.js";import{r as e}from"./_.contribution-B157lprA.js";e({id:"css",extensions:[".css"],aliases:["CSS","css"],mimetypes:["text/css"],loader:()=>s(()=>import("./css-B2GD-5ap.js"),[])});
