@@ -30,6 +30,13 @@ export default function AiAdvisorPage() {
     enabled: domainId !== '',
     queryFn: async () => (await api.get(`/domains/${domainId}/ai/deploy`)).data as { suggestions: string[] },
   })
+  const slowSiteQ = useQuery({
+    queryKey: ['ai', 'slow-site', domainId],
+    enabled: domainId !== '',
+    queryFn: async () =>
+      (await api.get(`/domains/${domainId}/ai/slow-site`)).data as { suggestions: string[]; tcp_ms?: { best?: number | null } },
+    refetchInterval: 30_000,
+  })
   const fileM = useMutation({
     mutationFn: async () =>
       (await api.post(`/domains/${domainId}/ai/file-editor`, { path: filePath, content: fileContent })).data as {
@@ -83,6 +90,19 @@ export default function AiAdvisorPage() {
         <div className="card p-5">
           <h3 className="mb-2 text-sm font-semibold text-gray-900 dark:text-white">{t('ai.deploy')}</h3>
           {deployQ.isSuccess ? renderList(deployQ.data.suggestions) : <p className="text-sm text-gray-500">{t('ai.select_domain_for_deploy')}</p>}
+        </div>
+        <div className="card p-5">
+          <h3 className="mb-2 text-sm font-semibold text-gray-900 dark:text-white">{t('ai.slow_site')}</h3>
+          {slowSiteQ.isSuccess ? (
+            <>
+              {typeof slowSiteQ.data?.tcp_ms?.best === 'number' ? (
+                <p className="mb-2 text-xs text-gray-500">{t('ai.slow_site_tcp', { ms: slowSiteQ.data.tcp_ms.best })}</p>
+              ) : null}
+              {renderList(slowSiteQ.data.suggestions)}
+            </>
+          ) : (
+            <p className="text-sm text-gray-500">{t('ai.select_domain_for_deploy')}</p>
+          )}
         </div>
         <div className="card p-5">
           <h3 className="mb-2 text-sm font-semibold text-gray-900 dark:text-white">{t('ai.cron_backup')}</h3>

@@ -190,4 +190,98 @@ class AiAdvisorController extends Controller
             'suggested_model' => 'RBAC + least privilege + 2FA + periodik rol denetimi',
         ]);
     }
+
+    public function slowSite(Request $request, Domain $domain): JsonResponse
+    {
+        if (! $this->userOwnsDomain($request, $domain)) {
+            abort(403);
+        }
+
+        $tcpMs80 = $this->probeTcpMs((string) $domain->name, 80);
+        $tcpMs443 = $this->probeTcpMs((string) $domain->name, 443);
+        $bestTcp = $tcpMs443 ?? $tcpMs80;
+
+        $runs = DeploymentRun::query()
+            ->where('domain_id', $domain->id)
+            ->latest('id')
+            ->limit(12)
+            ->get(['id', 'status', 'trigger', 'commit_hash', 'started_at', 'finished_at']);
+
+        $last = $runs->first();
+        $failed = $runs->filter(fn ($r) => strtolower((string) $r->status) === 'failed')->count();
+        $running = $runs->filter(fn ($r) => strtolower((string) $r->status) === 'running')->count();
+        $lastSuccess = $runs->first(fn ($r) => strtolower((string) $r->status) === 'success');
+
+        $suggestions = [];
+
+        if ($bestTcp === null) {
+            $suggestions[] = 'Siteye TCP baglantisi kurulamadı (80/443). DNS kaydi, Cloudflare/proxy ve firewall kurallarini kontrol edin.';
+        } elseif ($bestTcp > 900) {
+            $suggestions[] = sprintf('Baglanti gecikmesi yuksek (~%d ms). DNS/proxy rotasi ve sunucu yukunu kontrol edin.', $bestTcp);
+        }
+
+        if (! $domain->ssl_enabled) {
+            $suggestions[] = 'SSL kapali. SSL acik degilse tarayici yeniden yonlendirme/timeout gibi yan etkiler olusabilir; SSL kurulumunu deneyin.';
+        }
+
+        if ($running > 0) {
+            $suggestions[] = 'Deploy su an calisiyor. Build/migrate sirasinda performans dususu normal olabilir.';
+        }
+
+        if ($last && strtolower((string) $last->status) === 'failed') {
+            $suggestions[] = 'Son deploy basarisiz. Deploy loglarini inceleyin; gerekirse son basarili commit’e rollback yapin.';
+        }
+
+        if ($failed >= 3) {
+            $suggestions[] = 'Son deploylarda hata yogun. Deploy adimlarini bol (pull/build/migrate) ve her adimi ayri loglayin.';
+        }
+
+        if (! $lastSuccess) {
+            $suggestions[] = 'Bu domain icin basarili deploy kaydi yok. Ilk kurulumda repo/branch/runtime ayarlarinin dogru oldugunu dogrulayin.';
+        } elseif ($lastSuccess->finished_at && $lastSuccess->finished_at->lt(now()->subDays(14))) {
+            $suggestions[] = 'Uzun suredir basarili deploy yok. Kod guncellemeleri geciktiyse guvenlik yamalari (WP/Laravel) icin deploy planlayin.';
+        }
+
+        $suggestions[] = 'Daha detayli bakis icin Izleme ekraninda (Health + kaynaklar) domain secip skor nedenlerini kontrol edin.';
+
+        return response()->json([
+            'domain' => [
+                'id' => (int) $domain->id,
+                'name' => (string) $domain->name,
+                'status' => (string) ($domain->status ?? ''),
+                'ssl_enabled' => (bool) $domain->ssl_enabled,
+            ],
+            'tcp_ms' => [
+                '80' => $tcpMs80,
+                '443' => $tcpMs443,
+                'best' => $bestTcp,
+            ],
+            'deploy' => [
+                'last' => $last,
+                'failed_last_12' => $failed,
+                'running' => $running,
+                'last_success_at' => $lastSuccess?->finished_at,
+            ],
+            'suggestions' => array_values(array_unique(array_filter($suggestions))),
+        ]);
+    }
+
+    private function probeTcpMs(string $host, int $port): ?int
+    {
+        $host = trim($host);
+        if ($host === '') {
+            return null;
+        }
+        $errno = 0;
+        $errstr = '';
+        $t0 = microtime(true);
+        $sock = @fsockopen($host, $port, $errno, $errstr, 1.6);
+        $ms = (int) round((microtime(true) - $t0) * 1000);
+        if (is_resource($sock)) {
+            fclose($sock);
+            return $ms;
+        }
+
+        return null;
+    }
 }

@@ -151,6 +151,31 @@ class DomainService
         });
     }
 
+    /**
+     * Document root varyantı:
+     * - root   => <webroot>/<domain>/public_html
+     * - public => <webroot>/<domain>/public_html/public (Laravel gibi projeler için)
+     *
+     * Engine tarafında güvenli path doğrulaması yapılır ve vhost/pool yeniden uygulanır.
+     *
+     * @return array<string, mixed>
+     */
+    public function setDocumentRootVariant(Domain $domain, string $variant): array
+    {
+        $variant = in_array($variant, ['root', 'public'], true) ? $variant : 'root';
+
+        return DB::transaction(function () use ($domain, $variant): array {
+            $resp = $this->engineApi->setSiteDocumentRoot($domain->name, $variant);
+            if (! empty($resp['error'])) {
+                return $resp;
+            }
+            if (! empty($resp['document_root'])) {
+                $domain->update(['document_root' => (string) $resp['document_root']]);
+            }
+            return $resp;
+        });
+    }
+
     public function setPanelStatus(Domain $domain, string $status): void
     {
         $status = $status === 'suspended' ? 'suspended' : 'active';

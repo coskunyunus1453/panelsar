@@ -37,6 +37,7 @@ import { useAuthStore } from '../store/authStore'
 import { useThemeStore } from '../store/themeStore'
 import { tokenHasAbility } from '../lib/abilities'
 import { useDomainsList } from '../hooks/useDomains'
+import { useSearchParams } from 'react-router-dom'
 
 type HistoryPoint = { t: number; cpu: number; mem: number; disk: number }
 
@@ -128,10 +129,20 @@ export default function MonitoringPage() {
   const { isDark } = useThemeStore()
   const abilities = useAuthStore((s) => s.user?.abilities)
   const canServer = tokenHasAbility(abilities, 'monitoring:server')
+  const [searchParams] = useSearchParams()
   const [history, setHistory] = useState<HistoryPoint[]>([])
   const [tick, setTick] = useState(() => Date.now())
   const [healthDomainId, setHealthDomainId] = useState<number | ''>('')
   const domainsQ = useDomainsList()
+
+  useEffect(() => {
+    if (healthDomainId !== '') return
+    const raw = searchParams.get('domain')
+    const n = raw ? Number(raw) : NaN
+    if (Number.isFinite(n) && n > 0) {
+      setHealthDomainId(n)
+    }
+  }, [healthDomainId, searchParams])
 
   const gridColor = isDark ? '#334155' : '#e2e8f0'
   const axisColor = isDark ? '#94a3b8' : '#64748b'

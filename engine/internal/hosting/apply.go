@@ -88,7 +88,11 @@ func ApplyWebServer(cfg *config.Config, domain, docRoot string, meta *sites.Site
 			extras = append([]string(nil), meta.Aliases...)
 		}
 		sn := nginx.BuildServerNamesLine(domain, extras)
-		return nginx.ApplyVhost(cfg, domain, docRoot, sock, chain, key, sn)
+		perf := ""
+		if meta != nil {
+			perf = meta.PerformanceMode
+		}
+		return nginx.ApplyVhost(cfg, domain, docRoot, sock, chain, key, sn, perf)
 	case "openlitespeed":
 		var aliases []string
 		if meta != nil {
@@ -111,7 +115,11 @@ func ApplySubdomainVhost(cfg *config.Config, parentPrimary, hostname, docRoot st
 		return openlitespeed.ApplyVhost(cfg, h, docRoot, sock, "", "", nil)
 	}
 	h := strings.ToLower(strings.TrimSpace(hostname))
-	return nginx.ApplyVhost(cfg, h, docRoot, sock, "", "", h)
+	perf := ""
+	if subMeta != nil {
+		perf = subMeta.PerformanceMode
+	}
+	return nginx.ApplyVhost(cfg, h, docRoot, sock, "", "", h, perf)
 }
 
 // RemoveWebServer meta’daki server_type’a göre ilgili vhost’u kaldırır.

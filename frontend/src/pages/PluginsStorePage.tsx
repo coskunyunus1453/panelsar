@@ -61,6 +61,7 @@ export default function PluginsStorePage() {
   const [dryRun, setDryRun] = useState(true)
   const [preflight, setPreflight] = useState<PreflightResponse | null>(null)
   const [discoverData, setDiscoverData] = useState<DiscoverResponse | null>(null)
+  const [sourcePreset, setSourcePreset] = useState<'cpanel' | 'plesk' | 'aapanel' | 'custom'>('custom')
 
   const q = useQuery({
     queryKey: ['plugins-store'],
@@ -215,6 +216,10 @@ export default function PluginsStorePage() {
           </button>
         </div>
       </div>
+      <div className="rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 text-sm text-violet-900 dark:border-violet-900/40 dark:bg-violet-950/20 dark:text-violet-200">
+        <p className="font-semibold">{t('plugins.migration_assistant_title')}</p>
+        <p className="mt-1 text-xs">{t('plugins.migration_assistant_hint')}</p>
+      </div>
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {filtered.map((m) => (
@@ -275,6 +280,7 @@ export default function PluginsStorePage() {
                           setDryRun(true)
                           setPreflight(null)
                           setDiscoverData(null)
+                          setSourcePreset('custom')
                         }}
                       >
                         {t('plugins.start_migration')}
@@ -293,6 +299,42 @@ export default function PluginsStorePage() {
             </div>
             {runModuleId === m.id && (
               <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-3 space-y-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs text-gray-500">{t('plugins.source_preset')}:</span>
+                  <button
+                    type="button"
+                    className={`rounded-md border px-2 py-1 text-xs ${sourcePreset === 'cpanel' ? 'border-primary-500 bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-200' : 'border-gray-200 dark:border-gray-700'}`}
+                    onClick={() => {
+                      setSourcePreset('cpanel')
+                      setSourcePort('22')
+                      if (!sourcePath) setSourcePath('/home/USER/public_html')
+                    }}
+                  >
+                    cPanel
+                  </button>
+                  <button
+                    type="button"
+                    className={`rounded-md border px-2 py-1 text-xs ${sourcePreset === 'plesk' ? 'border-primary-500 bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-200' : 'border-gray-200 dark:border-gray-700'}`}
+                    onClick={() => {
+                      setSourcePreset('plesk')
+                      setSourcePort('22')
+                      if (!sourcePath) setSourcePath('/var/www/vhosts/example.com/httpdocs')
+                    }}
+                  >
+                    Plesk
+                  </button>
+                  <button
+                    type="button"
+                    className={`rounded-md border px-2 py-1 text-xs ${sourcePreset === 'aapanel' ? 'border-primary-500 bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-200' : 'border-gray-200 dark:border-gray-700'}`}
+                    onClick={() => {
+                      setSourcePreset('aapanel')
+                      setSourcePort('22')
+                      if (!sourcePath) setSourcePath('/www/wwwroot/example.com')
+                    }}
+                  >
+                    aaPanel
+                  </button>
+                </div>
                 <input
                   className="input w-full"
                   placeholder={t('plugins.source_host')}

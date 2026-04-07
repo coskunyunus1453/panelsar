@@ -12,11 +12,13 @@ import {
   Loader2,
   Plus,
   Search,
+  Settings,
   Shield,
   ShieldCheck,
   Trash2,
 } from 'lucide-react'
 import DomainDeleteConfirmModal from '../components/domains/DomainDeleteConfirmModal'
+import DomainQuickSettingsModal from '../components/domains/DomainQuickSettingsModal'
 import { safeDomainUrl } from '../lib/urlSafety'
 
 const PHP_OPTIONS = ['7.4', '8.0', '8.1', '8.2', '8.3', '8.4'] as const
@@ -63,6 +65,7 @@ export default function DomainsPage() {
   const [search, setSearch] = useState('')
   const [showAdd, setShowAdd] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<DomainRow | null>(null)
+  const [quickTarget, setQuickTarget] = useState<DomainRow | null>(null)
   const [busy, setBusy] = useState<Record<number, Busy>>({})
   const [sslProgress, setSslProgress] = useState<Record<number, SslProgress>>({})
   const [logTarget, setLogTarget] = useState<DomainRow | null>(null)
@@ -250,6 +253,12 @@ export default function DomainsPage() {
         domain={deleteTarget}
         onClose={() => setDeleteTarget(null)}
         onDeleted={() => setDeleteTarget(null)}
+      />
+
+      <DomainQuickSettingsModal
+        open={!!quickTarget}
+        domain={quickTarget}
+        onClose={() => setQuickTarget(null)}
       />
 
       {logTarget && (
@@ -622,6 +631,14 @@ export default function DomainsPage() {
 
                       <td className="px-6 py-4 text-right">
                         <div className="inline-flex items-center justify-end gap-1">
+                          <button
+                            type="button"
+                            title={t('domains.quick_settings')}
+                            className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500"
+                            onClick={() => setQuickTarget(domain)}
+                          >
+                            <Settings className="h-4 w-4" />
+                          </button>
                           <button
                             type="button"
                             title={t('domains.open_site')}

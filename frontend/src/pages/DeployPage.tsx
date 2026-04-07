@@ -5,6 +5,7 @@ import { Rocket, Copy, Play } from 'lucide-react'
 import toast from 'react-hot-toast'
 import api from '../services/api'
 import { useDomainsList } from '../hooks/useDomains'
+import { useSearchParams } from 'react-router-dom'
 
 type DeployConfig = {
   id: number
@@ -29,6 +30,7 @@ type DeployRun = {
 export default function DeployPage() {
   const { t } = useTranslation()
   const qc = useQueryClient()
+  const [searchParams] = useSearchParams()
   const domainsQ = useDomainsList()
   const [domainId, setDomainId] = useState<number | ''>('')
   const [repoUrl, setRepoUrl] = useState('')
@@ -37,6 +39,16 @@ export default function DeployPage() {
   const [branchWhitelist, setBranchWhitelist] = useState('')
   const [autoDeploy, setAutoDeploy] = useState(false)
   const [selectedRun, setSelectedRun] = useState<DeployRun | null>(null)
+  const [wizardRuntimeTouched, setWizardRuntimeTouched] = useState(false)
+
+  useEffect(() => {
+    if (domainId !== '') return
+    const raw = searchParams.get('domain')
+    const n = raw ? Number(raw) : NaN
+    if (Number.isFinite(n) && n > 0) {
+      setDomainId(n)
+    }
+  }, [domainId, searchParams])
 
   const cfgQ = useQuery({
     queryKey: ['deploy-config', domainId],
@@ -62,6 +74,15 @@ export default function DeployPage() {
     // XAMPP local’de `/api/*` rewrite bazen çalışmayabiliyor; bu yüzden front controller olan `index.php` üzerinden çağırıyoruz.
     return `${window.location.origin}${cleanBase}/index.php/api/deployment/webhook/${domainId}`
   }, [domainId])
+  const hasRepoConfigured = !!(cfg?.repo_url && cfg.repo_url.trim() !== '')
+  const canRunDeploy = hasRepoConfigured && branch.trim() !== ''
+  const wizardStep = useMemo(() => {
+    if (domainId === '') return 1
+    if (!repoUrl.trim()) return 1
+    if (!branch.trim()) return 2
+    if (!hasRepoConfigured) return 3
+    return 4
+  }, [domainId, repoUrl, branch, hasRepoConfigured])
 
   const syncFromServer = (next?: DeployConfig) => {
     if (!next) return
@@ -172,7 +193,7 @@ export default function DeployPage() {
               </div>
               <div>
                 <label className="label">{t('deploy.runtime')}</label>
-                <select className="input w-full" value={runtime} onChange={(e) => setRuntime(e.target.value as 'laravel' | 'node' | 'php')}>
+                <select className="input w-full" value={runtime} onChange={(e) => { setRuntime(e.target.value as 'laravel' | 'node' | 'php'); setWizardRuntimeTouched(true) }}>
                   <option value="laravel">Laravel/PHP</option>
                   <option value="node">Node</option>
                   <option value="php">PHP</option>
@@ -191,13 +212,28 @@ export default function DeployPage() {
               <button type="button" className="btn-primary" onClick={() => saveM.mutate()} disabled={saveM.isPending || cfgQ.isLoading}>
                 {t('common.save')}
               </button>
-              <button type="button" className="btn-secondary inline-flex items-center gap-2" onClick={() => runM.mutate()} disabled={runM.isPending}>
+              <button type="button" className="btn-secondary inline-flex items-center gap-2" onClick={() => runM.mutate()} disabled={runM.isPending || !canRunDeploy}>
                 <Play className="h-4 w-4" />
                 {t('deploy.deploy_now')}
               </button>
               <button type="button" className="btn-secondary" onClick={() => rollbackM.mutate()} disabled={rollbackM.isPending}>
                 {t('deploy.rollback')}
               </button>
+            </div>
+            <div className="rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-3 text-xs text-indigo-900 dark:border-indigo-900/40 dark:bg-indigo-950/20 dark:text-indigo-200">
+              <p className="font-semibold">{t('deploy.wizard_title')}</p>
+              <ol className="mt-2 list-decimal space-y-1 pl-4">
+                <li className={wizardStep === 1 ? 'font-semibold' : ''}>{t('deploy.wizard_step_1')}</li>
+                <li className={wizardStep === 2 ? 'font-semibold' : ''}>{t('deploy.wizard_step_2')}</li>
+                <li className={wizardStep === 3 ? 'font-semibold' : ''}>{t('deploy.wizard_step_3')}</li>
+                <li className={wizardStep === 4 ? 'font-semibold' : ''}>{t('deploy.wizard_step_4')}</li>
+              </ol>
+              {!hasRepoConfigured && (
+                <p className="mt-2">{t('deploy.first_setup_hint')}</p>
+              )}
+              {runtime === 'laravel' && !wizardRuntimeTouched && (
+                <p className="mt-2">{t('deploy.runtime_hint_laravel')}</p>
+              )}
             </div>
           </>
         )}

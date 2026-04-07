@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import api from '../services/api'
 import { Download } from 'lucide-react'
 import { useDomainsList } from '../hooks/useDomains'
 import { notify } from '../lib/notify'
+import { Link } from 'react-router-dom'
 
 type AppRow = { id: string; name: string; version: string; automated?: boolean }
 type InstallerRun = {
@@ -36,6 +37,8 @@ export default function InstallerPage() {
   const [seenFinalRuns, setSeenFinalRuns] = useState<number[]>([])
   const [detailRunId, setDetailRunId] = useState<number | null>(null)
   const [diagData, setDiagData] = useState<InstallerDiagnostics | null>(null)
+  const [guideApp, setGuideApp] = useState<AppRow | null>(null)
+  const [docrootVariant, setDocrootVariant] = useState<'root' | 'public'>('root')
 
   const databasesQ = useQuery({
     queryKey: ['databases', 'paginated'],
@@ -129,6 +132,50 @@ export default function InstallerPage() {
     setSeenFinalRuns((s) => [...s, target.id])
     setActiveRunId(null)
   }, [runsQ.data, activeRunId, seenFinalRuns, t])
+
+  const selectedDomain = useMemo(
+    () => (domainsQ.data ?? []).find((d) => d.id === domainId) ?? null,
+    [domainsQ.data, domainId],
+  )
+
+  useEffect(() => {
+    // Basit heuristik: document_root yolu .../public_html/public ile bitiyorsa "public".
+    const dr = (selectedDomain as unknown as { document_root?: string } | null)?.document_root
+    if (typeof dr === 'string' && dr.replace(/\\/g, '/').endsWith('/public_html/public')) {
+      setDocrootVariant('public')
+    } else {
+      setDocrootVariant('root')
+    }
+  }, [selectedDomain])
+
+  const docrootM = useMutation({
+    mutationFn: async (variant: 'root' | 'public') => {
+      const { data } = await api.post(`/domains/${domainId}/document-root`, { variant })
+      return data as { document_root?: string; variant?: 'root' | 'public' }
+    },
+    onSuccess: (data) => {
+      const v = data.variant === 'public' ? 'public' : 'root'
+      setDocrootVariant(v)
+      qc.invalidateQueries({ queryKey: ['domains'] })
+      notify('success', t('installer.guide_title', { app: guideApp?.name ?? '' }), t('installer.docroot_updated'))
+    },
+    onError: (err: unknown) => {
+      const ax = err as { response?: { data?: { message?: string } } }
+      notify('error', t('installer.docroot_title'), ax.response?.data?.message ?? String(err))
+    },
+  })
+
+  const guideSteps = (appId: string) => {
+    if (appId === 'laravel') {
+      return [
+        t('installer.guide_laravel_step_1'),
+        t('installer.guide_laravel_step_2'),
+        t('installer.guide_laravel_step_3'),
+        t('installer.guide_laravel_step_4'),
+      ]
+    }
+    return [t('installer.guide_generic_step_1'), t('installer.guide_generic_step_2')]
+  }
 
   return (
     <div className="space-y-6">
@@ -230,7 +277,6 @@ export default function InstallerPage() {
             !domainId ||
             installM.isPending ||
             hasRunningInstall ||
-            !auto ||
             (wp && !wpDatabaseId)
           return (
             <div key={app.id} className="card p-4 flex flex-col gap-2">
@@ -241,15 +287,19 @@ export default function InstallerPage() {
                 type="button"
                 className="btn-secondary text-sm mt-auto"
                 disabled={disabled}
-                title={!auto ? t('installer.manual_only') : undefined}
-                onClick={() =>
+                title={!auto ? t('installer.open_guide') : undefined}
+                onClick={() => {
+                  if (!auto) {
+                    setGuideApp(app)
+                    return
+                  }
                   installM.mutate({
                     app: app.id,
                     ...(wp && wpDatabaseId ? { database_id: wpDatabaseId as number, table_prefix: tablePrefix } : {}),
                   })
-                }
+                }}
               >
-                {t('installer.install')}
+                {auto ? t('installer.install') : t('installer.open_guide')}
               </button>
             </div>
           )
@@ -300,6 +350,87 @@ export default function InstallerPage() {
             <pre className="max-h-[360px] overflow-auto rounded-md bg-gray-50 dark:bg-gray-800 p-3 text-[11px] text-gray-700 dark:text-gray-200 whitespace-pre-wrap">
 {runDetailQ.data?.run.output || '-'}
             </pre>
+          </div>
+        </div>
+      )}
+
+      {guideApp && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-2xl rounded-lg bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 p-5">
+            <div className="flex items-start justify-between gap-3 mb-3">
+              <div>
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
+                  {t('installer.guide_title', { app: guideApp.name })}
+                </h3>
+                <p className="text-xs text-gray-500 mt-1">{t('installer.guide_subtitle')}</p>
+                {selectedDomain && (
+                  <p className="mt-1 text-[11px] text-gray-500">
+                    {t('installer.guide_domain')}: <span className="font-mono">{selectedDomain.name}</span>
+                  </p>
+                )}
+              </div>
+              <button type="button" className="btn-secondary py-1 px-2 text-xs" onClick={() => setGuideApp(null)}>
+                {t('common.close')}
+              </button>
+            </div>
+
+            <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-200">
+              {t('installer.guide_note_not_automated')}
+            </div>
+
+            <div className="mt-4 space-y-2 text-sm text-gray-700 dark:text-gray-300">
+              <ul className="list-disc pl-5 space-y-1">
+                {guideSteps(guideApp.id).map((s, i) => (
+                  <li key={`${guideApp.id}-step-${i}`}>{s}</li>
+                ))}
+              </ul>
+            </div>
+
+            {guideApp.id === 'laravel' && selectedDomain && (
+              <div className="mt-4 rounded-xl border border-gray-200 p-4 dark:border-gray-700">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-gray-900 dark:text-white">{t('installer.docroot_title')}</p>
+                    <p className="text-xs text-gray-500 mt-1">{t('installer.docroot_hint')}</p>
+                  </div>
+                  <span className="text-[11px] rounded-full px-2 py-0.5 border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300">
+                    {docrootVariant === 'public' ? 'public/' : 'public_html/'}
+                  </span>
+                </div>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    className="btn-primary text-sm"
+                    disabled={domainId === '' || docrootM.isPending || docrootVariant === 'public'}
+                    onClick={() => docrootM.mutate('public')}
+                  >
+                    {t('installer.docroot_set_public')}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-secondary text-sm"
+                    disabled={domainId === '' || docrootM.isPending || docrootVariant === 'root'}
+                    onClick={() => docrootM.mutate('root')}
+                  >
+                    {t('installer.docroot_set_root')}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <div className="mt-4 flex flex-wrap gap-2">
+              {domainId !== '' && (
+                <Link className="btn-secondary text-sm" to={`/files?domain=${domainId}`}>
+                  {t('installer.guide_open_files')}
+                </Link>
+              )}
+              <Link className="btn-secondary text-sm" to="/site-tools">
+                {t('installer.guide_open_tools')}
+              </Link>
+              <Link className="btn-secondary text-sm" to="/deploy">
+                {t('installer.guide_open_deploy')}
+              </Link>
+            </div>
           </div>
         </div>
       )}

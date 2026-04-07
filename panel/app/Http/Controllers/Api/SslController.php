@@ -52,6 +52,7 @@ class SslController extends Controller
                 'message' => $result['message'] ?? null,
                 'certificate' => $result['certificate'] ?? null,
                 'engine' => $result['engine'] ?? null,
+                'diagnostics' => $result['diagnostics'] ?? null,
             ], fn ($v) => $v !== null), $result['http_status']);
         }
 

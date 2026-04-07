@@ -101,6 +101,27 @@ export default function DashboardPage() {
     { label: t('dashboard.create_database'), icon: Database, path: '/databases' },
     { label: t('dashboard.create_email'), icon: Mail, path: '/email' },
   ]
+  const pkg = user?.hosting_package
+  const limitRows = pkg
+    ? [
+        {
+          label: t('nav.domains'),
+          used: d?.domains_count ?? 0,
+          max: pkg.max_domains,
+        },
+        {
+          label: t('nav.databases'),
+          used: d?.databases_count ?? 0,
+          max: pkg.max_databases,
+        },
+        {
+          label: t('nav.email'),
+          used: d?.email_accounts_count ?? 0,
+          max: pkg.max_email_accounts,
+        },
+      ]
+    : []
+  const nearLimit = limitRows.some((x) => x.max > 0 && x.used >= x.max)
 
   return (
     <div className="space-y-6">
@@ -196,7 +217,33 @@ export default function DashboardPage() {
           )}
         </div>
 
-        <div className="card p-6">
+        <div className="card p-6 space-y-5">
+          {pkg && (
+            <div className="rounded-xl border border-gray-200 p-4 dark:border-gray-700">
+              <h3 className="text-sm font-semibold text-gray-900 dark:text-white">{t('dashboard.package_limits')}</h3>
+              <div className="mt-3 space-y-2">
+                {limitRows.map((r) => {
+                  const remaining = Math.max(0, r.max - r.used)
+                  return (
+                    <div key={r.label} className="flex items-center justify-between text-xs">
+                      <span className="text-gray-600 dark:text-gray-300">{r.label}</span>
+                      <span className="font-medium text-gray-900 dark:text-white">
+                        {r.used} / {r.max} ({t('dashboard.remaining')}: {remaining})
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+              {nearLimit && (
+                <Link
+                  to="/billing"
+                  className="mt-3 inline-flex rounded-lg border border-amber-300 bg-amber-50 px-2.5 py-1.5 text-xs font-medium text-amber-900 hover:bg-amber-100 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-100"
+                >
+                  {t('dashboard.upgrade_cta')}
+                </Link>
+              )}
+            </div>
+          )}
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
             {t('dashboard.quick_actions')}
           </h3>

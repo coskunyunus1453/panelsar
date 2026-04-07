@@ -1552,6 +1552,47 @@ export default function FileManagerPage() {
                   </div>
                 )}
               </div>
+              {domainId > 0 && (
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="text-[11px] font-medium text-gray-500 dark:text-gray-400">
+                    {t('files.smart_shortcuts')}
+                  </span>
+                  <button
+                    type="button"
+                    className="rounded-md border border-gray-200 px-2 py-1 text-xs hover:bg-gray-50 dark:border-gray-600 dark:hover:bg-gray-800"
+                    onClick={() => {
+                      setFilePath('')
+                      void openFileWrapped('wp-config.php')
+                    }}
+                  >
+                    {t('files.shortcut_wp_config')}
+                  </button>
+                  <button
+                    type="button"
+                    className="rounded-md border border-gray-200 px-2 py-1 text-xs hover:bg-gray-50 dark:border-gray-600 dark:hover:bg-gray-800"
+                    onClick={() => {
+                      setFilePath('')
+                      void openFileWrapped('.env')
+                    }}
+                  >
+                    {t('files.shortcut_env')}
+                  </button>
+                  <button
+                    type="button"
+                    className="rounded-md border border-gray-200 px-2 py-1 text-xs hover:bg-gray-50 dark:border-gray-600 dark:hover:bg-gray-800"
+                    onClick={() => setFilePath('storage')}
+                  >
+                    {t('files.shortcut_storage')}
+                  </button>
+                  <button
+                    type="button"
+                    className="rounded-md border border-gray-200 px-2 py-1 text-xs hover:bg-gray-50 dark:border-gray-600 dark:hover:bg-gray-800"
+                    onClick={() => setFilePath('public')}
+                  >
+                    {t('files.shortcut_public')}
+                  </button>
+                </div>
+              )}
               <div className="ml-auto flex flex-wrap items-center gap-2">
                 <button
                   type="button"

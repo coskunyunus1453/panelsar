@@ -110,6 +110,10 @@ export default function BillingPage() {
           <p className="text-gray-500 dark:text-gray-400 text-sm">{t('billing.subtitle')}</p>
         </div>
       </div>
+      <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900 dark:border-emerald-900/40 dark:bg-emerald-950/20 dark:text-emerald-200">
+        <p className="font-semibold">{t('billing.payment_methods_title')}</p>
+        <p className="mt-1 text-xs">{t('billing.payment_methods_hint')}</p>
+      </div>
 
       <div>
         <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">{t('billing.packages')}</h2>

@@ -201,6 +201,33 @@ class EngineApiService
     }
 
     /**
+     * @return array{domain?: string, performance_mode?: string, server_type?: string, supported_servers?: list<string>, error?: string}
+     */
+    public function getSitePerformance(string $domain): array
+    {
+        return $this->get('/api/v1/sites/'.rawurlencode($domain).'/performance');
+    }
+
+    /**
+     * @return array{domain?: string, performance_mode?: string, ok?: bool, error?: string}
+     */
+    public function setSitePerformance(string $domain, string $mode): array
+    {
+        return $this->postChecked('/api/v1/sites/'.rawurlencode($domain).'/performance', [
+            'mode' => $mode,
+        ]);
+    }
+
+    public function setSiteDocumentRoot(string $domain, string $variant): array
+    {
+        $variant = in_array($variant, ['root', 'public'], true) ? $variant : 'root';
+
+        return $this->postChecked('/api/v1/sites/'.rawurlencode($domain).'/document-root', [
+            'variant' => $variant,
+        ]);
+    }
+
+    /**
      * @return array{
      *  nginx_manage_vhosts: bool,
      *  nginx_reload_after_vhost: bool,

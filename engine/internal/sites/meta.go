@@ -13,6 +13,8 @@ type SiteMeta struct {
 	DocumentRoot string   `json:"document_root"`
 	ServerType   string   `json:"server_type"`
 	SSLEnabled   bool     `json:"ssl_enabled"`
+	// PerformanceMode: boş = kapalı; "standard" = gzip + statik cache header preset (nginx vhost).
+	PerformanceMode string `json:"performance_mode,omitempty"`
 	Aliases      []string `json:"aliases,omitempty"` // Örn. example.net — aynı belge kökü, vhost server_name
 	Hostname     string   `json:"hostname,omitempty"` // Alt site meta dosyalarında FQDN (silme / vhost için)
 }

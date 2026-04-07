@@ -85,6 +85,26 @@ server {
     ssl_session_cache shared:HostvimSSL:10m;
 
     add_header Strict-Transport-Security "max-age=31536000" always;
+{{if eq .PerfMode "standard"}}
+    # Hostvim Performance Mode (standard)
+    gzip on;
+    gzip_static on;
+    gzip_vary on;
+    gzip_proxied any;
+    gzip_comp_level 5;
+    gzip_min_length 1024;
+    gzip_types text/plain text/css text/xml application/json application/javascript application/xml application/xml+rss text/javascript image/svg+xml;
+    etag on;
+    if_modified_since exact;
+
+    location ~* \.(?:css|js|mjs|map|json|xml|txt|ico|png|jpg|jpeg|gif|webp|svg|woff|woff2|ttf|eot)$ {
+        expires modified 30d;
+        add_header Cache-Control "public, max-age=2592000, immutable" always;
+        access_log off;
+        try_files $uri =404;
+    }
+    add_header X-Hostvim-Perf "standard" always;
+{{end}}
 
     root {{.DocRoot}};
     index index.php index.html;
@@ -113,6 +133,26 @@ server {
     listen 80;
     listen [::]:80;
     server_name {{.ServerNames}};
+{{if eq .PerfMode "standard"}}
+    # Hostvim Performance Mode (standard)
+    gzip on;
+    gzip_static on;
+    gzip_vary on;
+    gzip_proxied any;
+    gzip_comp_level 5;
+    gzip_min_length 1024;
+    gzip_types text/plain text/css text/xml application/json application/javascript application/xml application/xml+rss text/javascript image/svg+xml;
+    etag on;
+    if_modified_since exact;
+
+    location ~* \.(?:css|js|mjs|map|json|xml|txt|ico|png|jpg|jpeg|gif|webp|svg|woff|woff2|ttf|eot)$ {
+        expires modified 30d;
+        add_header Cache-Control "public, max-age=2592000, immutable" always;
+        access_log off;
+        try_files $uri =404;
+    }
+    add_header X-Hostvim-Perf "standard" always;
+{{end}}
     root {{.DocRoot}};
     index index.php index.html;
 
@@ -152,6 +192,7 @@ type vhostVars struct {
 	PHPSocket    string
 	SSLFullChain string
 	SSLPrivKey   string
+	PerfMode     string
 }
 
 // PHPSocketPath üretir: override doluysa onu; değilse /run/php/php{version}-fpm.sock (örn. 8.2).
@@ -193,7 +234,7 @@ func confBaseName(domain string) string {
 // confName: dosya adı / log öneki (örn. example.com veya blog.example.com).
 // serverNamesLine boşsa confName + www.confName kullanılır.
 // sslFullchain ve sslPrivkey doluysa 443 + 80’de HTTPS yönlendirmesi üretilir.
-func ApplyVhost(cfg *config.Config, confName, docRoot, phpSocket, sslFullchain, sslPrivkey, serverNamesLine string) error {
+func ApplyVhost(cfg *config.Config, confName, docRoot, phpSocket, sslFullchain, sslPrivkey, serverNamesLine, perfMode string) error {
 	if !cfg.Hosting.NginxManageVhosts {
 		return nil
 	}
@@ -248,6 +289,7 @@ func ApplyVhost(cfg *config.Config, confName, docRoot, phpSocket, sslFullchain, 
 		PHPSocket:    sock,
 		SSLFullChain: chain,
 		SSLPrivKey:   key,
+		PerfMode:     strings.TrimSpace(perfMode),
 	}
 
 	var buf bytes.Buffer

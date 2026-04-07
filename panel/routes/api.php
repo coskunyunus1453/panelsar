@@ -18,6 +18,7 @@ use App\Http\Controllers\Api\DatabaseController;
 use App\Http\Controllers\Api\DeploymentController;
 use App\Http\Controllers\Api\DnsRecordController;
 use App\Http\Controllers\Api\DomainController;
+use App\Http\Controllers\Api\DocumentRootController;
 use App\Http\Controllers\Api\EmailAccountController;
 use App\Http\Controllers\Api\FileManagerController;
 use App\Http\Controllers\Api\FtpController;
@@ -25,6 +26,7 @@ use App\Http\Controllers\Api\InstallerController;
 use App\Http\Controllers\Api\LicenseController;
 use App\Http\Controllers\Api\MonitoringController;
 use App\Http\Controllers\Api\NotificationController;
+use App\Http\Controllers\Api\PerformanceController;
 use App\Http\Controllers\Api\PluginStoreController;
 use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\SecurityController;
@@ -101,6 +103,9 @@ Route::middleware(['auth:sanctum', 'abilities:access:customer-panel'])->group(fu
         Route::post('domains/{domain}/php', [DomainController::class, 'switchPhp']);
         Route::post('domains/{domain}/status', [DomainController::class, 'setStatus']);
         Route::post('domains/{domain}/server', [DomainController::class, 'switchServer']);
+        Route::post('domains/{domain}/document-root', [DocumentRootController::class, 'update']);
+        Route::get('domains/{domain}/performance', [PerformanceController::class, 'show']);
+        Route::post('domains/{domain}/performance', [PerformanceController::class, 'update']);
     });
 
     Route::middleware('ability:databases:read')->group(function () {
@@ -218,6 +223,7 @@ Route::middleware(['auth:sanctum', 'abilities:access:customer-panel'])->group(fu
     });
     Route::middleware('ability:files:read')->post('domains/{domain}/ai/file-editor', [AiAdvisorController::class, 'fileEditor']);
     Route::middleware('ability:tools:run')->get('domains/{domain}/ai/deploy', [AiAdvisorController::class, 'deploy']);
+    Route::middleware('ability:dashboard:read')->get('domains/{domain}/ai/slow-site', [AiAdvisorController::class, 'slowSite']);
 
     Route::middleware('ability:security:read')->get('security/overview', [SecurityController::class, 'overview']);
     Route::middleware(['role:admin', 'ability:security:write'])->group(function () {

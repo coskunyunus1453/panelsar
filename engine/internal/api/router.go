@@ -71,6 +71,7 @@ func NewRouter(cfg *config.Config, d *daemon.Daemon, log *logrus.Logger) *gin.En
 			site.POST("", handleCreateSite(cfg, d))
 			site.POST("/:domain/suspend", handleSuspendSite(cfg, d))
 			site.POST("/:domain/activate", handleActivateSite(cfg, d))
+			site.POST("/:domain/document-root", handleSetDocumentRoot(cfg, d))
 			site.DELETE("/:domain", handleDeleteSite(cfg, d))
 			site.GET("", handleListSites(cfg, d))
 			site.GET("/:domain/logs", handleSiteLogs(cfg, d))
@@ -289,6 +290,115 @@ func handleActivateSite(cfg *config.Config, d *daemon.Daemon) gin.HandlerFunc {
 			return
 		}
 		c.JSON(http.StatusOK, gin.H{"message": "site activated", "domain": domain})
+	}
+}
+
+func handleSetDocumentRoot(cfg *config.Config, d *daemon.Daemon) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		domain := strings.ToLower(strings.TrimSpace(c.Param("domain")))
+		if domain == "" || strings.Contains(domain, "..") || !nginx.DomainSafe(domain) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid domain"})
+			return
+		}
+		var req struct {
+			Variant string `json:"variant" binding:"required"`
+		}
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		variant := strings.ToLower(strings.TrimSpace(req.Variant))
+		if variant != "root" && variant != "public" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid variant"})
+			return
+		}
+
+		meta, err := sites.ReadSiteMeta(cfg.Paths.WebRoot, domain)
+		if err != nil || meta == nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "site not found"})
+			return
+		}
+		base := filepath.Clean(filepath.Join(cfg.Paths.WebRoot, domain, "public_html"))
+		target := base
+		if variant == "public" {
+			target = filepath.Join(base, "public")
+		}
+		// Safety: only allow under base.
+		if !strings.HasPrefix(target+string(os.PathSeparator), base+string(os.PathSeparator)) && target != base {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "target escapes base"})
+			return
+		}
+
+		// Ensure directory exists and is a directory.
+		if st, statErr := os.Stat(target); statErr != nil {
+			if os.IsNotExist(statErr) && variant == "public" {
+				if mk := os.MkdirAll(target, 0o755); mk != nil {
+					c.JSON(http.StatusBadRequest, gin.H{"error": mk.Error()})
+					return
+				}
+			} else {
+				c.JSON(http.StatusBadRequest, gin.H{"error": statErr.Error()})
+				return
+			}
+		} else if !st.IsDir() {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "target is not a directory"})
+			return
+		}
+
+		// Update PHP-FPM pool docroot if managed.
+		ps := phpfpmSettings(cfg)
+		phpV := strings.TrimSpace(meta.PHPVersion)
+		if phpV == "" {
+			phpV = "8.2"
+		}
+		var poolPrev []byte
+		var poolHadPrev bool
+		phpSocket := ""
+		if cfg.Hosting.PHPFPMmanagePools {
+			sock, prev, had, perr := phpfpm.WritePool(ps, domain, phpV, target)
+			poolPrev, poolHadPrev = prev, had
+			if perr != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": perr.Error()})
+				return
+			}
+			phpSocket = sock
+			if cfg.Hosting.PHPFPMreloadAfterPool {
+				if rerr := phpfpm.Reload(phpV); rerr != nil {
+					_ = phpfpm.RestorePoolConf(ps, domain, phpV, poolPrev, poolHadPrev)
+					_ = phpfpm.Reload(phpV)
+					c.JSON(http.StatusInternalServerError, gin.H{"error": rerr.Error()})
+					return
+				}
+			}
+		} else {
+			phpSocket = nginx.EffectivePHPSocket(phpV, cfg.Hosting.PHPFPMsocket)
+		}
+
+		oldDoc := meta.DocumentRoot
+		meta.DocumentRoot = target
+		if err := hosting.ApplyWebServer(cfg, domain, meta.DocumentRoot, meta, phpSocket); err != nil {
+			// rollback pool if needed
+			if cfg.Hosting.PHPFPMmanagePools {
+				_ = phpfpm.RestorePoolConf(ps, domain, phpV, poolPrev, poolHadPrev)
+				if cfg.Hosting.PHPFPMreloadAfterPool {
+					_ = phpfpm.Reload(phpV)
+				}
+			}
+			meta.DocumentRoot = oldDoc
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		if err := sites.WriteSiteMeta(cfg.Paths.WebRoot, domain, meta); err != nil {
+			meta.DocumentRoot = oldDoc
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"domain":        domain,
+			"variant":       variant,
+			"document_root": meta.DocumentRoot,
+		})
 	}
 }
 

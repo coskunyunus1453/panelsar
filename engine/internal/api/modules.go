@@ -28,6 +28,7 @@ import (
 	"hostvim/engine/internal/panelmirror"
 	"hostvim/engine/internal/phpfpm"
 	"hostvim/engine/internal/phpini"
+	"hostvim/engine/internal/sites"
 	"hostvim/engine/internal/security"
 	"hostvim/engine/internal/stack"
 	"hostvim/engine/internal/tools"
@@ -537,6 +538,94 @@ func registerModuleRoutes(cfg *config.Config, d *daemon.Daemon, api *gin.RouterG
 	})
 	api.POST("/installer/install", handleInstallerInstall(cfg))
 	api.POST("/sites/:domain/tools", handleSiteTools(cfg))
+
+	// Performance mode (per-site; stored in .hostvim/site.json)
+	api.GET("/sites/:domain/performance", func(c *gin.Context) {
+		d := strings.ToLower(strings.TrimSpace(c.Param("domain")))
+		if d == "" || strings.Contains(d, "..") || !nginx.DomainSafe(d) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid domain"})
+			return
+		}
+		meta, err := sites.ReadSiteMeta(cfg.Paths.WebRoot, d)
+		if err != nil || meta == nil {
+			if err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			} else {
+				c.JSON(http.StatusNotFound, gin.H{"error": "site meta not found"})
+			}
+			return
+		}
+		mode := strings.TrimSpace(meta.PerformanceMode)
+		if mode == "" {
+			mode = "off"
+		}
+		c.JSON(http.StatusOK, gin.H{
+			"domain":            d,
+			"performance_mode":  mode,
+			"server_type":       strings.TrimSpace(meta.ServerType),
+			"document_root":     strings.TrimSpace(meta.DocumentRoot),
+			"ssl_enabled":       meta.SSLEnabled,
+			"php_version":       strings.TrimSpace(meta.PHPVersion),
+			"supported_servers": []string{"nginx"},
+		})
+	})
+
+	api.POST("/sites/:domain/performance", func(c *gin.Context) {
+		d := strings.ToLower(strings.TrimSpace(c.Param("domain")))
+		if d == "" || strings.Contains(d, "..") || !nginx.DomainSafe(d) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid domain"})
+			return
+		}
+		var req struct {
+			Mode string `json:"mode" binding:"required"`
+		}
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		mode := strings.ToLower(strings.TrimSpace(req.Mode))
+		if mode == "off" || mode == "0" || mode == "false" {
+			mode = ""
+		}
+		if mode != "" && mode != "standard" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid mode"})
+			return
+		}
+		meta, err := sites.ReadSiteMeta(cfg.Paths.WebRoot, d)
+		if err != nil || meta == nil {
+			if err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			} else {
+				c.JSON(http.StatusNotFound, gin.H{"error": "site meta not found"})
+			}
+			return
+		}
+		// Only nginx vhost supports the preset.
+		if strings.ToLower(strings.TrimSpace(meta.ServerType)) != "nginx" && mode != "" {
+			c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "performance mode supported only on nginx"})
+			return
+		}
+		meta.PerformanceMode = mode
+		if err := sites.WriteSiteMeta(cfg.Paths.WebRoot, d, meta); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		// Re-apply vhost so mode becomes effective.
+		docRoot := strings.TrimSpace(meta.DocumentRoot)
+		if docRoot == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "document_root missing in meta"})
+			return
+		}
+		if err := hosting.ApplyWebServer(cfg, d, docRoot, meta, ""); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		outMode := strings.TrimSpace(meta.PerformanceMode)
+		if outMode == "" {
+			outMode = "off"
+		}
+		c.JSON(http.StatusOK, gin.H{"domain": d, "performance_mode": outMode, "ok": true})
+	})
 
 	api.POST("/license/validate", func(c *gin.Context) {
 		var req struct {
