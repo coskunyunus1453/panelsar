@@ -73,7 +73,11 @@ api.interceptors.response.use(
       }
       if (error.response?.status === 423 && code === 'password_change_required') {
         if (typeof window !== 'undefined') {
-          window.location.href = `${window.location.origin}${inferPublicPathPrefix().replace(/\/+$/, '')}/settings?mandatoryPassword=1`
+          const prefix = inferPublicPathPrefix().replace(/\/+$/, '')
+          const target = `${window.location.origin}${prefix}/settings?mandatoryPassword=1`
+          if (window.location.href !== target) {
+            window.location.href = target
+          }
         }
         return Promise.reject(error)
       }

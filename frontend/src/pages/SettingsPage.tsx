@@ -33,6 +33,7 @@ export default function SettingsPage() {
   const user = useAuthStore((s) => s.user)
   const enforceAdmin2fa = useAuthStore((s) => s.enforceAdmin2fa)
   const updateUser = useAuthStore((s) => s.updateUser)
+  const requiresPasswordChange = user?.force_password_change === true
   const isAdmin = user?.roles?.some((r) => r.name === 'admin')
   const mandatory2faParam = searchParams.get('mandatory2fa') === '1'
   const mandatoryPasswordParam = searchParams.get('mandatoryPassword') === '1'
@@ -44,8 +45,9 @@ export default function SettingsPage() {
   const safeAdminBrandingUrl = safeBrandingImageUrl(branding?.logo_admin_url)
   const brandingCfgQ = useQuery({
     queryKey: ['branding-config'],
-    enabled: isAdmin,
+    enabled: isAdmin && !requiresPasswordChange,
     queryFn: async () => (await api.get('/admin/settings/branding')).data as { max_upload_kb: number },
+    retry: false,
   })
 
   const profileM = useMutation({
@@ -110,8 +112,9 @@ export default function SettingsPage() {
 
   const twoFaStatusQ = useQuery({
     queryKey: ['twofa-status'],
-    enabled: !!user,
+    enabled: !!user && !requiresPasswordChange,
     queryFn: async () => (await api.get('/auth/2fa/status')).data as { two_factor_enabled: boolean },
+    retry: false,
   })
 
   const [twofaSetup, setTwofaSetup] = useState<null | { otpauth_url: string; secret: string }>(null)
@@ -294,7 +297,7 @@ export default function SettingsPage() {
         </div>
       )}
 
-      {isAdmin && (
+      {isAdmin && !requiresPasswordChange && (
         <div className="card p-6">
           <div className="flex items-center gap-3 mb-6">
             <ImageIcon className="h-5 w-5 text-gray-500" />
@@ -513,6 +516,7 @@ export default function SettingsPage() {
         >
           <div>
             <label className="label">Mevcut şifre</label>
+            <input name="username" type="email" defaultValue={user?.email || ''} autoComplete="username" className="hidden" tabIndex={-1} />
             <input name="current_password" type="password" className="input w-full" required autoComplete="current-password" />
           </div>
           <div>

@@ -962,11 +962,11 @@ fi
 echo ""
 if [[ "${SKIP_DB_SEED:-}" != "1" ]]; then
   echo "################################################################"
-  echo "#  PANEL GİRİŞİ (şifre terminale yazılmaz — güvenlik)"
+  echo "#  PANEL GİRİŞİ"
   echo "################################################################"
   if [[ -f /root/hostvim-admin-login.txt ]]; then
-    echo "#  URL, e-posta ve şifre yalnızca root okuyabilir (chmod 600):"
-    echo "#    sudo cat /root/hostvim-admin-login.txt"
+    sed 's/^/#  /' /root/hostvim-admin-login.txt
+    echo "#"
     echo "#  İlk girişten sonra şifreyi değiştirin; dosyayı silin veya:"
     echo "#    sudo shred -u /root/hostvim-admin-login.txt 2>/dev/null || sudo rm -f /root/hostvim-admin-login.txt"
   elif [[ -f /root/panelsar-admin-login.txt ]]; then

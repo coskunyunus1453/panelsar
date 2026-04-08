@@ -39,6 +39,7 @@ export default function Header() {
   const { t, i18n } = useTranslation()
   const navigate = useNavigate()
   const { user, logout: logoutStore } = useAuthStore()
+  const requiresPasswordChange = user?.force_password_change === true
   const serverUI = isServerAdminUI(user)
   const { isDark, toggleTheme, openMobileSidebar } = useThemeStore()
   const { mode, setMode, advancedTipsSeen, markAdvancedTipsSeen } = useUiModeStore()
@@ -55,6 +56,8 @@ export default function Header() {
     queryKey: ['notifications-feed'],
     queryFn: async () => (await api.get('/notifications/feed')).data as { items: Array<{ id: string; title: string; message?: string; path?: string; level: 'info' | 'success' | 'error'; created_at?: string }> },
     refetchInterval: 10000,
+    enabled: !requiresPasswordChange,
+    retry: false,
   })
   useEffect(() => {
     if (feedQ.data?.items) {
