@@ -55,6 +55,11 @@ export default function LoginPage() {
 
   const finishLogin = (data: LoginResponse) => {
     setAuth(data.user, data.token, portal, { enforce_admin_2fa: data.enforce_admin_2fa })
+    if (data.force_password_change || data.user.force_password_change) {
+      toast('İlk giriş: Şifrenizi şimdi değiştirin.', { icon: '🔒' })
+      navigate('/settings?mandatoryPassword=1')
+      return
+    }
     toast.success(t('dashboard.welcome'))
     const enforce = data.enforce_admin_2fa ?? null
     if (mustEnrollTwoFactor(data.user, enforce)) {

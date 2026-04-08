@@ -136,12 +136,14 @@ class FileManagerController extends Controller
         }
         $validated = $request->validate(['path' => 'required|string']);
 
-        $result = $this->engine->mkdirFile(
-            $domain->name,
-            $this->panelRelToEngineRel($domain, $validated['path'])
-        );
+        $enginePath = $this->panelRelToEngineRel($domain, $validated['path']);
+        $templateMode = $this->inferSiblingMode($domain, $enginePath, true);
+        $result = $this->engine->mkdirFile($domain->name, $enginePath);
         if (! empty($result['error'])) {
             return response()->json(['message' => $result['error']], 422);
+        }
+        if ($templateMode !== null) {
+            $this->engine->chmodFile($domain->name, $enginePath, $templateMode);
         }
 
         return response()->json($result);
@@ -475,10 +477,16 @@ class FileManagerController extends Controller
         $relPath = (string) ($validated['path'] ?? '');
         $engineRelPath = $this->panelRelToEngineRel($domain, $relPath);
         $up = $request->file('file');
+        $baseName = basename((string) $up->getClientOriginalName());
+        $engineTargetPath = trim($engineRelPath !== '' ? $engineRelPath.'/'.$baseName : $baseName, '/');
+        $templateMode = $this->inferSiblingMode($domain, $engineTargetPath, false);
         $this->quota->ensureDiskHeadroom($request->user(), (int) $up->getSize());
         try {
             $result = $this->engine->uploadFile($domain->name, $engineRelPath, $up);
             $ok = empty($result['error']);
+            if ($ok && $templateMode !== null) {
+                $this->engine->chmodFile($domain->name, $engineTargetPath, $templateMode);
+            }
             $this->logFileAction($request, $domain, 'upload', $relPath, null, $ok, $result['error'] ?? null);
 
             $status = $ok ? 200 : 502;
@@ -497,6 +505,77 @@ class FileManagerController extends Controller
         $mb = max(1, $panelOverride > 0 ? $panelOverride : $configured);
 
         return $mb * 1024;
+    }
+
+    /**
+     * Hedef dizindeki kardeş dosya/klasörlerden mode şablonu bulur (örn 644/755).
+     */
+    private function inferSiblingMode(Domain $domain, string $engineTargetPath, bool $wantDir): ?string
+    {
+        $target = trim(str_replace('\\', '/', $engineTargetPath), '/');
+        if ($target === '') {
+            return null;
+        }
+        $base = basename($target);
+        $targetExt = $wantDir ? '' : $this->fileExt($base);
+        $pos = strrpos($target, '/');
+        $parent = $pos === false ? '' : substr($target, 0, $pos);
+
+        $list = $this->engine->listFilesResult($domain->name, $parent, 500, 0, 'name', 'asc');
+        if (($list['error'] ?? null) !== null) {
+            return null;
+        }
+
+        $sameExtMode = null;
+        $anyMode = null;
+        foreach (($list['entries'] ?? []) as $e) {
+            $name = (string) ($e['name'] ?? '');
+            if ($name === '' || $name === $base) {
+                continue;
+            }
+            if ((bool) ($e['is_dir'] ?? false) !== $wantDir) {
+                continue;
+            }
+            $mode = $this->normalizeMode((string) ($e['mode'] ?? ''));
+            if ($mode === null) {
+                continue;
+            }
+            if ($wantDir) {
+                return $mode;
+            }
+            if ($anyMode === null) {
+                $anyMode = $mode;
+            }
+            if ($targetExt !== '' && $this->fileExt($name) === $targetExt) {
+                $sameExtMode = $mode;
+                break;
+            }
+        }
+
+        return $sameExtMode ?? $anyMode;
+    }
+
+    private function normalizeMode(string $raw): ?string
+    {
+        $m = trim($raw);
+        if ($m === '') {
+            return null;
+        }
+        if (preg_match('/^[0-7]{3,4}$/', $m) === 1) {
+            return strlen($m) === 4 ? substr($m, 1) : $m;
+        }
+
+        return null;
+    }
+
+    private function fileExt(string $name): string
+    {
+        $dot = strrpos($name, '.');
+        if ($dot === false || $dot === 0 || $dot === strlen($name) - 1) {
+            return '';
+        }
+
+        return strtolower(substr($name, $dot + 1));
     }
 
     public function rename(Request $request, Domain $domain): JsonResponse

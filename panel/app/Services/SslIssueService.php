@@ -9,6 +9,25 @@ use Illuminate\Support\Str;
 
 class SslIssueService
 {
+    /**
+     * Let's Encrypt ACME: iletişim e-postasında alan adında en az bir nokta gerekir
+     * (örn. admin@localhost, user@internal kabul edilmez).
+     */
+    public static function isLetsEncryptContactEmail(string $email): bool
+    {
+        $email = trim($email);
+        if ($email === '' || ! filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            return false;
+        }
+        $at = strrpos($email, '@');
+        if ($at === false) {
+            return false;
+        }
+        $host = strtolower(substr($email, $at + 1));
+
+        return str_contains($host, '.');
+    }
+
     public function __construct(
         private EngineApiService $engine,
         private HostingQuotaService $quota,
@@ -43,6 +62,14 @@ class SslIssueService
                 'ok' => false,
                 'http_status' => 422,
                 'message' => (string) __('ssl.email_required'),
+            ];
+        }
+
+        if (! self::isLetsEncryptContactEmail((string) $email)) {
+            return [
+                'ok' => false,
+                'http_status' => 422,
+                'message' => (string) __('ssl.invalid_lets_encrypt_email', ['email' => $email]),
             ];
         }
 

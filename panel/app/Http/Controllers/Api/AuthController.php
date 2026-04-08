@@ -136,6 +136,7 @@ class AuthController extends Controller
             'token' => $token->plainTextToken,
             'expires_at' => $expiresAt,
             'enforce_admin_2fa' => (bool) config('hostvim.enforce_admin_2fa', false),
+            'force_password_change' => (bool) $user->force_password_change,
         ]);
     }
 
@@ -155,6 +156,7 @@ class AuthController extends Controller
         return response()->json([
             'user' => $userPayload,
             'enforce_admin_2fa' => (bool) config('hostvim.enforce_admin_2fa', false),
+            'force_password_change' => (bool) $user->force_password_change,
         ]);
     }
 

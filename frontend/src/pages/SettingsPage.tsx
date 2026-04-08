@@ -35,8 +35,10 @@ export default function SettingsPage() {
   const updateUser = useAuthStore((s) => s.updateUser)
   const isAdmin = user?.roles?.some((r) => r.name === 'admin')
   const mandatory2faParam = searchParams.get('mandatory2fa') === '1'
+  const mandatoryPasswordParam = searchParams.get('mandatoryPassword') === '1'
   const showMandatory2faBanner =
     mandatory2faParam || mustEnrollTwoFactor(user, enforceAdmin2fa)
+  const showMandatoryPasswordBanner = mandatoryPasswordParam || user?.force_password_change === true
   const { data: branding } = useBranding()
   const safeCustomerBrandingUrl = safeBrandingImageUrl(branding?.logo_customer_url)
   const safeAdminBrandingUrl = safeBrandingImageUrl(branding?.logo_admin_url)
@@ -249,6 +251,7 @@ export default function SettingsPage() {
     }) => api.post('/user/password', payload),
     onSuccess: () => {
       toast.success('Şifre güncellendi')
+      updateUser({ force_password_change: false })
     },
     onError: (err: unknown) => {
       const ax = err as { response?: { data?: { errors?: Record<string, string[]> } } }
@@ -279,6 +282,15 @@ export default function SettingsPage() {
           className="rounded-xl border border-amber-400/70 bg-amber-50 dark:bg-amber-950/35 p-4 text-sm text-amber-950 dark:text-amber-100"
         >
           {t('settings.mandatory_2fa_banner')}
+        </div>
+      )}
+
+      {showMandatoryPasswordBanner && (
+        <div
+          role="alert"
+          className="rounded-xl border border-rose-400/70 bg-rose-50 dark:bg-rose-950/35 p-4 text-sm text-rose-950 dark:text-rose-100"
+        >
+          {t('settings.mandatory_password_banner')}
         </div>
       )}
 
@@ -506,6 +518,7 @@ export default function SettingsPage() {
           <div>
             <label className="label">Yeni şifre</label>
             <input name="password" type="password" className="input w-full" required autoComplete="new-password" />
+            <p className="mt-1 text-xs text-gray-500">{t('settings.password_policy_hint')}</p>
           </div>
           <div>
             <label className="label">Yeni şifre (tekrar)</label>

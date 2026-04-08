@@ -2,7 +2,7 @@ import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } fro
 import { useTranslation } from 'react-i18next'
 import { useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useDropzone } from 'react-dropzone'
+import { useDropzone, type DropEvent } from 'react-dropzone'
 import api from '../services/api'
 import { useThemeStore } from '../store/themeStore'
 import {
@@ -235,6 +235,93 @@ async function fetchAllFileEntries(domainId: number, dirRel: string): Promise<Li
     offset += limit
   }
   return all
+}
+
+function isAlreadyExistsErrorMessage(msg: string): boolean {
+  const s = msg.toLowerCase()
+  return s.includes('already exists') || s.includes('file exists') || s.includes('exist')
+}
+
+type FsEntryLike = {
+  isFile?: boolean
+  isDirectory?: boolean
+  name?: string
+  file?: (cb: (file: File) => void, onError?: (err: unknown) => void) => void
+  createReader?: () => {
+    readEntries: (cb: (entries: FsEntryLike[]) => void, onError?: (err: unknown) => void) => void
+  }
+}
+
+async function readAllDirEntries(reader: {
+  readEntries: (cb: (entries: FsEntryLike[]) => void, onError?: (err: unknown) => void) => void
+}): Promise<FsEntryLike[]> {
+  const out: FsEntryLike[] = []
+  for (;;) {
+    const chunk = await new Promise<FsEntryLike[]>((resolve) => {
+      reader.readEntries((entries) => resolve(entries ?? []), () => resolve([]))
+    })
+    if (!chunk.length) break
+    out.push(...chunk)
+  }
+  return out
+}
+
+async function walkDroppedEntry(
+  entry: FsEntryLike,
+  prefix: string,
+  out: FileWithRelPath[],
+): Promise<void> {
+  if (entry.isFile && entry.file) {
+    const f = await new Promise<File | null>((resolve) => {
+      entry.file!(
+        (file) => resolve(file),
+        () => resolve(null),
+      )
+    })
+    if (!f) return
+    const name = entry.name || f.name
+    const rel = prefix ? `${prefix}/${name}` : name
+    // browser file objesine göreli yol bilgisi ekle
+    Object.defineProperty(f, 'webkitRelativePath', { value: rel, configurable: true })
+    out.push(f as FileWithRelPath)
+    return
+  }
+  if (entry.isDirectory && entry.createReader) {
+    const name = entry.name || ''
+    const nextPrefix = name ? (prefix ? `${prefix}/${name}` : name) : prefix
+    const reader = entry.createReader()
+    const children = await readAllDirEntries(reader)
+    for (const child of children) {
+      await walkDroppedEntry(child, nextPrefix, out)
+    }
+  }
+}
+
+async function getFilesFromDropEvent(evt: DropEvent): Promise<(File | DataTransferItem)[]> {
+  if ('target' in (evt as any) && (evt as any).target && (evt as any).dataTransfer == null) {
+    const input = (evt as any).target as HTMLInputElement
+    return Array.from(input?.files || [])
+  }
+  const dragEvt = evt as DragEvent
+  const dt = dragEvt.dataTransfer
+  if (!dt) return []
+
+  const items = Array.from(dt.items || [])
+  const hasWebkitEntries = items.some((it: any) => typeof it.webkitGetAsEntry === 'function')
+  if (!hasWebkitEntries) {
+    return Array.from(dt.files || [])
+  }
+
+  const out: FileWithRelPath[] = []
+  for (const item of items) {
+    const anyItem = item as any
+    const entry = (typeof anyItem.webkitGetAsEntry === 'function'
+      ? anyItem.webkitGetAsEntry()
+      : null) as FsEntryLike | null
+    if (!entry) continue
+    await walkDroppedEntry(entry, '', out)
+  }
+  return out
 }
 
 const FILEMGR_HELP_KEY = 'hostvim_filemgr_help_seen'
@@ -640,6 +727,28 @@ export default function FileManagerPage() {
       if (items.length === 0) {
         await qc.invalidateQueries({ queryKey: ['files', domainId, path] })
         return
+      }
+      // Hedefte eksik klasörleri önce oluştur (recursive).
+      const needDirs = new Set<string>()
+      for (const it of items) {
+        const segs = it.parentRel.split('/').filter(Boolean)
+        let acc = ''
+        for (const seg of segs) {
+          acc = acc ? `${acc}/${seg}` : seg
+          if (isSafeRelativePath(acc)) needDirs.add(acc)
+        }
+      }
+      for (const dir of Array.from(needDirs).sort((a, b) => a.length - b.length)) {
+        try {
+          await api.post(`/domains/${domainId}/files/mkdir`, { path: dir })
+        } catch (err: unknown) {
+          const ax = err as { response?: { data?: { message?: string } } }
+          const msg = String(ax.response?.data?.message ?? '')
+          if (!isAlreadyExistsErrorMessage(msg)) {
+            toast.error(msg || t('files.mkdir_err'))
+            throw err
+          }
+        }
       }
       const weights = items.map((it) => Math.max(1, it.file.size || 0))
       const overallTotal = weights.reduce((a, b) => a + b, 0)
@@ -1079,6 +1188,7 @@ export default function FileManagerPage() {
     disabled: domainId === '' || uploadBusy,
     noClick: true,
     multiple: true,
+    getFilesFromEvent: getFilesFromDropEvent,
   })
 
   const entries = filesQ.data?.entries ?? []

@@ -2,6 +2,7 @@
 
 use App\Http\Middleware\EnforceVendorHost;
 use App\Http\Middleware\EnsureTokenAbility;
+use App\Http\Middleware\RequirePasswordChange;
 use App\Http\Middleware\RequireTwoFactorForAdmin;
 use App\Http\Middleware\SecureHeaders;
 use App\Http\Middleware\SetApiLocale;
@@ -46,6 +47,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'permission' => PermissionMiddleware::class,
             'role_or_permission' => RoleOrPermissionMiddleware::class,
             'require_admin_2fa' => RequireTwoFactorForAdmin::class,
+            'require_password_change' => RequirePasswordChange::class,
             'vendor_host' => EnforceVendorHost::class,
         ]);
     })

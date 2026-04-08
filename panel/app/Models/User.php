@@ -18,6 +18,7 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
+        'force_password_change',
         'locale',
         'status',
         'parent_id',
@@ -38,6 +39,7 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'force_password_change' => 'boolean',
             'two_factor_enabled' => 'boolean',
             'hosting_package_manual_override' => 'boolean',
         ];

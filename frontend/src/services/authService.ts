@@ -6,6 +6,7 @@ export interface LoginResponse {
   token: string
   expires_at: string
   enforce_admin_2fa?: boolean
+  force_password_change?: boolean
 }
 
 export type LoginResult =
@@ -45,7 +46,7 @@ export const authService = {
     await api.post('/auth/logout')
   },
 
-  me: async (): Promise<{ user: User; enforce_admin_2fa?: boolean }> => {
+  me: async (): Promise<{ user: User; enforce_admin_2fa?: boolean; force_password_change?: boolean }> => {
     const { data } = await api.get('/auth/me')
     return data
   },

@@ -67,7 +67,7 @@ HOSTVIM_HOME="${HOSTVIM_HOME:-${PANELSAR_HOME:-$REPO_ROOT}}"
 HOSTVIM_BRANCH="${HOSTVIM_BRANCH:-${PANELSAR_BRANCH:-main}}"
 HOSTVIM_AUTO_SYNC_GIT="${HOSTVIM_AUTO_SYNC_GIT:-1}"
 SERVER_NAME="${SERVER_NAME:-_}"
-LETS_ENCRYPT_EMAIL="${LETS_ENCRYPT_EMAIL:-admin@localhost}"
+LETS_ENCRYPT_EMAIL="${LETS_ENCRYPT_EMAIL:-}"
 APP_PROFILE="${APP_PROFILE:-customer}"
 # 2FA kurumsal politikada açılacaksa ENFORCE_ADMIN_2FA=true verin; varsayılan kapalı.
 if [[ "${ENFORCE_ADMIN_2FA:-}" == "" ]]; then
@@ -519,8 +519,15 @@ hostvim_resolve_admin_email() {
   le="${LETS_ENCRYPT_EMAIL:-}"
   le="${le//[[:space:]]/}"
   if [[ -n "$le" && "$le" == *"@"* ]]; then
-    echo "$le"
-    return 0
+    local le_dom
+    le_dom="${le##*@}"
+    if [[ "$le_dom" == *.* ]] && [[ "$le_dom" != "localhost" ]] && [[ "$le_dom" != "localdomain" ]]; then
+      echo "$le"
+      return 0
+    fi
+  fi
+  if [[ -n "$le" && "$le" == *"@"* ]]; then
+    echo "Uyarı: LETS_ENCRYPT_EMAIL geçersiz/geliştirme değeri olduğu için admin e-posta türetiminde kullanılmadı: $le" >&2
   fi
   app_url="$(grep -E '^APP_URL=' "$ENV_FILE" 2>/dev/null | cut -d= -f2- | tr -d '\r')"
   app_url="${app_url#\"}"
@@ -748,6 +755,24 @@ if [[ "${SKIP_DB_SEED:-}" != "1" ]]; then
     fi
   } > "$LOGIN_FILE"
   chmod 600 "$LOGIN_FILE"
+
+  SHOW_CREDS_IN_TERMINAL="${HOSTVIM_SHOW_ADMIN_CREDENTIALS:-1}"
+  if [[ "$SHOW_CREDS_IN_TERMINAL" == "1" ]] || [[ "$SHOW_CREDS_IN_TERMINAL" == "yes" ]]; then
+    echo ""
+    echo "################################################################"
+    echo "#  PANEL GİRİŞ BİLGİSİ (ilk kurulum)"
+    echo "################################################################"
+    echo "  URL:     ${PANEL_URL_HINT}"
+    echo "  E-posta: ${ADMIN_EMAIL}"
+    if [[ -n "$ADMIN_PASSWORD" ]]; then
+      echo "  Şifre:   ${ADMIN_PASSWORD}"
+    else
+      echo "  Şifre:   (korundu; mevcut şifre değişmedi)"
+    fi
+    echo "  Not: İlk girişten sonra şifreyi değiştirin."
+    echo "################################################################"
+    echo ""
+  fi
 
   if [[ -n "$ADMIN_PASSWORD" ]]; then
     sudo -u www-data env \

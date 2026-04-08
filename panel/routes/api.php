@@ -70,7 +70,7 @@ Route::prefix('auth')->group(function () {
     });
 });
 
-Route::middleware(['auth:sanctum', 'abilities:access:customer-panel'])->group(function () {
+Route::middleware(['auth:sanctum', 'abilities:access:customer-panel', 'require_password_change'])->group(function () {
     Route::patch('user/profile', [ProfileController::class, 'update']);
     Route::post('user/password', [ProfileController::class, 'password']);
 
@@ -344,6 +344,7 @@ Route::middleware(['auth:sanctum', 'abilities:access:customer-panel'])->group(fu
         Route::put('settings/php/{version}/ini', [PhpSettingsController::class, 'updateIni']);
         Route::patch('settings/php/{version}/modules', [PhpSettingsController::class, 'updateModules']);
         Route::post('settings/php/sync-nginx-upload-limit', [PhpSettingsController::class, 'syncNginxUploadLimit']);
+        Route::get('settings/php/sync-nginx-upload-limit/{runId}', [PhpSettingsController::class, 'syncNginxUploadLimitStatus']);
     });
 
     Route::middleware('role:reseller|admin|vendor_admin')->prefix('reseller')->group(function () {

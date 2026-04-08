@@ -28,6 +28,31 @@ type LimitsSync = {
 type IniResponse = { path?: string; ini: string; file_manager_limit_mb?: number; limits_sync?: LimitsSync }
 type ModulesResponse = { path?: string; modules: PhpModule[] }
 type VersionsResponse = { versions: string[] }
+type NginxSyncStep = { key: 'read_config' | 'patch_config' | 'test_reload'; ok: boolean; message: string }
+type NginxSyncStartResponse = { run_id: string; status: 'queued' }
+type NginxSyncStatusResponse = {
+  run_id: string
+  status: 'queued' | 'running' | 'success' | 'failed'
+  progress: number
+  steps: NginxSyncStep[]
+  message?: string
+  failed_step?: NginxSyncStep['key']
+}
+
+function extractIniSizeMb(ini: string, key: string): number | null {
+  const re = new RegExp(`^\\s*${key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*=\\s*([0-9.]+\\s*[KMG]?)\\s*$`, 'im')
+  const m = ini.match(re)
+  if (!m?.[1]) return null
+  const raw = m[1].replace(/\s+/g, '').toUpperCase()
+  if (!raw) return null
+  const unit = raw.slice(-1)
+  const n = Number(/[0-9]/.test(unit) ? raw : raw.slice(0, -1))
+  if (!Number.isFinite(n) || n <= 0) return null
+  if (unit === 'G') return Math.ceil(n * 1024)
+  if (unit === 'K') return Math.ceil(n / 1024)
+  if (unit === 'M') return Math.ceil(n)
+  return Math.ceil(n / (1024 * 1024))
+}
 
 const TAB_IDS = ['quick', 'modules', 'ini'] as const
 type TabId = (typeof TAB_IDS)[number]
@@ -122,6 +147,9 @@ export default function AdminPhpSettingsPage() {
   const [iniText, setIniText] = useState('')
   const [moduleState, setModuleState] = useState<PhpModule[]>([])
   const [limitsSync, setLimitsSync] = useState<LimitsSync | null>(null)
+  const [nginxSyncProgress, setNginxSyncProgress] = useState(0)
+  const [nginxSyncSteps, setNginxSyncSteps] = useState<NginxSyncStep[]>([])
+  const [nginxSyncRunId, setNginxSyncRunId] = useState<string | null>(null)
 
   useEffect(() => {
     if (iniQ.data?.ini != null) setIniText(iniQ.data.ini)
@@ -197,19 +225,56 @@ export default function AdminPhpSettingsPage() {
       if (!targetMb || targetMb < 1) {
         throw new Error(t('php_settings.upload_sync.no_target'))
       }
-      await api.post('/admin/settings/php/sync-nginx-upload-limit', {
+      const { data } = await api.post('/admin/settings/php/sync-nginx-upload-limit', {
         limit_mb: targetMb,
         scope: 'panel',
       })
+      return data as NginxSyncStartResponse
     },
-    onSuccess: () => {
-      toast.success(t('php_settings.upload_sync.nginx_saved'))
+    onSuccess: (data) => {
+      setNginxSyncProgress(5)
+      setNginxSyncSteps([
+        { key: 'read_config', ok: false, message: t('php_settings.upload_sync.step_read') },
+        { key: 'patch_config', ok: false, message: t('php_settings.upload_sync.step_patch') },
+        { key: 'test_reload', ok: false, message: t('php_settings.upload_sync.step_reload') },
+      ])
+      setNginxSyncRunId(data.run_id)
     },
     onError: (err: unknown) => {
       const ax = err as { response?: { data?: { message?: string } } }
+      setNginxSyncRunId(null)
+      setNginxSyncProgress(0)
+      setNginxSyncSteps([])
       toast.error(ax.response?.data?.message ?? String(err))
     },
   })
+
+  const nginxSyncStatusQ = useQuery({
+    queryKey: ['admin-php-nginx-upload-sync-status', nginxSyncRunId],
+    enabled: !!nginxSyncRunId,
+    queryFn: async () =>
+      (
+        await api.get(`/admin/settings/php/sync-nginx-upload-limit/${encodeURIComponent(String(nginxSyncRunId))}`)
+      ).data as NginxSyncStatusResponse,
+    refetchInterval: 1000,
+  })
+
+  useEffect(() => {
+    const data = nginxSyncStatusQ.data
+    if (!data || !nginxSyncRunId) return
+    if (data.run_id !== nginxSyncRunId) return
+
+    setNginxSyncProgress(data.progress ?? 0)
+    setNginxSyncSteps(data.steps ?? [])
+
+    if (data.status === 'success') {
+      toast.success(t('php_settings.upload_sync.nginx_saved'))
+      setNginxSyncRunId(null)
+    } else if (data.status === 'failed') {
+      toast.error(data.message ?? String('Nginx sync failed'))
+      setNginxSyncRunId(null)
+    }
+  }, [nginxSyncStatusQ.data, nginxSyncRunId, t])
 
   const hasAnyLoaded = versionsQ.isFetched && !!version
 
@@ -236,14 +301,22 @@ export default function AdminPhpSettingsPage() {
 
   const canEditIni = useMemo(() => canWrite, [canWrite])
   const effectiveLimits = useMemo(() => {
-    const upload = limitsSync?.php_upload_max_filesize_mb
-    const post = limitsSync?.php_post_max_size_mb
-    const phpEffective = limitsSync?.effective_php_limit_mb
+    const parsedUpload = extractIniSizeMb(iniText, 'upload_max_filesize')
+    const parsedPost = extractIniSizeMb(iniText, 'post_max_size')
+    const upload = limitsSync?.php_upload_max_filesize_mb ?? parsedUpload
+    const post = limitsSync?.php_post_max_size_mb ?? parsedPost
+    const parsedEffective =
+      upload && post
+        ? Math.max(1, Math.min(upload, post))
+        : upload ?? post ?? undefined
+    const phpEffective = limitsSync?.effective_php_limit_mb ?? parsedEffective
     const appLimit = limitsSync?.file_manager_limit_mb
-    const nginxHint = limitsSync?.nginx_hint_client_max_body_size_mb
+    const nginxHint =
+      limitsSync?.nginx_hint_client_max_body_size_mb ??
+      (typeof phpEffective === 'number' && phpEffective > 0 ? phpEffective : undefined)
     const hasData = [upload, post, phpEffective, appLimit, nginxHint].some((v) => typeof v === 'number' && v > 0)
     return { upload, post, phpEffective, appLimit, nginxHint, hasData }
-  }, [limitsSync])
+  }, [limitsSync, iniText])
 
   const tabs: { id: TabId; icon: typeof SlidersHorizontal; label: string }[] = [
     { id: 'quick', icon: SlidersHorizontal, label: t('php_settings.tabs.quick') },
@@ -356,8 +429,13 @@ export default function AdminPhpSettingsPage() {
                   <button
                     type="button"
                     className="btn-secondary min-h-[40px]"
-                    disabled={!canWrite || syncNginxLimitM.isPending || !effectiveLimits.nginxHint}
-                    onClick={() => syncNginxLimitM.mutate()}
+                    disabled={!canWrite || syncNginxLimitM.isPending || !!nginxSyncRunId || !effectiveLimits.nginxHint}
+                    onClick={() => {
+                      setNginxSyncRunId(null)
+                      setNginxSyncSteps([])
+                      setNginxSyncProgress(0)
+                      syncNginxLimitM.mutate()
+                    }}
                   >
                     {t('php_settings.upload_sync.sync_nginx')}
                   </button>
@@ -450,6 +528,49 @@ export default function AdminPhpSettingsPage() {
           </div>
         )}
       </div>
+      {nginxSyncRunId !== null && nginxSyncStatusQ.data?.status !== 'success' && nginxSyncStatusQ.data?.status !== 'failed' && (
+        <div className="fixed inset-0 z-[140] flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-xl border border-gray-200 bg-white p-5 shadow-2xl dark:border-gray-700 dark:bg-gray-900">
+            <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+              {t('php_settings.upload_sync.modal_title')}
+            </p>
+            <p className="mt-1 text-xs text-gray-600 dark:text-gray-400">
+              {t('php_settings.upload_sync.modal_hint')}
+            </p>
+            <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-200">
+              {t('php_settings.upload_sync.do_not_close')}
+            </div>
+            <div className="mt-4 h-2 overflow-hidden rounded-full bg-gray-200 dark:bg-gray-800">
+              <div
+                className="h-full rounded-full bg-primary-600 transition-all duration-300"
+                style={{ width: `${nginxSyncProgress}%` }}
+              />
+            </div>
+            <div className="mt-2 text-right text-xs text-gray-500 dark:text-gray-400">
+              {Math.max(5, Math.min(99, nginxSyncProgress))}%
+            </div>
+            {!!nginxSyncSteps.length && (
+              <div className="mt-3 space-y-1.5">
+                {nginxSyncSteps.map((s, idx) => {
+                  const threshold = (idx + 1) * 33
+                  const done = s.ok || nginxSyncProgress >= threshold
+                  const label =
+                    s.key === 'read_config'
+                      ? t('php_settings.upload_sync.step_read')
+                      : s.key === 'patch_config'
+                        ? t('php_settings.upload_sync.step_patch')
+                        : t('php_settings.upload_sync.step_reload')
+                  return (
+                    <div key={s.key} className={clsx('text-xs', done ? 'text-emerald-600 dark:text-emerald-300' : 'text-gray-500 dark:text-gray-400')}>
+                      {done ? 'OK' : '…'} {label}
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

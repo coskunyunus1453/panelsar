@@ -195,6 +195,7 @@ class DatabaseSeeder extends Seeder
         // Kurulum betiği HOSTVIM_ADMIN_PASSWORD verir; önceki yarım seed’de oluşmuş kullanıcıda şifre güncellenmezdi → 422.
         if ($adminPasswordEnv !== null && $adminPasswordEnv !== '') {
             $admin->password = Hash::make($adminPasswordEnv);
+            $admin->force_password_change = true;
             $admin->save();
         }
         $admin->syncRoles(['admin']);

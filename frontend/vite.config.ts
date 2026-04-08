@@ -7,6 +7,7 @@ export default defineConfig(({ mode }) => {
   // Varsayılan `/`: panel alan adı kökündeyken `/admin/...` gibi yollarda sayfa yenilenince
   // `./assets/*` göreli yol `/admin/assets/*` olur ve JS 404 → "Uygulama yükleniyor" takılı kalır.
   // Alt klasör kurulum: build öncesi `VITE_BASE_URL=/hostvim/panel/public/` (sonunda /) verin.
+  // Canlı kök (örn. http://IP/): VITE_BASE_URL=/ veya boş. /admin/ yalnızca gerçekten site kökü /admin/ ise.
   const base = env.VITE_BASE_URL ?? '/'
 
   return {

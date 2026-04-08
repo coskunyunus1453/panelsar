@@ -483,6 +483,8 @@
     "switch_to_easy": "Switch to Easy Mode",
     "switch_to_advanced": "Switch to Advanced Mode",
     "simple_active": "Simple view active",
+    "switched_easy": "Now in Easy Mode",
+    "switched_advanced": "Now in Advanced Mode",
     "advanced_tips_title": "Advanced Mode Tips",
     "tip_1": "Security, Monitoring, Cron, and Deploy tools become visible.",
     "tip_2": "Changes in admin/technical settings may affect the live system.",
@@ -1196,6 +1198,8 @@
     "two_factor_disable_confirm": "Turn off 2FA",
     "two_factor_disabled_toast": "Two-factor authentication is off.",
     "mandatory_2fa_banner": "Your host requires two-factor authentication for your role. Complete setup below before using the rest of the panel.",
+    "mandatory_password_banner": "For security, password change is required after first login. Set a new password below to continue.",
+    "password_policy_hint": "At least 8 characters; must include uppercase, lowercase, number, and symbol.",
     "branding": "Branding",
     "branding_hint": "Separate logos for customer UI vs admin area. Sidebar picks admin logo on /admin routes and customer logo elsewhere; login uses the customer logo.",
     "logo_customer": "Customer panel logo",
@@ -1262,7 +1266,13 @@
       "sync_nginx": "Apply Nginx limit",
       "nginx_saved": "Nginx client_max_body_size updated",
       "no_target": "No recommended Nginx limit available.",
-      "config_missing": "Unable to read Nginx panel config content."
+      "config_missing": "Unable to read Nginx panel config content.",
+      "modal_title": "Applying Nginx setting",
+      "modal_hint": "Running Nginx config test/reload steps. Do not close this page until it completes.",
+      "do_not_close": "Warning: Do not close or refresh this page until the operation completes.",
+      "step_read": "Reading Nginx config",
+      "step_patch": "Updating client_max_body_size",
+      "step_reload": "Testing and reloading Nginx"
     },
     "tabs": {
       "quick": "Quick settings",

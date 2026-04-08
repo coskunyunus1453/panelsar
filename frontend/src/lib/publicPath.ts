@@ -12,7 +12,11 @@ export function inferPublicPathPrefix(): string {
   if (!el?.src) {
     return ''
   }
-  const path = new URL(el.src).pathname
+  let path = new URL(el.src).pathname
+  // Yanlış VITE_BASE (/admin/) + zaten /admin altında yayın → /admin/admin/assets/...
+  if (path.includes('/admin/admin/assets/')) {
+    path = path.replace('/admin/admin/', '/admin/')
+  }
   const marker = '/assets/index-'
   const idx = path.indexOf(marker)
   if (idx <= 0) {

@@ -483,6 +483,8 @@
     "switch_to_easy": "Kolay Moda Geç",
     "switch_to_advanced": "Gelişmiş Moda Geç",
     "simple_active": "Basit görünüm aktif",
+    "switched_easy": "Şimdi Kolay Mod",
+    "switched_advanced": "Şimdi Gelişmiş Mod",
     "advanced_tips_title": "Gelişmiş Mod İpuçları",
     "tip_1": "Security, Monitoring, Cron ve Deploy araçları görünür.",
     "tip_2": "Admin/teknik ayarlarda değişiklikler canlı sistemi etkileyebilir.",
@@ -1196,6 +1198,8 @@
     "two_factor_disable_confirm": "2FA’yı kapat",
     "two_factor_disabled_toast": "İki faktörlü doğrulama kapatıldı.",
     "mandatory_2fa_banner": "Sunucu politikası rolünüz için iki aşamalı doğrulama zorunlu kılıyor. Panelin geri kalanını kullanmadan önce aşağıdaki kurulumu tamamlayın.",
+    "mandatory_password_banner": "Güvenlik gereği ilk girişten sonra şifre değişimi zorunludur. Devam etmek için aşağıdan yeni şifre belirleyin.",
+    "password_policy_hint": "En az 8 karakter; büyük harf, küçük harf, rakam ve özel karakter içermelidir.",
     "branding": "Marka görselleri",
     "branding_hint": "Müşteri paneli ile yönetici bölümü için ayrı logolar. Kenar çubukunda yol (/admin) hangi logo ile eşleşiyorsa o gösterilir; giriş ekranında müşteri logosu kullanılır.",
     "logo_customer": "Müşteri paneli logosu",
@@ -1262,7 +1266,13 @@
       "sync_nginx": "Nginx limitini uygula",
       "nginx_saved": "Nginx client_max_body_size güncellendi",
       "no_target": "Nginx için önerilen limit bulunamadı.",
-      "config_missing": "Nginx panel config içeriği alınamadı."
+      "config_missing": "Nginx panel config içeriği alınamadı.",
+      "modal_title": "Nginx ayarı uygulanıyor",
+      "modal_hint": "Nginx config test/reload adımları çalışıyor. İşlem bitene kadar sayfayı kapatmayın.",
+      "do_not_close": "Uyarı: İşlem bitene kadar bu sayfayı kapatmayın veya yenilemeyin.",
+      "step_read": "Nginx config okunuyor",
+      "step_patch": "client_max_body_size güncelleniyor",
+      "step_reload": "Nginx test ve reload uygulanıyor"
     },
     "tabs": {
       "quick": "Hızlı ayarlar",

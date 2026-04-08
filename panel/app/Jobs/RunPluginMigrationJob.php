@@ -7,6 +7,7 @@ use App\Models\PluginModule;
 use App\Models\PluginMigrationRun;
 use App\Services\DatabaseService;
 use App\Support\MigrationCliResolver;
+use App\Support\MigrationSsh;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -170,7 +171,7 @@ class RunPluginMigrationJob implements ShouldQueue
         file_put_contents($tmpKey, $key);
         @chmod($tmpKey, 0600);
         try {
-            $ssh = sprintf('ssh -i %s -o StrictHostKeyChecking=no -p %d', escapeshellarg($tmpKey), (int) $run->source_port);
+            $ssh = MigrationSsh::rsyncRshShell($tmpKey, (int) $run->source_port);
             $cmd = sprintf('rsync -az --delete --partial --append-verify -e %s %s %s', escapeshellarg($ssh), escapeshellarg($source), escapeshellarg($target));
             $this->execWithRetry($cmd, 'Dosya rsync', 2, 2);
             $run->output = $this->append($run->output, 'Dosya tasima tamamlandi.');
@@ -213,7 +214,7 @@ class RunPluginMigrationJob implements ShouldQueue
         file_put_contents($tmpKey, $key);
         @chmod($tmpKey, 0600);
         try {
-            $ssh = sprintf('ssh -i %s -o StrictHostKeyChecking=no -p %d', escapeshellarg($tmpKey), (int) $run->source_port);
+            $ssh = MigrationSsh::rsyncRshShell($tmpKey, (int) $run->source_port);
             $srcHost = (string) ($options['source_db_host'] ?? '127.0.0.1');
             $srcPort = (int) ($options['source_db_port'] ?? 3306);
             $dump = sprintf(
@@ -245,7 +246,7 @@ class RunPluginMigrationJob implements ShouldQueue
 
     private function exec(string $command, string $title): void
     {
-        $p = Process::fromShellCommandline($command, null, null, null, 1800);
+        $p = Process::fromShellCommandline($command, null, MigrationSsh::processEnv(), null, 1800);
         $p->run();
         if (! $p->isSuccessful()) {
             throw new \RuntimeException($title.' basarisiz: '.trim($p->getErrorOutput() ?: $p->getOutput()));
@@ -272,14 +273,16 @@ class RunPluginMigrationJob implements ShouldQueue
     private function countRemoteFiles(PluginMigrationRun $run, string $keyPath, string $sourcePath): int
     {
         $remoteCmd = sprintf('find %s -type f | wc -l', escapeshellarg($this->normalizePath($sourcePath)));
-        $p = new Process([
-            'ssh',
-            '-i', $keyPath,
-            '-o', 'StrictHostKeyChecking=no',
-            '-p', (string) $run->source_port,
-            $run->source_user.'@'.$run->source_host,
-            $remoteCmd,
-        ], null, null, null, 60);
+        $p = new Process(
+            array_merge(
+                MigrationSsh::commandPrefix($keyPath, (int) $run->source_port),
+                [$run->source_user.'@'.$run->source_host, $remoteCmd]
+            ),
+            null,
+            MigrationSsh::processEnv(),
+            null,
+            60
+        );
         $p->run();
         if (! $p->isSuccessful()) {
             return -1;

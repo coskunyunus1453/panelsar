@@ -3,10 +3,13 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\SyncNginxUploadLimitJob;
 use App\Models\PanelSetting;
 use App\Services\EngineApiService;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 
 class PhpSettingsController extends Controller
 {
@@ -102,35 +105,40 @@ class PhpSettingsController extends Controller
 
         $scope = (string) ($validated['scope'] ?? 'panel');
         $limitMb = (int) $validated['limit_mb'];
-        $desired = "client_max_body_size {$limitMb}m;";
 
-        $cfg = $this->engine->getNginxConfig($scope);
-        if (! empty($cfg['error'])) {
-            return response()->json(['message' => (string) $cfg['error']], 502);
-        }
-        $content = (string) ($cfg['content'] ?? '');
-        if (trim($content) === '') {
-            return response()->json(['message' => 'Nginx config content not found.'], 422);
-        }
+        $runId = (string) Str::uuid();
+        $cacheKey = 'admin:php:nginx-upload-sync:'.$runId;
 
-        if (preg_match('/client_max_body_size\s+\S+;/i', $content) === 1) {
-            $next = (string) preg_replace('/client_max_body_size\s+\S+;/i', $desired, $content);
-        } elseif (preg_match('/server_name\s+[^;\n]+;\s*/i', $content) === 1) {
-            $next = (string) preg_replace('/(server_name\s+[^;\n]+;\s*\n)/i', "$1    {$desired}\n", $content, 1);
-        } else {
-            $next = $content."\n    ".$desired."\n";
-        }
+        $steps = [
+            ['key' => 'read_config', 'ok' => false, 'message' => 'Reading Nginx config'],
+            ['key' => 'patch_config', 'ok' => false, 'message' => 'Updating client_max_body_size'],
+            ['key' => 'test_reload', 'ok' => false, 'message' => 'Testing and reloading Nginx'],
+        ];
 
-        $updated = $this->engine->updateNginxConfig($scope, $next, true);
-        if (! empty($updated['error'])) {
-            return response()->json(['message' => (string) $updated['error']], 502);
-        }
+        Cache::put($cacheKey, [
+            'run_id' => $runId,
+            'status' => 'queued',
+            'progress' => 0,
+            'steps' => $steps,
+        ], now()->addMinutes(30));
+
+        dispatch(new SyncNginxUploadLimitJob($runId, $limitMb, $scope))->afterResponse();
 
         return response()->json([
-            'message' => 'Nginx upload limiti güncellendi.',
-            'scope' => $scope,
-            'client_max_body_size_mb' => $limitMb,
-        ]);
+            'run_id' => $runId,
+            'status' => 'queued',
+        ], 202);
+    }
+
+    public function syncNginxUploadLimitStatus(string $runId): JsonResponse
+    {
+        $cacheKey = 'admin:php:nginx-upload-sync:'.$runId;
+        $state = Cache::get($cacheKey);
+        if (! is_array($state) || empty($state['status'])) {
+            return response()->json(['message' => 'Not found'], 404);
+        }
+
+        return response()->json($state);
     }
 
     private function currentFileManagerLimitMb(): int

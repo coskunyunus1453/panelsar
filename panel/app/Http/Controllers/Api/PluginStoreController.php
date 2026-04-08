@@ -10,6 +10,7 @@ use App\Models\PluginModule;
 use App\Models\UserPluginModule;
 use App\Services\SafeAuditLogger;
 use App\Support\MigrationCliResolver;
+use App\Support\MigrationSsh;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Bus;
@@ -442,15 +443,16 @@ class PluginStoreController extends Controller
         @chmod($tmpKey, 0600);
         try {
             $remoteCmd = sprintf('test -d %s && echo OK', escapeshellarg($path));
-            $p = new Process([
-                'ssh',
-                '-i', $tmpKey,
-                '-o', 'StrictHostKeyChecking=accept-new',
-                '-o', 'ConnectTimeout=15',
-                '-p', (string) $port,
-                $user.'@'.$host,
-                $remoteCmd,
-            ], null, null, null, 25);
+            $p = new Process(
+                array_merge(
+                    MigrationSsh::commandPrefix($tmpKey, (int) $port),
+                    [$user.'@'.$host, $remoteCmd]
+                ),
+                null,
+                MigrationSsh::processEnv(),
+                null,
+                25
+            );
             $p->run();
 
             $ok = $p->isSuccessful() && str_contains($p->getOutput(), 'OK');
@@ -487,15 +489,16 @@ class PluginStoreController extends Controller
     private function remoteTestDir(string $keyPath, int $port, string $userAtHost, string $path): bool
     {
         $remoteCmd = sprintf('test -d %s && echo OK', escapeshellarg($path));
-        $p = new Process([
-            'ssh',
-            '-i', $keyPath,
-            '-o', 'StrictHostKeyChecking=accept-new',
-            '-o', 'ConnectTimeout=15',
-            '-p', (string) $port,
-            $userAtHost,
-            $remoteCmd,
-        ], null, null, null, 25);
+        $p = new Process(
+            array_merge(
+                MigrationSsh::commandPrefix($keyPath, (int) $port),
+                [$userAtHost, $remoteCmd]
+            ),
+            null,
+            MigrationSsh::processEnv(),
+            null,
+            25
+        );
         $p->run();
 
         return $p->isSuccessful() && str_contains($p->getOutput(), 'OK');
@@ -550,14 +553,16 @@ class PluginStoreController extends Controller
             "ls -1 /var/lib/mysql 2>/dev/null | sed '/^mysql\$/d;/^performance_schema\$/d;/^information_schema\$/d;/^sys\$/d' | head -n 50",
         ];
         foreach ($cmds as $cmd) {
-            $p = new Process([
-                'ssh',
-                '-i', $keyPath,
-                '-o', 'StrictHostKeyChecking=accept-new',
-                '-p', (string) $port,
-                $userAtHost,
-                $cmd,
-            ], null, null, null, 25);
+            $p = new Process(
+                array_merge(
+                    MigrationSsh::commandPrefix($keyPath, (int) $port),
+                    [$userAtHost, $cmd]
+                ),
+                null,
+                MigrationSsh::processEnv(),
+                null,
+                25
+            );
             $p->run();
             if (! $p->isSuccessful()) {
                 continue;

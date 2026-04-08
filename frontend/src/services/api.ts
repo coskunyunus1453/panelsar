@@ -71,6 +71,12 @@ api.interceptors.response.use(
       ) {
         return Promise.reject(error)
       }
+      if (error.response?.status === 423 && code === 'password_change_required') {
+        if (typeof window !== 'undefined') {
+          window.location.href = `${window.location.origin}${inferPublicPathPrefix().replace(/\/+$/, '')}/settings?mandatoryPassword=1`
+        }
+        return Promise.reject(error)
+      }
 
       const msg = error.response?.data?.message || error.message || 'API error'
       useNotificationsStore.getState().add({

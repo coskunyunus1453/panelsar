@@ -17,6 +17,8 @@ class HostvimFixPermissionsCommand extends Command
         $dirs = [
             storage_path('app/public'),
             storage_path('app/private'),
+            storage_path('app/ssh-home'),
+            storage_path('app/ssh-home/.ssh'),
             storage_path('framework/cache/data'),
             storage_path('framework/sessions'),
             storage_path('framework/views'),

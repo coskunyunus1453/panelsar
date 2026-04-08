@@ -37,7 +37,7 @@ class ProfileController extends Controller
     {
         $validated = $request->validate([
             'current_password' => 'required|string',
-            'password' => ['required', 'confirmed', Password::defaults()],
+            'password' => ['required', 'confirmed', Password::min(8)->letters()->mixedCase()->numbers()->symbols()],
         ]);
 
         if (! Hash::check($validated['current_password'], $request->user()->password)) {
@@ -48,6 +48,7 @@ class ProfileController extends Controller
 
         $request->user()->update([
             'password' => Hash::make($validated['password']),
+            'force_password_change' => false,
         ]);
 
         return response()->json(['message' => 'Şifre güncellendi.']);

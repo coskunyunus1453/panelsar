@@ -13,6 +13,7 @@ import {
   Sun,
   Moon,
   LogOut,
+  Settings,
   Bell,
   Globe,
   User,
@@ -20,6 +21,8 @@ import {
   SlidersHorizontal,
   LayoutGrid,
   ShieldCheck,
+  ChevronDown,
+  ChevronRight,
 } from 'lucide-react'
 import clsx from 'clsx'
 import { useEffect, useState } from 'react'
@@ -40,8 +43,9 @@ export default function Header() {
   const { isDark, toggleTheme, openMobileSidebar } = useThemeStore()
   const { mode, setMode, advancedTipsSeen, markAdvancedTipsSeen } = useUiModeStore()
   const [showAdvancedTips, setShowAdvancedTips] = useState(false)
-  const [showLangMenu, setShowLangMenu] = useState(false)
   const [showNotifMenu, setShowNotifMenu] = useState(false)
+  const [showProfileMenu, setShowProfileMenu] = useState(false)
+  const [showLanguageSubmenu, setShowLanguageSubmenu] = useState(false)
   const [panelCheckRunning, setPanelCheckRunning] = useState(false)
   const { items, markAllRead, clear, remove, mergeFromServer } = useNotificationsStore()
   const [levelFilter, setLevelFilter] = useState<'all' | 'error' | 'info' | 'success'>('all')
@@ -129,7 +133,19 @@ export default function Header() {
 
   const changeLanguage = (code: string) => {
     i18n.changeLanguage(code)
-    setShowLangMenu(false)
+    setShowLanguageSubmenu(false)
+    setShowProfileMenu(false)
+  }
+  const toggleUiMode = () => {
+    const next = mode === 'easy' ? 'advanced' : 'easy'
+    setMode(next)
+    if (next === 'easy') {
+      setShowAdvancedTips(false)
+    }
+    toast.success(
+      next === 'easy' ? t('ui_mode.switched_easy') : t('ui_mode.switched_advanced'),
+      { duration: 1800 },
+    )
   }
 
   useEffect(() => {
@@ -142,13 +158,7 @@ export default function Header() {
     <header className="relative z-20 flex h-16 shrink-0 items-center justify-between gap-2 border-b border-gray-200 bg-white px-3 dark:border-gray-800 dark:bg-gray-900 sm:gap-3 sm:px-6">
       <button
         type="button"
-        onClick={() => {
-          const next = mode === 'easy' ? 'advanced' : 'easy'
-          setMode(next)
-          if (next === 'easy') {
-            setShowAdvancedTips(false)
-          }
-        }}
+        onClick={toggleUiMode}
         className={clsx(
           'absolute left-3 top-1/2 z-[60] -translate-y-1/2 rounded-xl border p-2 transition-colors md:hidden',
           mode === 'easy'
@@ -165,16 +175,10 @@ export default function Header() {
         )}
       </button>
 
-      <div className="relative z-10 flex min-w-0 flex-1 flex-nowrap items-center justify-center gap-0.5 overflow-x-auto px-11 py-0 [scrollbar-width:none] sm:gap-1 sm:px-12 md:flex-initial md:justify-end md:gap-3 md:overflow-visible md:px-0 [&::-webkit-scrollbar]:hidden">
+      <div className="relative z-10 flex min-w-0 flex-1 flex-nowrap items-center justify-center gap-0.5 overflow-x-auto px-11 py-0 [scrollbar-width:none] sm:gap-1 sm:px-12 md:flex-1 md:justify-center md:gap-3 md:overflow-visible md:px-0 [&::-webkit-scrollbar]:hidden">
         <button
           type="button"
-          onClick={() => {
-            const next = mode === 'easy' ? 'advanced' : 'easy'
-            setMode(next)
-            if (next === 'easy') {
-              setShowAdvancedTips(false)
-            }
-          }}
+          onClick={toggleUiMode}
           className={clsx(
             'relative z-0 hidden shrink-0 rounded-xl border p-2 transition-colors md:inline-flex',
             mode === 'easy'
@@ -275,35 +279,6 @@ export default function Header() {
 
         <div className="relative shrink-0">
           <button
-            onClick={() => setShowLangMenu(!showLangMenu)}
-            className="rounded-lg p-1.5 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800 md:p-2"
-            title={t('settings.language')}
-          >
-            <Globe className="h-[18px] w-[18px] md:h-5 md:w-5" />
-          </button>
-
-          {showLangMenu && (
-            <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50">
-              {languages.map((lang) => (
-                <button
-                  key={lang.code}
-                  onClick={() => changeLanguage(lang.code)}
-                  className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors ${
-                    i18n.language === lang.code
-                      ? 'text-primary-600 dark:text-primary-400 font-medium'
-                      : 'text-gray-700 dark:text-gray-300'
-                  }`}
-                >
-                  <span className="text-lg">{lang.flag}</span>
-                  <span>{lang.name}</span>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-
-        <div className="relative shrink-0">
-          <button
             onClick={() => {
               const next = !showNotifMenu
               setShowNotifMenu(next)
@@ -375,25 +350,83 @@ export default function Header() {
           )}
         </div>
 
-        <div
-          className="flex shrink-0 items-center gap-1.5 border-l border-gray-200 pl-1.5 dark:border-gray-700 sm:gap-2 sm:pl-2 md:ml-2 md:pl-4"
-          title={user?.name ?? undefined}
-        >
-          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary-100 dark:bg-primary-900 md:h-8 md:w-8">
-            <User className="h-3.5 w-3.5 text-primary-600 dark:text-primary-400 md:h-4 md:w-4" />
-          </div>
-          <span className="hidden max-w-[8rem] truncate text-sm font-medium text-gray-700 dark:text-gray-300 md:inline">
-            {user?.name}
-          </span>
+        <div className="relative shrink-0 border-l border-gray-200 pl-1.5 dark:border-gray-700 sm:pl-2 md:ml-2 md:pl-4">
+          <button
+            onClick={() => setShowProfileMenu((v) => !v)}
+            className="flex h-7 w-7 items-center justify-center rounded-full bg-primary-100 text-primary-600 hover:bg-primary-200 dark:bg-primary-900 dark:text-primary-400 dark:hover:bg-primary-800 md:h-8 md:w-8"
+            title={user?.name ?? t('nav.settings')}
+          >
+            <User className="h-3.5 w-3.5 md:h-4 md:w-4" />
+          </button>
+          {showProfileMenu && (
+            <>
+              <div
+                className="fixed inset-0 z-40 bg-black/40"
+                onClick={() => {
+                  setShowProfileMenu(false)
+                  setShowLanguageSubmenu(false)
+                }}
+              />
+              <div className="fixed inset-x-3 bottom-3 z-50 w-auto overflow-hidden rounded-xl border border-gray-200 bg-white shadow-2xl dark:border-gray-700 dark:bg-gray-800 md:absolute md:inset-auto md:right-0 md:bottom-auto md:mt-2 md:w-44 md:rounded-lg md:shadow-lg">
+                <button
+                  type="button"
+                  className="flex w-full items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-700"
+                  onClick={() => {
+                    setShowProfileMenu(false)
+                    navigate('/settings')
+                  }}
+                >
+                  <Settings className="h-4 w-4" />
+                  {t('nav.settings')}
+                </button>
+                <div className="border-t border-gray-100 px-2 py-1 dark:border-gray-700">
+                  <button
+                    type="button"
+                    className="flex w-full items-center justify-between rounded px-2 py-1.5 text-xs text-left text-gray-700 transition-colors hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-700"
+                    onClick={() => setShowLanguageSubmenu((v) => !v)}
+                  >
+                    <span className="inline-flex items-center gap-1">
+                      <Globe className="h-3.5 w-3.5" />
+                      {t('settings.language')}
+                    </span>
+                    {showLanguageSubmenu ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+                  </button>
+                  {showLanguageSubmenu && (
+                    <div className="mt-1 space-y-0.5">
+                      {languages.map((lang) => (
+                        <button
+                          key={lang.code}
+                          type="button"
+                          onClick={() => changeLanguage(lang.code)}
+                          className={clsx(
+                            'flex w-full items-center gap-2 rounded px-2 py-1.5 text-xs text-left transition-colors',
+                            i18n.language === lang.code
+                              ? 'bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300'
+                              : 'text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-700',
+                          )}
+                        >
+                          <span>{lang.flag}</span>
+                          <span>{lang.name}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  className="flex w-full items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"
+                  onClick={() => {
+                    setShowProfileMenu(false)
+                    void handleLogout()
+                  }}
+                >
+                  <LogOut className="h-4 w-4" />
+                  {t('auth.logout')}
+                </button>
+              </div>
+            </>
+          )}
         </div>
-
-        <button
-          onClick={handleLogout}
-          className="shrink-0 rounded-lg p-1.5 text-gray-500 hover:bg-red-50 hover:text-red-600 dark:text-gray-400 dark:hover:bg-red-900/20 dark:hover:text-red-400 md:p-2"
-          title={t('auth.logout')}
-        >
-          <LogOut className="h-[18px] w-[18px] md:h-5 md:w-5" />
-        </button>
 
       </div>
       <button

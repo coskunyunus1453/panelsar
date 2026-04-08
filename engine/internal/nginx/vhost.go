@@ -112,14 +112,28 @@ server {
     access_log {{.AccessLog}};
     error_log {{.ErrorLog}};
 
+    client_max_body_size 128m;
+
     location / {
         try_files $uri $uri/ /index.php?$query_string;
+    }
+
+    # Wrong VITE base + /admin URL → browser requests /admin/admin/assets/* ; map to real /assets/*
+    location ^~ /admin/admin/assets/ {
+        rewrite ^/admin/admin/assets/(.*)$ /assets/$1 break;
+        try_files $uri =404;
+        access_log off;
     }
 
     # SPA static fallback: if build produced relative asset paths and user is on /admin/*
     # serve /admin/assets/* from actual /assets/* to avoid 404 on hashed bundles.
     location ^~ /admin/assets/ {
         rewrite ^/admin/assets/(.*)$ /assets/$1 break;
+        try_files $uri =404;
+        access_log off;
+    }
+
+    location ^~ /assets/ {
         try_files $uri =404;
         access_log off;
     }
@@ -168,14 +182,27 @@ server {
     access_log {{.AccessLog}};
     error_log {{.ErrorLog}};
 
+    client_max_body_size 128m;
+
     location / {
         try_files $uri $uri/ /index.php?$query_string;
+    }
+
+    location ^~ /admin/admin/assets/ {
+        rewrite ^/admin/admin/assets/(.*)$ /assets/$1 break;
+        try_files $uri =404;
+        access_log off;
     }
 
     # SPA static fallback: if build produced relative asset paths and user is on /admin/*
     # serve /admin/assets/* from actual /assets/* to avoid 404 on hashed bundles.
     location ^~ /admin/assets/ {
         rewrite ^/admin/assets/(.*)$ /assets/$1 break;
+        try_files $uri =404;
+        access_log off;
+    }
+
+    location ^~ /assets/ {
         try_files $uri =404;
         access_log off;
     }
