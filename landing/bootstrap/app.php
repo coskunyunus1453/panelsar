@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\EnsureUserIsAdmin;
+use App\Http\Middleware\EnsureUserNotCommunityBanned;
 use App\Http\Middleware\SecurityHeaders;
 use App\Http\Middleware\SetLandingLocale;
 use Illuminate\Foundation\Application;
@@ -15,12 +16,15 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        $middleware->redirectGuestsTo(fn () => route('login'));
+        $middleware->redirectUsersTo(fn () => route('community.index'));
         $middleware->web(append: [
             SetLandingLocale::class,
             SecurityHeaders::class,
         ]);
         $middleware->alias([
             'admin' => EnsureUserIsAdmin::class,
+            'community.active' => EnsureUserNotCommunityBanned::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

@@ -7,6 +7,7 @@ use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
@@ -29,6 +30,28 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'is_admin' => 'boolean',
+            'community_banned_at' => 'datetime',
+            'community_shadowbanned_at' => 'datetime',
         ];
+    }
+
+    public function communityTopics(): HasMany
+    {
+        return $this->hasMany(CommunityTopic::class);
+    }
+
+    public function communityPosts(): HasMany
+    {
+        return $this->hasMany(CommunityPost::class);
+    }
+
+    public function isCommunityBanned(): bool
+    {
+        return $this->community_banned_at !== null;
+    }
+
+    public function isCommunityShadowBanned(): bool
+    {
+        return $this->community_shadowbanned_at !== null;
     }
 }

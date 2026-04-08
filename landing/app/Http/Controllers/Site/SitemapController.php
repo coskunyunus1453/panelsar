@@ -5,9 +5,13 @@ namespace App\Http\Controllers\Site;
 use App\Http\Controllers\Controller;
 use App\Models\BlogCategory;
 use App\Models\BlogPost;
+use App\Models\CommunitySiteMeta;
+use App\Models\CommunityTag;
+use App\Models\CommunityTopic;
 use App\Models\DocPage;
 use App\Models\SitePage;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\Schema;
 
 class SitemapController extends Controller
 {
@@ -56,6 +60,41 @@ class SitemapController extends Controller
 
         foreach (['blog.index', 'docs.index', 'site.pricing'] as $name) {
             $entries[] = ['loc' => route($name, absolute: true), 'lastmod' => now()];
+        }
+
+        if (Schema::hasTable('community_site_meta') && Schema::hasTable('community_topics')) {
+            $meta = CommunitySiteMeta::query()->first();
+            if ($meta && $meta->enable_indexing) {
+                $entries[] = ['loc' => route('community.index', absolute: true), 'lastmod' => now()];
+                $topicsQuery = CommunityTopic::query()
+                    ->published()
+                    ->whereHas('category', fn ($q) => $q->where('is_active', true));
+                if (Schema::hasColumn('community_topics', 'moderation_status')) {
+                    $topicsQuery->where('moderation_status', CommunityTopic::MODERATION_APPROVED);
+                }
+                foreach ($topicsQuery->orderByDesc('updated_at')->get(['slug', 'updated_at']) as $t) {
+                    $entries[] = [
+                        'loc' => route('community.topic', $t->slug, absolute: true),
+                        'lastmod' => $t->updated_at,
+                    ];
+                }
+                if (Schema::hasTable('community_tags')) {
+                    foreach (CommunityTag::query()
+                        ->whereHas('topics', function ($q): void {
+                            $q->where('status', CommunityTopic::STATUS_PUBLISHED);
+                            if (Schema::hasColumn('community_topics', 'moderation_status')) {
+                                $q->where('moderation_status', CommunityTopic::MODERATION_APPROVED);
+                            }
+                        })
+                        ->orderBy('slug')
+                        ->get(['slug', 'updated_at']) as $tag) {
+                        $entries[] = [
+                            'loc' => route('community.tag', $tag->slug, absolute: true),
+                            'lastmod' => $tag->updated_at,
+                        ];
+                    }
+                }
+            }
         }
 
         return response()

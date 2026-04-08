@@ -461,10 +461,7 @@ final class LandingAppearance
             return Storage::disk('public')->url($pathOnPublicDisk);
         }
 
-        $request = request();
-        $root = rtrim($request->getSchemeAndHttpHost().$request->getBasePath(), '/');
-
-        return $root.'/storage/'.$pathOnPublicDisk;
+        return url('storage/'.$pathOnPublicDisk);
     }
 
     public static function heroImageAlt(): string

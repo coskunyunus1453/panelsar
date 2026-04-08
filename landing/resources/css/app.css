@@ -974,31 +974,38 @@ a.hv-muted-nav:hover {
     @apply text-orange-300/90;
 }
 
-/* Quill (admin zengin metin) — toolbar + gece modu */
-[data-admin-quill] .ql-toolbar.ql-snow {
-    @apply border-0 border-b border-slate-200 bg-slate-50;
+/* Quill zengin metin — toolbar, mobil sarma, gece modu */
+[data-hv-quill] .ql-toolbar.ql-snow {
+	@apply flex flex-wrap border-0 border-b border-slate-200 bg-slate-50;
 }
-.dark [data-admin-quill] .ql-toolbar.ql-snow {
-    @apply border-slate-600 bg-slate-900;
+.dark [data-hv-quill] .ql-toolbar.ql-snow {
+	@apply border-slate-600 bg-slate-900;
 }
-[data-admin-quill] .ql-container.ql-snow {
-    @apply border-0 font-sans text-sm text-slate-900;
+[data-hv-quill] .ql-container.ql-snow {
+	@apply border-0 font-sans text-sm text-slate-900;
 }
-.dark [data-admin-quill] .ql-container.ql-snow {
-    @apply text-slate-100;
+.dark [data-hv-quill] .ql-container.ql-snow {
+	@apply text-slate-100;
 }
-.dark [data-admin-quill] .ql-editor.ql-blank::before {
-    @apply text-slate-500;
+.dark [data-hv-quill] .ql-editor.ql-blank::before {
+	@apply text-slate-500;
 }
-.dark [data-admin-quill] .ql-snow .ql-stroke {
-    stroke: rgb(203 213 225);
+.dark [data-hv-quill] .ql-snow .ql-stroke {
+	stroke: rgb(203 213 225);
 }
-.dark [data-admin-quill] .ql-snow .ql-fill {
-    fill: rgb(203 213 225);
+.dark [data-hv-quill] .ql-snow .ql-fill {
+	fill: rgb(203 213 225);
 }
-.dark [data-admin-quill] .ql-snow .ql-picker {
-    @apply text-slate-200;
+.dark [data-hv-quill] .ql-snow .ql-picker {
+	@apply text-slate-200;
 }
-.dark [data-admin-quill] .ql-snow .ql-picker-options {
-    @apply border-slate-600 bg-slate-900;
+.dark [data-hv-quill] .ql-snow .ql-picker-options {
+	@apply border-slate-600 bg-slate-900;
+}
+
+/* Dokunmatik: editör minimum yükseklik */
+@media (max-width: 640px) {
+	[data-hv-quill] .hv-quill-host {
+		min-height: 12rem !important;
+	}
 }

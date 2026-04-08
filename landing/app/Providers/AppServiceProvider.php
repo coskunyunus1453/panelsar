@@ -41,6 +41,24 @@ class AppServiceProvider extends ServiceProvider
             return Limit::perMinute(30)->by(request()->ip());
         });
 
+        RateLimiter::for('community-topic-create', function (Request $request) {
+            $by = (string) ($request->user()?->getKey() ?? $request->ip());
+
+            return [
+                Limit::perHour(18)->by('ct-h:'.$by),
+                Limit::perDay(60)->by('ct-d:'.$by),
+            ];
+        });
+
+        RateLimiter::for('community-reply', function (Request $request) {
+            $by = (string) ($request->user()?->getKey() ?? $request->ip());
+
+            return [
+                Limit::perMinute(10)->by('cr-m:'.$by),
+                Limit::perHour(150)->by('cr-h:'.$by),
+            ];
+        });
+
         $landingViews = [
             'components.layouts.landing',
             'components.site.layout',
@@ -56,6 +74,14 @@ class AppServiceProvider extends ServiceProvider
             'site.blog.show',
             'site.docs.index',
             'site.docs.show',
+            'site.auth.login',
+            'site.auth.register',
+            'site.auth.forgot-password',
+            'site.auth.reset-password',
+            'site.community.index',
+            'site.community.topic',
+            'site.community.ask',
+            'site.community.profile',
         ];
 
         View::composer($landingViews, LandingAppearanceComposer::class);

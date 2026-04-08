@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Models\PanelSetting;
+use App\Services\OutboundMailConfigurator;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Schema;
 
@@ -49,6 +50,8 @@ class HostvimInitOutboundMailCommand extends Command
                 ['value' => encrypt($envPass)]
             );
         }
+
+        OutboundMailConfigurator::apply();
 
         return self::SUCCESS;
     }

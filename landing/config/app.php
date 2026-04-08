@@ -56,6 +56,19 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Asset URL (Vite / @vite, asset() kökü)
+    |--------------------------------------------------------------------------
+    |
+    | Site alt klasördeyse (örn. /hostvim/landing/public) burayı ayarlayın ve
+    | npm run build öncesinde .env'de tanımlayın; aksi halde ön yüz /build/ ile
+    | kökten yanlış adres ister.
+    |
+    */
+
+    'asset_url' => env('ASSET_URL'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Application Timezone
     |--------------------------------------------------------------------------
     |

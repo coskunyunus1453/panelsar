@@ -575,11 +575,22 @@ func registerModuleRoutes(cfg *config.Config, d *daemon.Daemon, api *gin.RouterG
 	api.GET("/installer/apps", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
 			"apps": []gin.H{
-				{"id": "wordpress", "name": "WordPress", "version": "latest", "automated": true},
-				{"id": "joomla", "name": "Joomla", "version": "latest", "automated": false},
-				{"id": "laravel", "name": "Laravel", "version": "11.x", "automated": false},
-				{"id": "drupal", "name": "Drupal", "version": "10.x", "automated": false},
-				{"id": "prestashop", "name": "PrestaShop", "version": "8.x", "automated": false},
+				// Script installer — KOBİ (otomatik)
+				{"id": "wordpress", "name": "WordPress", "version": "latest", "automated": true, "category": "kobi", "supports_woocommerce": true},
+				{"id": "opencart", "name": "OpenCart", "version": "4.0.x", "automated": true, "category": "kobi"},
+				// App deploy — AJANS (rehber / yönlendirme)
+				{"id": "nodejs", "name": "Node.js", "version": "", "automated": false, "category": "agency", "route": "/deploy"},
+				{"id": "laravel", "name": "Laravel", "version": "11.x", "automated": false, "category": "agency", "route": "/deploy"},
+				{"id": "docker", "name": "Docker", "version": "", "automated": false, "category": "agency", "route": "/site-tools"},
+				{"id": "git_deploy", "name": "Git deploy", "version": "", "automated": false, "category": "agency", "route": "/deploy"},
+				// Modern stack (rehber)
+				{"id": "nextjs", "name": "Next.js starter", "version": "", "automated": false, "category": "modern", "route": "/deploy"},
+				{"id": "strapi", "name": "Strapi", "version": "", "automated": false, "category": "modern", "route": "/deploy"},
+				{"id": "n8n", "name": "n8n", "version": "", "automated": false, "category": "modern", "route": "/site-tools"},
+				// Diğer (manuel)
+				{"id": "joomla", "name": "Joomla", "version": "latest", "automated": false, "category": "other"},
+				{"id": "drupal", "name": "Drupal", "version": "10.x", "automated": false, "category": "other"},
+				{"id": "prestashop", "name": "PrestaShop", "version": "8.x", "automated": false, "category": "other"},
 			},
 		})
 	})
@@ -1517,14 +1528,15 @@ func listProcesses() ([]gin.H, error) {
 func handleInstallerInstall(cfg *config.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var req struct {
-			App         string `json:"app" binding:"required"`
-			Domain      string `json:"domain" binding:"required"`
-			DbHost      string `json:"db_host"`
-			DbPort      int    `json:"db_port"`
-			DbName      string `json:"db_name"`
-			DbUser      string `json:"db_user"`
-			DbPassword  string `json:"db_password"`
-			TablePrefix string `json:"table_prefix"`
+			App                  string `json:"app" binding:"required"`
+			Domain               string `json:"domain" binding:"required"`
+			DbHost               string `json:"db_host"`
+			DbPort               int    `json:"db_port"`
+			DbName               string `json:"db_name"`
+			DbUser               string `json:"db_user"`
+			DbPassword           string `json:"db_password"`
+			TablePrefix          string `json:"table_prefix"`
+			InstallWooCommerce   bool   `json:"install_woocommerce"`
 		}
 		if err := c.ShouldBindJSON(&req); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -1541,7 +1553,12 @@ func handleInstallerInstall(cfg *config.Config) gin.HandlerFunc {
 				TablePrefix: req.TablePrefix,
 			}
 		}
-		if err := installer.Run(cfg, req.App, req.Domain, db); err != nil {
+		var opts *installer.Options
+		appTrim := strings.ToLower(strings.TrimSpace(req.App))
+		if appTrim == "wordpress" && req.InstallWooCommerce {
+			opts = &installer.Options{InstallWooCommerce: true}
+		}
+		if err := installer.Run(cfg, req.App, req.Domain, db, opts); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}

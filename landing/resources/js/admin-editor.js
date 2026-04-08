@@ -59,6 +59,6 @@ function initRoot(root) {
     runSync();
 }
 
-export function initAdminRichEditors() {
-    document.querySelectorAll('[data-admin-quill]').forEach((el) => initRoot(el));
+export function initHvRichEditors() {
+    document.querySelectorAll('[data-hv-quill]').forEach((el) => initRoot(el));
 }

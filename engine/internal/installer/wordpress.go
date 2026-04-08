@@ -1,10 +1,10 @@
 package installer
 
 import (
-	"archive/zip"
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -17,7 +17,12 @@ import (
 
 var tablePrefixRe = regexp.MustCompile(`^[a-zA-Z0-9_]{1,16}$`)
 
-func installWordPress(cfg *config.Config, domain string, db *DBConfig) error {
+// Options ek kurulum bayrakları (ör. WooCommerce eklentisi).
+type Options struct {
+	InstallWooCommerce bool
+}
+
+func installWordPress(cfg *config.Config, domain string, db *DBConfig, opts *Options) error {
 	if domain == "" || strings.Contains(domain, "..") {
 		return fmt.Errorf("invalid domain")
 	}
@@ -55,8 +60,14 @@ func installWordPress(cfg *config.Config, domain string, db *DBConfig) error {
 	}
 	defer os.Remove(zipFile)
 
-	if err := unzipWordPress(zipFile, docRoot); err != nil {
+	if err := unzipWithPrefix(zipFile, docRoot, "wordpress/"); err != nil {
 		return err
+	}
+
+	if opts != nil && opts.InstallWooCommerce {
+		if err := installWooCommercePlugin(cfg, docRoot); err != nil {
+			return fmt.Errorf("woocommerce: %w", err)
+		}
 	}
 
 	dbHost := strings.TrimSpace(db.Host)
@@ -81,9 +92,38 @@ func installWordPress(cfg *config.Config, domain string, db *DBConfig) error {
 	return nil
 }
 
-func downloadFile(url, dest string, timeout time.Duration) error {
+const wooPluginZipURL = "https://downloads.wordpress.org/plugin/woocommerce.latest-stable.zip"
+
+func installWooCommercePlugin(cfg *config.Config, docRoot string) error {
+	pluginsDir := filepath.Join(docRoot, "wp-content", "plugins")
+	if err := os.MkdirAll(pluginsDir, 0o755); err != nil {
+		return fmt.Errorf("plugins dir: %w", err)
+	}
+	if err := os.MkdirAll(cfg.Paths.TempDir, 0o755); err != nil {
+		return fmt.Errorf("temp dir: %w", err)
+	}
+	zipFile := filepath.Join(cfg.Paths.TempDir, "hostvim-woocommerce.zip")
+	if err := downloadFile(wooPluginZipURL, zipFile, 20*time.Minute); err != nil {
+		return err
+	}
+	defer os.Remove(zipFile)
+
+	if err := unzipWithPrefix(zipFile, pluginsDir, "woocommerce/"); err != nil {
+		return err
+	}
+	return nil
+}
+
+func downloadFile(rawURL, dest string, timeout time.Duration) error {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return fmt.Errorf("url: %w", err)
+	}
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return fmt.Errorf("yalnızca http/https indirmeleri desteklenir")
+	}
 	client := &http.Client{Timeout: timeout}
-	req, err := http.NewRequest(http.MethodGet, url, nil)
+	req, err := http.NewRequest(http.MethodGet, rawURL, nil)
 	if err != nil {
 		return err
 	}
@@ -103,67 +143,6 @@ func downloadFile(url, dest string, timeout time.Duration) error {
 	defer f.Close()
 	if _, err := io.Copy(f, resp.Body); err != nil {
 		return err
-	}
-	return nil
-}
-
-func unzipWordPress(srcZip, destDir string) error {
-	r, err := zip.OpenReader(srcZip)
-	if err != nil {
-		return fmt.Errorf("zip: %w", err)
-	}
-	defer r.Close()
-
-	const prefix = "wordpress/"
-	absDest, err := filepath.Abs(destDir)
-	if err != nil {
-		return err
-	}
-
-	for _, f := range r.File {
-		if !strings.HasPrefix(f.Name, prefix) {
-			continue
-		}
-		rel := strings.TrimPrefix(f.Name, prefix)
-		if rel == "" || strings.HasSuffix(rel, "/") {
-			continue
-		}
-		rel = filepath.FromSlash(rel)
-		if strings.Contains(rel, "..") {
-			continue
-		}
-		target := filepath.Join(destDir, rel)
-		absTarget, err := filepath.Abs(target)
-		if err != nil {
-			return err
-		}
-		if absTarget != absDest && !strings.HasPrefix(absTarget, absDest+string(os.PathSeparator)) {
-			continue
-		}
-		if f.FileInfo().IsDir() {
-			if err := os.MkdirAll(target, 0o755); err != nil {
-				return err
-			}
-			continue
-		}
-		if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
-			return err
-		}
-		rc, err := f.Open()
-		if err != nil {
-			return err
-		}
-		out, err := os.OpenFile(target, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode())
-		if err != nil {
-			rc.Close()
-			return err
-		}
-		_, err = io.Copy(out, rc)
-		rc.Close()
-		out.Close()
-		if err != nil {
-			return err
-		}
 	}
 	return nil
 }

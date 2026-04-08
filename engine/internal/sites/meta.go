@@ -26,6 +26,15 @@ func metaDir(webRoot, domain string) string {
 	return filepath.Join(webRoot, domain, metaDirName)
 }
 
+// SitePrivateDir alan adı altındaki .hostvim dizinini döndürür (site.json ile aynı konum).
+// Tipik kurulumda bu yol, web sunucusunun belge kökünün (ör. public_html) dışında kalır; HTTP ile doğrudan servis edilmez.
+func SitePrivateDir(webRoot, domain string) string {
+	if domain == "" || strings.Contains(domain, "..") {
+		return ""
+	}
+	return metaDir(webRoot, domain)
+}
+
 func legacySiteMetaDir(webRoot, domain string) string {
 	return filepath.Join(webRoot, domain, legacyMetaDirName)
 }

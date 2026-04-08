@@ -95,6 +95,22 @@
                 <a href="{{ route('admin.blog-categories.index') }}" class="flex items-center gap-2 rounded-xl px-3 py-2 {{ request()->routeIs('admin.blog-categories.*') ? 'bg-orange-500/15 font-medium text-orange-800 ring-1 ring-orange-500/30 dark:text-orange-200' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-900/80' }}">
                     Blog kategorileri
                 </a>
+                <div class="px-3 pt-2 text-[10px] font-semibold uppercase tracking-wider text-slate-400">Topluluk (forum)</div>
+                <a href="{{ route('admin.community.settings.edit') }}" class="flex items-center gap-2 rounded-xl px-3 py-2 {{ request()->routeIs('admin.community.settings.*') ? 'bg-orange-500/15 font-medium text-orange-800 ring-1 ring-orange-500/30 dark:text-orange-200' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-900/80' }}">
+                    Topluluk SEO
+                </a>
+                <a href="{{ route('admin.community.moderation.index') }}" class="flex items-center gap-2 rounded-xl px-3 py-2 {{ request()->routeIs('admin.community.moderation.*') ? 'bg-orange-500/15 font-medium text-orange-800 ring-1 ring-orange-500/30 dark:text-orange-200' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-900/80' }}">
+                    Moderasyon kuyruğu
+                </a>
+                <a href="{{ route('admin.community.categories.index') }}" class="flex items-center gap-2 rounded-xl px-3 py-2 {{ request()->routeIs('admin.community.categories.*') ? 'bg-orange-500/15 font-medium text-orange-800 ring-1 ring-orange-500/30 dark:text-orange-200' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-900/80' }}">
+                    Topluluk kategorileri
+                </a>
+                <a href="{{ route('admin.community.members.index') }}" class="flex items-center gap-2 rounded-xl px-3 py-2 {{ request()->routeIs('admin.community.members.*') ? 'bg-orange-500/15 font-medium text-orange-800 ring-1 ring-orange-500/30 dark:text-orange-200' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-900/80' }}">
+                    Topluluk üyeleri
+                </a>
+                <a href="{{ route('admin.community.topics.index') }}" class="flex items-center gap-2 rounded-xl px-3 py-2 {{ request()->routeIs('admin.community.topics.*') ? 'bg-orange-500/15 font-medium text-orange-800 ring-1 ring-orange-500/30 dark:text-orange-200' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-900/80' }}">
+                    Topluluk konuları
+                </a>
                 <a href="{{ route('admin.doc-pages.index') }}" class="flex items-center gap-2 rounded-xl px-3 py-2 {{ request()->routeIs('admin.doc-pages.*') ? 'bg-orange-500/15 font-medium text-orange-800 ring-1 ring-orange-500/30 dark:text-orange-200' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-900/80' }}">
                     Dokümanlar
                 </a>
@@ -192,6 +208,12 @@
                 <a href="{{ route('admin.site-pages.index') }}" class="block rounded-xl px-3 py-2 text-slate-700 hover:bg-orange-50 dark:text-slate-200 dark:hover:bg-slate-900/80">Site sayfaları</a>
                 <a href="{{ route('admin.blog-posts.index') }}" class="block rounded-xl px-3 py-2 text-slate-700 hover:bg-orange-50 dark:text-slate-200 dark:hover:bg-slate-900/80">Blog</a>
                 <a href="{{ route('admin.blog-categories.index') }}" class="block rounded-xl px-3 py-2 text-slate-700 hover:bg-orange-50 dark:text-slate-200 dark:hover:bg-slate-900/80">Blog kategorileri</a>
+                <div class="px-3 pt-2 text-[10px] font-semibold uppercase text-slate-400">Topluluk</div>
+                <a href="{{ route('admin.community.settings.edit') }}" class="block rounded-xl px-3 py-2 text-slate-700 hover:bg-orange-50 dark:text-slate-200 dark:hover:bg-slate-900/80">Topluluk SEO</a>
+                <a href="{{ route('admin.community.moderation.index') }}" class="block rounded-xl px-3 py-2 text-slate-700 hover:bg-orange-50 dark:text-slate-200 dark:hover:bg-slate-900/80">Moderasyon kuyruğu</a>
+                <a href="{{ route('admin.community.categories.index') }}" class="block rounded-xl px-3 py-2 text-slate-700 hover:bg-orange-50 dark:text-slate-200 dark:hover:bg-slate-900/80">Topluluk kategorileri</a>
+                <a href="{{ route('admin.community.members.index') }}" class="block rounded-xl px-3 py-2 text-slate-700 hover:bg-orange-50 dark:text-slate-200 dark:hover:bg-slate-900/80">Topluluk üyeleri</a>
+                <a href="{{ route('admin.community.topics.index') }}" class="block rounded-xl px-3 py-2 text-slate-700 hover:bg-orange-50 dark:text-slate-200 dark:hover:bg-slate-900/80">Topluluk konuları</a>
                 <a href="{{ route('admin.doc-pages.index') }}" class="block rounded-xl px-3 py-2 text-slate-700 hover:bg-orange-50 dark:text-slate-200 dark:hover:bg-slate-900/80">Dokümanlar</a>
                 <a href="{{ route('admin.plans.index') }}" class="block rounded-xl px-3 py-2 text-slate-700 hover:bg-orange-50 dark:text-slate-200 dark:hover:bg-slate-900/80">Planlar</a>
             </nav>

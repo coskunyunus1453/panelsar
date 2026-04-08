@@ -15,6 +15,7 @@ use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Throwable;
 
@@ -38,18 +39,29 @@ class InstallerController extends Controller
         }
 
         try {
+            $allowedApps = [
+                'wordpress', 'opencart',
+                'joomla', 'laravel', 'drupal', 'prestashop',
+                'nodejs', 'docker', 'git_deploy', 'nextjs', 'strapi', 'n8n',
+            ];
             $validated = $request->validate([
-                'app' => 'required|string|in:wordpress,joomla,laravel,drupal,prestashop',
+                'app' => ['required', 'string', Rule::in($allowedApps)],
                 'database_id' => 'nullable|integer|exists:databases,id',
                 'table_prefix' => 'nullable|string|regex:/^[a-zA-Z0-9_]{1,16}$/',
+                'install_woocommerce' => 'sometimes|boolean',
             ]);
 
-            if ($validated['app'] !== 'wordpress') {
-                return response()->json(['message' => __('installer.automated_only_wordpress')], 422);
+            $automated = in_array($validated['app'], ['wordpress', 'opencart'], true);
+            if (! $automated) {
+                return response()->json(['message' => __('installer.automated_apps_only')], 422);
             }
 
-            if (empty($validated['database_id'])) {
+            $installWoo = ! empty($validated['install_woocommerce']);
+            if ($validated['app'] === 'wordpress' && empty($validated['database_id'])) {
                 return response()->json(['message' => __('installer.wordpress_requires_db')], 422);
+            }
+            if ($validated['app'] === 'opencart' && empty($validated['database_id'])) {
+                return response()->json(['message' => __('installer.opencart_requires_db')], 422);
             }
 
             $db = Database::query()
@@ -95,17 +107,25 @@ class InstallerController extends Controller
                 'db_password' => $dbPassword,
                 'table_prefix' => $prefix,
             ];
+            if ($validated['app'] === 'wordpress') {
+                $payload['install_woocommerce'] = $installWoo;
+            }
+
+            $engineApp = $validated['app'];
+            $runAppLabel = ($validated['app'] === 'wordpress' && $installWoo)
+                ? 'wordpress_woocommerce'
+                : $validated['app'];
 
             // Yeni installer_runs tablosu canlıda henüz migrate edilmemiş olabilir.
             // Bu durumda kurulum akışını düşürmeyip doğrudan senkron kurulum yap.
             if (! Schema::hasTable('installer_runs')) {
-                return $this->runInstallerDirect($domain, $payload);
+                return $this->runInstallerDirect($domain, $engineApp, $payload);
             }
 
             $run = InstallerRun::query()->create([
                 'user_id' => $request->user()->id,
                 'domain_id' => $domain->id,
-                'app' => 'wordpress',
+                'app' => $runAppLabel,
                 'status' => 'queued',
                 'message' => __('installer.started'),
             ]);
@@ -113,7 +133,7 @@ class InstallerController extends Controller
             $isSyncQueue = (string) config('queue.default', 'sync') === 'sync';
             if ($isSyncQueue) {
                 // Queue worker yoksa kullanıcıyı yanıltmamak için aynı requestte çalıştır.
-                (new RunInstallerJob($run->id, $domain->name, 'wordpress', $payload))->handle($this->engine);
+                (new RunInstallerJob($run->id, $domain->name, $engineApp, $payload))->handle($this->engine);
 
                 $run->refresh();
                 if ($run->status === 'failed') {
@@ -143,7 +163,7 @@ class InstallerController extends Controller
                 ]);
             }
 
-            Bus::dispatch(new RunInstallerJob($run->id, $domain->name, 'wordpress', $payload))->afterResponse();
+            Bus::dispatch(new RunInstallerJob($run->id, $domain->name, $engineApp, $payload))->afterResponse();
 
             return response()->json([
                 'message' => __('installer.started_background'),
@@ -306,9 +326,9 @@ class InstallerController extends Controller
      *
      * @param  array<string, mixed>  $payload
      */
-    private function runInstallerDirect(Domain $domain, array $payload): JsonResponse
+    private function runInstallerDirect(Domain $domain, string $engineApp, array $payload): JsonResponse
     {
-        $engine = $this->engine->installerRun('wordpress', $domain->name, $payload);
+        $engine = $this->engine->installerRun($engineApp, $domain->name, $payload);
         if (! empty($engine['error'])) {
             if (EngineApiService::isLikelyConnectionFailure($engine['error'])) {
                 return response()->json([

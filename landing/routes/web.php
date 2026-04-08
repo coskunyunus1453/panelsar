@@ -4,6 +4,12 @@ use App\Http\Controllers\Admin\Auth\LoginController;
 use App\Http\Controllers\Admin\BillingSettingsController;
 use App\Http\Controllers\Admin\BlogCategoryController;
 use App\Http\Controllers\Admin\BlogPostController;
+use App\Http\Controllers\Admin\CommunityCategoryController;
+use App\Http\Controllers\Admin\CommunityMemberController;
+use App\Http\Controllers\Admin\CommunityModerationController;
+use App\Http\Controllers\Admin\CommunityPostController;
+use App\Http\Controllers\Admin\CommunitySiteMetaController;
+use App\Http\Controllers\Admin\CommunityTopicController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\DocPageController;
 use App\Http\Controllers\Admin\LandingTranslationController;
@@ -19,7 +25,14 @@ use App\Http\Controllers\Admin\SaasProductModuleController;
 use App\Http\Controllers\Admin\SitePageController as AdminSitePageController;
 use App\Http\Controllers\Admin\SiteSettingsController;
 use App\Http\Controllers\Admin\ThemeSettingsController;
+use App\Http\Controllers\Site\Auth\LoginController as SiteLoginController;
+use App\Http\Controllers\Site\Auth\NewPasswordController;
+use App\Http\Controllers\Site\Auth\PasswordResetLinkController;
+use App\Http\Controllers\Site\Auth\RegisterController as SiteRegisterController;
 use App\Http\Controllers\Site\BlogController;
+use App\Http\Controllers\Site\CommunityController;
+use App\Http\Controllers\Site\CommunityParticipationController;
+use App\Http\Controllers\Site\CommunityProfileController;
 use App\Http\Controllers\Site\DocController;
 use App\Http\Controllers\Site\PricingController;
 use App\Http\Controllers\Site\SitemapController;
@@ -87,6 +100,50 @@ Route::get('/p/{slug}', [SitePageController::class, 'show'])->name('site.page');
 
 Route::view('/license/success', 'site.license-success')->name('license.success');
 Route::view('/license/cancel', 'site.license-cancel')->name('license.cancel');
+
+Route::middleware('guest')->group(function (): void {
+    Route::get('login', [SiteLoginController::class, 'create'])->name('login');
+    Route::post('login', [SiteLoginController::class, 'store'])
+        ->middleware('throttle:10,1')
+        ->name('login.store');
+    Route::get('register', [SiteRegisterController::class, 'create'])->name('register');
+    Route::post('register', [SiteRegisterController::class, 'store'])
+        ->middleware('throttle:10,1')
+        ->name('register.store');
+    Route::get('forgot-password', [PasswordResetLinkController::class, 'create'])->name('password.request');
+    Route::post('forgot-password', [PasswordResetLinkController::class, 'store'])
+        ->middleware('throttle:5,1')
+        ->name('password.email');
+    Route::get('reset-password/{token}', [NewPasswordController::class, 'create'])->name('password.reset');
+    Route::post('reset-password', [NewPasswordController::class, 'store'])
+        ->middleware('throttle:5,1')
+        ->name('password.store');
+});
+
+Route::post('logout', [SiteLoginController::class, 'destroy'])
+    ->middleware('auth')
+    ->name('logout');
+
+Route::get('/community', [CommunityController::class, 'index'])->name('community.index');
+Route::get('/community/c/{category:slug}', [CommunityController::class, 'category'])->name('community.category');
+Route::get('/community/etiket/{tag:slug}', [CommunityController::class, 'tag'])->name('community.tag');
+Route::get('/community/t/{topic:slug}', [CommunityController::class, 'topic'])->name('community.topic');
+
+Route::middleware(['auth', 'community.active'])->group(function (): void {
+    Route::get('/community/profil', [CommunityProfileController::class, 'edit'])->name('community.profile.edit');
+    Route::put('/community/profil', [CommunityProfileController::class, 'update'])->name('community.profile.update');
+
+    Route::get('/community/ask', [CommunityParticipationController::class, 'ask'])->name('community.ask');
+    Route::post('/community/ask', [CommunityParticipationController::class, 'storeTopic'])
+        ->middleware('throttle:community-topic-create')
+        ->name('community.ask.store');
+    Route::post('/community/t/{topic:slug}/reply', [CommunityParticipationController::class, 'storeReply'])
+        ->middleware('throttle:community-reply')
+        ->name('community.reply');
+    Route::post('/community/t/{topic:slug}/best', [CommunityParticipationController::class, 'setBestAnswer'])
+        ->middleware('throttle:community-reply')
+        ->name('community.best');
+});
 
 Route::prefix('admin')->name('admin.')->group(function (): void {
     Route::get('login', [LoginController::class, 'create'])->name('login');
@@ -156,6 +213,39 @@ Route::prefix('admin')->name('admin.')->group(function (): void {
             Route::put('nav-menu/{item}', [NavMenuItemController::class, 'update'])->name('nav-menu.update');
             Route::delete('nav-menu/{item}', [NavMenuItemController::class, 'destroy'])->name('nav-menu.destroy');
             Route::post('nav-menu/reorder', [NavMenuItemController::class, 'reorder'])->name('nav-menu.reorder');
+
+            Route::get('community/settings', [CommunitySiteMetaController::class, 'edit'])->name('community.settings.edit');
+            Route::put('community/settings', [CommunitySiteMetaController::class, 'update'])->name('community.settings.update');
+            Route::get('community/moderation', [CommunityModerationController::class, 'index'])->name('community.moderation.index');
+            Route::post('community/moderation/topics/{community_topic}/approve', [CommunityModerationController::class, 'approveTopic'])->name('community.moderation.topics.approve');
+            Route::post('community/moderation/topics/{community_topic}/reject', [CommunityModerationController::class, 'rejectTopic'])->name('community.moderation.topics.reject');
+            Route::post('community/moderation/posts/{community_post}/approve', [CommunityModerationController::class, 'approvePost'])->name('community.moderation.posts.approve');
+            Route::post('community/moderation/posts/{community_post}/reject', [CommunityModerationController::class, 'rejectPost'])->name('community.moderation.posts.reject');
+            Route::resource('community/categories', CommunityCategoryController::class)
+                ->except(['show'])
+                ->names([
+                    'index' => 'community.categories.index',
+                    'create' => 'community.categories.create',
+                    'store' => 'community.categories.store',
+                    'edit' => 'community.categories.edit',
+                    'update' => 'community.categories.update',
+                    'destroy' => 'community.categories.destroy',
+                ])
+                ->parameters(['categories' => 'community_category']);
+            Route::get('community/members', [CommunityMemberController::class, 'index'])->name('community.members.index');
+            Route::get('community/members/{user}/edit', [CommunityMemberController::class, 'edit'])->name('community.members.edit');
+            Route::put('community/members/{user}', [CommunityMemberController::class, 'update'])->name('community.members.update');
+            Route::post('community/members/{user}/ban', [CommunityMemberController::class, 'ban'])->name('community.members.ban');
+            Route::post('community/members/{user}/unban', [CommunityMemberController::class, 'unban'])->name('community.members.unban');
+            Route::post('community/members/{user}/shadowban', [CommunityMemberController::class, 'shadowban'])->name('community.members.shadowban');
+            Route::post('community/members/{user}/unshadowban', [CommunityMemberController::class, 'unshadowban'])->name('community.members.unshadowban');
+            Route::delete('community/members/{user}', [CommunityMemberController::class, 'destroy'])->name('community.members.destroy');
+            Route::get('community/topics', [CommunityTopicController::class, 'index'])->name('community.topics.index');
+            Route::get('community/topics/{community_topic}/edit', [CommunityTopicController::class, 'edit'])->name('community.topics.edit');
+            Route::put('community/topics/{community_topic}', [CommunityTopicController::class, 'update'])->name('community.topics.update');
+            Route::delete('community/topics/{community_topic}', [CommunityTopicController::class, 'destroy'])->name('community.topics.destroy');
+            Route::patch('community/posts/{community_post}', [CommunityPostController::class, 'update'])->name('community.posts.update');
+            Route::delete('community/posts/{community_post}', [CommunityPostController::class, 'destroy'])->name('community.posts.destroy');
         });
     });
 });

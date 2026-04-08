@@ -3,15 +3,16 @@
     'value' => '',
     'id' => null,
     'placeholder' => '',
+    'minHeight' => '280px',
 ])
 @php
     $fieldId = $id ?? $name;
 @endphp
 <div
-    data-admin-quill
+    data-hv-quill
     data-textarea-id="{{ $fieldId }}"
     @if ($placeholder !== '') data-placeholder="{{ $placeholder }}" @endif
-    class="mt-1 overflow-hidden rounded-xl border border-slate-300 dark:border-slate-600"
+    class="community-rich-editor mt-1 overflow-hidden rounded-xl border border-slate-300 dark:border-slate-600"
 >
     <textarea
         id="{{ $fieldId }}"
@@ -22,7 +23,7 @@
     >{{ $value }}</textarea>
     <div
         data-quill-host
-        class="admin-quill-host bg-white dark:bg-slate-900/80"
-        style="min-height: 280px"
+        class="hv-quill-host bg-white dark:bg-slate-900/80"
+        style="min-height: {{ $minHeight }}"
     ></div>
 </div>

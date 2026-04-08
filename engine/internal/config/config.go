@@ -116,7 +116,8 @@ type HostingConfig struct {
 	ComposerPath    string `mapstructure:"composer_path"`
 	NpmPath         string `mapstructure:"npm_path"`
 	ToolsMaxSeconds int    `mapstructure:"tools_max_seconds"`
-	WordPressZipURL string `mapstructure:"wordpress_zip_url"`
+	WordPressZipURL  string `mapstructure:"wordpress_zip_url"`
+	OpenCartZipURL   string `mapstructure:"opencart_zip_url"`
 
 	// NginxVhostHelper — sudo ile çağrılan betik (varsayılan: /usr/local/sbin/hostvim-nginx-vhost).
 	NginxVhostHelper string `mapstructure:"nginx_vhost_helper"`

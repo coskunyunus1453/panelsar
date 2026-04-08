@@ -1359,421 +1359,102 @@ export default function FileManagerPage() {
     >
       <input {...getInputProps()} />
 
-      <div className="card overflow-hidden border border-gray-200 dark:border-gray-700">
-        <div className="flex flex-col gap-3 border-b border-gray-100 bg-gray-50/60 px-2 py-2.5 dark:border-gray-800 dark:bg-gray-900/40 sm:px-3 lg:flex-row lg:flex-wrap lg:items-end lg:gap-x-4 lg:gap-y-2">
-          <div className="min-w-0 flex-1 lg:max-w-[min(100%,22rem)]">
-            <label
-              className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400"
-              htmlFor="file-manager-domain"
-            >
-              {t('domains.name')}
-            </label>
-            <select
-              id="file-manager-domain"
-              className="input w-full min-w-0 text-sm"
-              value={domainId}
-              onChange={(e) => {
-                onDomainSelectChange(e.target.value)
-                setSelected(null)
-                setSearchHits([])
-              }}
-            >
-              <option value="">{t('common.select')}</option>
-              {domainOptions.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="min-w-0 flex-[1.25] lg:min-w-[16rem]">
-            <label
-              className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400"
-              htmlFor="file-manager-search"
-            >
-              {t('files.search_field_label')}
-            </label>
-            <div className="flex flex-wrap items-stretch gap-2 sm:flex-nowrap">
-              <input
-                id="file-manager-search"
-                className="input min-h-[38px] min-w-0 flex-1 py-2 text-sm sm:min-w-[12rem]"
-                value={searchQ}
-                disabled={domainId === ''}
-                onChange={(e) => setSearchQ(e.target.value)}
-                placeholder={t('files.toolbar_search_placeholder')}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && searchQ.trim().length >= 2) {
-                    searchM.mutate(searchQ.trim())
-                  }
-                }}
-              />
-              <button
-                type="button"
-                role="switch"
-                aria-checked={searchIncludeSubdirs}
-                title={t('files.search_include_subdirs')}
-                disabled={domainId === ''}
-                onClick={() => setSearchIncludeSubdirs((v) => !v)}
-                className={clsx(
-                  'inline-flex min-h-[38px] shrink-0 items-center justify-center gap-1 rounded-lg border px-2.5 text-xs font-semibold transition-colors sm:px-3',
-                  searchIncludeSubdirs
-                    ? 'border-primary-500/60 bg-primary-50 text-primary-800 shadow-sm dark:border-primary-500/40 dark:bg-primary-950/45 dark:text-primary-200'
-                    : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800',
-                  domainId === '' && 'cursor-not-allowed opacity-45',
-                )}
-              >
-                <Folder className="h-3.5 w-3.5 shrink-0 opacity-80" aria-hidden />
-                <span className="max-w-[4.5rem] truncate sm:max-w-none">{t('files.search_subdirs_short')}</span>
-              </button>
-              <button
-                type="button"
-                className="btn-primary inline-flex min-h-[38px] shrink-0 items-center justify-center px-3"
-                disabled={domainId === '' || searchQ.trim().length < 2 || searchM.isPending}
-                onClick={() => searchM.mutate(searchQ.trim())}
-                title={t('files.search_run')}
-              >
-                <Search className="h-4 w-4 sm:mr-1" />
-                <span className="hidden sm:inline">{t('files.search_run')}</span>
-              </button>
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-[minmax(0,1fr)_min(16rem,36vw)] lg:grid-cols-[minmax(0,1fr)_18rem] xl:grid-cols-[minmax(0,1fr)_20rem] md:items-start md:gap-4 lg:gap-5">
+        <div className="card order-1 min-w-0 overflow-hidden rounded-xl border border-gray-200 shadow-sm dark:border-gray-700 dark:shadow-none">
+          {domainId === '' ? (
+            <div className="flex min-h-[min(50vh,22rem)] flex-col items-center justify-center gap-3 px-6 py-12 text-center">
+              <Folder className="h-12 w-12 text-gray-300 dark:text-gray-600" aria-hidden />
+              <p className="max-w-sm text-sm text-gray-500 dark:text-gray-400">{t('files.select_domain_hint')}</p>
             </div>
-          </div>
-          <button
-            type="button"
-            className="btn-secondary inline-flex h-[38px] shrink-0 items-center justify-center self-start px-3 lg:self-end"
-            onClick={() => {
-              void domainsQ.refetch()
-              void filesQ.refetch()
-            }}
-            title={t('common.refresh')}
-          >
-            <RefreshCw className="h-4 w-4" />
-            <span className="sr-only">{t('common.refresh')}</span>
-          </button>
-        </div>
-
-        {domainId === '' && (
-          <p className="p-8 text-center text-sm text-gray-500 dark:text-gray-400">
-            {t('files.select_domain_hint')}
-          </p>
-        )}
-
-        {domainId !== '' && (
-          <>
-            <div className="flex flex-wrap items-center gap-2 border-b border-gray-100 dark:border-gray-800 px-2 py-1.5 text-sm sm:px-3 sm:py-2">
-              <button
-                type="button"
-                className="rounded-md p-1.5 text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800 disabled:opacity-40"
-                disabled={path === ''}
-                title="Geri"
-                onClick={() => {
-                  setFilePath(parentPath(path))
-                  setSelected(null)
-                }}
-              >
-                <ArrowLeft className="h-5 w-5" />
-              </button>
-              <nav className="flex min-w-0 flex-1 flex-wrap items-center gap-0.5" aria-label="breadcrumb">
+          ) : (
+            <>
+            <div className="border-b border-gray-100 bg-gray-50/40 dark:border-gray-800 dark:bg-gray-950/30">
+              <div className="flex flex-wrap items-center gap-2 px-2 py-2 text-sm sm:px-3">
                 <button
                   type="button"
-                  className="max-w-[10rem] truncate rounded px-1.5 py-0.5 font-medium text-primary-600 hover:bg-gray-100 dark:text-primary-400 dark:hover:bg-gray-800 sm:max-w-none"
+                  className="rounded-md p-1.5 text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800 disabled:opacity-40"
+                  disabled={path === ''}
+                  title={t('common.back')}
+                  aria-label={t('common.back')}
                   onClick={() => {
-                    setFilePath('')
+                    setFilePath(parentPath(path))
                     setSelected(null)
                   }}
                 >
-                  {t('files.root_segment')}
+                  <ArrowLeft className="h-5 w-5" />
                 </button>
-                {crumbs.map((c) => (
-                  <span key={c.path} className="inline-flex min-w-0 items-center gap-0.5">
-                    <ChevronRight className="h-4 w-4 shrink-0 text-gray-400" />
-                    <button
-                      type="button"
-                      className="max-w-[8rem] truncate rounded px-1.5 py-0.5 text-left font-medium text-primary-600 hover:bg-gray-100 dark:text-primary-400 dark:hover:bg-gray-800 sm:max-w-[14rem]"
-                      onClick={() => {
-                        setFilePath(c.path)
-                        setSelected(null)
-                      }}
-                    >
-                      {c.label}
-                    </button>
-                  </span>
-                ))}
-              </nav>
-              <button
-                type="button"
-                className="shrink-0 rounded-md p-1.5 text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800"
-                onClick={() => void filesQ.refetch()}
-                title={t('files.op_refresh')}
-              >
-                <RefreshCw className={clsx('h-4 w-4', filesQ.isFetching && 'animate-spin')} />
-              </button>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2 border-b border-gray-100 dark:border-gray-800 px-2 py-1.5 sm:px-3 sm:py-2">
-              <div className="relative" ref={fileOpsRef}>
+                <nav className="flex min-w-0 flex-1 flex-wrap items-center gap-0.5" aria-label="breadcrumb">
+                  <button
+                    type="button"
+                    className="max-w-[10rem] truncate rounded px-1.5 py-0.5 font-medium text-primary-600 hover:bg-gray-100 dark:text-primary-400 dark:hover:bg-gray-800 sm:max-w-none"
+                    onClick={() => {
+                      setFilePath('')
+                      setSelected(null)
+                    }}
+                  >
+                    {t('files.root_segment')}
+                  </button>
+                  {crumbs.map((c) => (
+                    <span key={c.path} className="inline-flex min-w-0 items-center gap-0.5">
+                      <ChevronRight className="h-4 w-4 shrink-0 text-gray-400" />
+                      <button
+                        type="button"
+                        className="max-w-[8rem] truncate rounded px-1.5 py-0.5 text-left font-medium text-primary-600 hover:bg-gray-100 dark:text-primary-400 dark:hover:bg-gray-800 sm:max-w-[14rem]"
+                        onClick={() => {
+                          setFilePath(c.path)
+                          setSelected(null)
+                        }}
+                      >
+                        {c.label}
+                      </button>
+                    </span>
+                  ))}
+                </nav>
                 <button
                   type="button"
-                  className="inline-flex items-center gap-2 rounded-md border border-gray-200 bg-gray-50 px-3 py-1.5 text-sm font-medium text-gray-800 hover:bg-gray-100 dark:border-gray-600 dark:bg-gray-800/80 dark:text-gray-100 dark:hover:bg-gray-800"
-                  onClick={() => setFileOpsOpen((o) => !o)}
+                  className="shrink-0 rounded-md p-1.5 text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800"
+                  onClick={() => void filesQ.refetch()}
+                  title={t('files.op_refresh')}
                 >
-                  <Folder className="h-4 w-4 text-amber-500" />
-                  {t('files.file_operations')}
-                  <ChevronDown className="h-4 w-4 opacity-70" />
+                  <RefreshCw className={clsx('h-4 w-4', filesQ.isFetching && 'animate-spin')} />
                 </button>
-                {fileOpsOpen && (
-                  <div className="absolute left-0 top-full z-30 mt-1 min-w-[220px] rounded-lg border border-gray-200 bg-white py-1 shadow-lg dark:border-gray-700 dark:bg-gray-900">
-                    <button
-                      type="button"
-                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-gray-50 disabled:opacity-40 dark:hover:bg-gray-800"
-                      disabled={uploadBusy}
-                      onClick={() => {
-                        setFileOpsOpen(false)
-                        open()
-                      }}
-                    >
-                      <Upload className="h-4 w-4" />
-                      {t('files.op_upload')}
-                    </button>
-                    <button
-                      type="button"
-                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-800"
-                      onClick={() => {
-                        setFileOpsOpen(false)
-                        const name = window.prompt(t('files.op_new_folder'), '')
-                        if (name?.trim()) mkdirM.mutate(name.trim())
-                      }}
-                    >
-                      <Folder className="h-4 w-4 text-amber-500" />
-                      {t('files.op_new_folder')}
-                    </button>
-                    <button
-                      type="button"
-                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-800"
-                      onClick={() => {
-                        setFileOpsOpen(false)
-                        const name = window.prompt(t('files.op_new_file'), '')
-                        if (!name?.trim()) return
-                        const base = name.trim()
-                        if (!isSafeNewFileName(base)) {
-                          toast.error(t('files.invalid_filename'))
-                          return
-                        }
-                        if (entries.some((e) => e.name === base && !e.is_dir)) {
-                          toast.error(t('files.file_exists'))
-                          return
-                        }
-                        createFileM.mutate(base)
-                      }}
-                    >
-                      <FilePlus className="h-4 w-4" />
-                      {t('files.op_new_file')}
-                    </button>
-                    <button
-                      type="button"
-                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-800"
-                      onClick={() => {
-                        setFileOpsOpen(false)
-                        void filesQ.refetch()
-                      }}
-                    >
-                      <RefreshCw className="h-4 w-4" />
-                      {t('files.op_refresh')}
-                    </button>
-                    <div className="my-1 border-t border-gray-100 dark:border-gray-800" />
-                    <button
-                      type="button"
-                      disabled={selectedIds.size === 0 || bulkTrashMoveM.isPending}
-                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40 dark:text-red-300 dark:hover:bg-red-950/30"
-                      onClick={() => {
-                        setFileOpsOpen(false)
-                        confirmBulkTrashSelection()
-                      }}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                      {t('files.op_bulk_delete', { count: selectedIds.size })}
-                    </button>
-                    <button
-                      type="button"
-                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-800"
-                      onClick={() => {
-                        setFileOpsOpen(false)
-                        const base = selected ? joinRel(path, selected) : ''
-                        const from = window.prompt(t('files.copy_source_prompt'), base)
-                        if (!from?.trim() || !isSafeRelativePath(from.trim())) return
-                        const to = window.prompt(t('files.copy_target_prompt'), `${from.trim()}-copy`)
-                        if (!to?.trim() || !isSafeRelativePath(to.trim())) return
-                        copyM.mutate({ from: from.trim(), to: to.trim() })
-                      }}
-                    >
-                      {t('files.op_copy')}
-                    </button>
-                    <button
-                      type="button"
-                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-800"
-                      onClick={() => {
-                        setFileOpsOpen(false)
-                        const rel = selected ? joinRel(path, selected) : path
-                        setChmodDialog({ path: rel, mode: '644' })
-                      }}
-                    >
-                      <Unlock className="h-4 w-4" />
-                      {t('files.op_chmod')}
-                    </button>
-                    <button
-                      type="button"
-                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-800"
-                      onClick={() => {
-                        setFileOpsOpen(false)
-                        const sourceDefault = selected ? joinRel(path, selected) : path
-                        if (!sourceDefault.trim()) {
-                          toast.error(t('files.zip_pick_source'))
-                          return
-                        }
-                        const source = window.prompt(t('files.zip_source_prompt'), sourceDefault)
-                        if (!source?.trim() || !isSafeRelativePath(source.trim())) return
-                        const cleaned = source.trim().replace(/\/+$/g, '')
-                        const defaultZip = `${cleaned || 'archive'}.zip`
-                        const target = window.prompt(t('files.zip_target_prompt'), defaultZip)
-                        if (!target?.trim() || !isSafeRelativePath(target.trim())) return
-                        const targetZip = target.trim().toLowerCase().endsWith('.zip')
-                          ? target.trim()
-                          : `${target.trim()}.zip`
-                        zipM.mutate({ source: source.trim(), target: targetZip })
-                      }}
-                    >
-                      {t('files.op_zip')}
-                    </button>
-                    <button
-                      type="button"
-                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-800"
-                      onClick={() => {
-                        setFileOpsOpen(false)
-                        const archiveDefault = selected ? joinRel(path, selected) : ''
-                        const archive = window.prompt(t('files.unzip_archive_prompt'), archiveDefault)
-                        if (!archive?.trim() || !isSafeRelativePath(archive.trim())) return
-                        const targetDir = window.prompt(t('files.unzip_target_prompt'), path || '')
-                        if (targetDir === null) return
-                        if (!isSafeRelativePath(targetDir.trim())) return
-                        unzipM.mutate({ archive: archive.trim(), target_dir: targetDir.trim() })
-                      }}
-                    >
-                      {t('files.op_unzip')}
-                    </button>
-                  </div>
-                )}
               </div>
-              {domainId > 0 && (
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <span className="text-[11px] font-medium text-gray-500 dark:text-gray-400">
-                    {t('files.smart_shortcuts')}
+              {selectedIds.size > 0 && (
+                <div className="flex flex-wrap items-center gap-2 border-t border-amber-200/70 bg-amber-50/95 px-2 py-1.5 dark:border-amber-900/50 dark:bg-amber-950/35 sm:px-3">
+                  <span className="text-xs font-semibold tabular-nums text-amber-900 dark:text-amber-200">
+                    {t('files.selection_count', { count: selectedIds.size })}
                   </span>
                   <button
                     type="button"
-                    className="rounded-md border border-gray-200 px-2 py-1 text-xs hover:bg-gray-50 dark:border-gray-600 dark:hover:bg-gray-800"
+                    className="btn-secondary py-1.5 text-xs"
+                    disabled={bulkChmodM.isPending}
                     onClick={() => {
-                      setFilePath('')
-                      void openFileWrapped('wp-config.php')
+                      const mode = window.prompt(t('files.bulk_chmod_prompt'), '755')
+                      if (!mode?.trim() || !/^[0-7]{3,4}$/.test(mode.trim())) {
+                        toast.error(t('files.invalid_mode'))
+                        return
+                      }
+                      const paths = entries
+                        .filter((e) => selectedIds.has(rowKey(e)))
+                        .map((e) => joinRel(path, e.name))
+                        .filter((p) => isSafeRelativePath(p))
+                      if (paths.length === 0) return
+                      bulkChmodM.mutate({ paths, mode: mode.trim() })
                     }}
                   >
-                    {t('files.shortcut_wp_config')}
+                    {t('files.bulk_chmod_btn', { count: selectedIds.size })}
                   </button>
                   <button
                     type="button"
-                    className="rounded-md border border-gray-200 px-2 py-1 text-xs hover:bg-gray-50 dark:border-gray-600 dark:hover:bg-gray-800"
-                    onClick={() => {
-                      setFilePath('')
-                      void openFileWrapped('.env')
-                    }}
+                    className="inline-flex items-center gap-1.5 rounded-md border border-red-200 bg-red-50 px-2.5 py-1.5 text-xs font-medium text-red-800 hover:bg-red-100 disabled:opacity-50 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-200 dark:hover:bg-red-950/60"
+                    disabled={bulkTrashMoveM.isPending}
+                    onClick={confirmBulkTrashSelection}
                   >
-                    {t('files.shortcut_env')}
-                  </button>
-                  <button
-                    type="button"
-                    className="rounded-md border border-gray-200 px-2 py-1 text-xs hover:bg-gray-50 dark:border-gray-600 dark:hover:bg-gray-800"
-                    onClick={() => setFilePath('storage')}
-                  >
-                    {t('files.shortcut_storage')}
-                  </button>
-                  <button
-                    type="button"
-                    className="rounded-md border border-gray-200 px-2 py-1 text-xs hover:bg-gray-50 dark:border-gray-600 dark:hover:bg-gray-800"
-                    onClick={() => setFilePath('public')}
-                  >
-                    {t('files.shortcut_public')}
+                    <Trash2 className="h-3.5 w-3.5" />
+                    {t('files.bulk_delete_btn', { count: selectedIds.size })}
                   </button>
                 </div>
               )}
-              <div className="ml-auto flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  className="btn-secondary inline-flex items-center gap-1.5 py-1.5 text-sm"
-                  onClick={() => setTrashOpen(true)}
-                >
-                  <Trash2 className="h-4 w-4" />
-                  {t('files.recycle_bin')}
-                </button>
-                {selectedIds.size > 0 && (
-                  <>
-                    <button
-                      type="button"
-                      className="btn-secondary py-1.5 text-sm"
-                      disabled={bulkChmodM.isPending}
-                      onClick={() => {
-                        const mode = window.prompt(t('files.bulk_chmod_prompt'), '755')
-                        if (!mode?.trim() || !/^[0-7]{3,4}$/.test(mode.trim())) {
-                          toast.error(t('files.invalid_mode'))
-                          return
-                        }
-                        const paths = entries
-                          .filter((e) => selectedIds.has(rowKey(e)))
-                          .map((e) => joinRel(path, e.name))
-                          .filter((p) => isSafeRelativePath(p))
-                        if (paths.length === 0) return
-                        bulkChmodM.mutate({ paths, mode: mode.trim() })
-                      }}
-                    >
-                      {t('files.bulk_chmod_btn', { count: selectedIds.size })}
-                    </button>
-                    <button
-                      type="button"
-                      className="inline-flex items-center gap-1.5 rounded-md border border-red-200 bg-red-50 px-3 py-1.5 text-sm font-medium text-red-800 hover:bg-red-100 disabled:opacity-50 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-200 dark:hover:bg-red-950/60"
-                      disabled={bulkTrashMoveM.isPending}
-                      onClick={confirmBulkTrashSelection}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                      {t('files.bulk_delete_btn', { count: selectedIds.size })}
-                    </button>
-                  </>
-                )}
-                <div className="inline-flex overflow-hidden rounded-md border border-gray-200 dark:border-gray-600">
-                  <button
-                    type="button"
-                    className={clsx(
-                      'p-2',
-                      viewMode === 'grid'
-                        ? 'bg-primary-100 text-primary-800 dark:bg-primary-900/40 dark:text-primary-200'
-                        : 'bg-white text-gray-500 hover:bg-gray-50 dark:bg-gray-900 dark:hover:bg-gray-800',
-                    )}
-                    title={t('files.view_grid')}
-                    onClick={() => setViewMode('grid')}
-                  >
-                    <LayoutGrid className="h-4 w-4" />
-                  </button>
-                  <button
-                    type="button"
-                    className={clsx(
-                      'border-l border-gray-200 p-2 dark:border-gray-600',
-                      viewMode === 'list'
-                        ? 'bg-primary-100 text-primary-800 dark:bg-primary-900/40 dark:text-primary-200'
-                        : 'bg-white text-gray-500 hover:bg-gray-50 dark:bg-gray-900 dark:hover:bg-gray-800',
-                    )}
-                    title={t('files.view_list')}
-                    onClick={() => setViewMode('list')}
-                  >
-                    <ListIcon className="h-4 w-4" />
-                  </button>
-                </div>
-              </div>
             </div>
 
             {searchHits.length > 0 && (
@@ -1805,7 +1486,7 @@ export default function FileManagerPage() {
 
             <p
               className={clsx(
-                'border-b border-gray-100 px-3 py-2 text-center text-xs dark:border-gray-800',
+                'border-b border-gray-100 px-3 py-1.5 text-center text-[11px] leading-snug dark:border-gray-800 sm:text-xs',
                 isDragActive
                   ? 'bg-primary-100 text-primary-900 dark:bg-primary-900/40 dark:text-primary-100'
                   : 'bg-gray-50/80 text-gray-600 dark:bg-gray-800/50 dark:text-gray-300',
@@ -1823,7 +1504,7 @@ export default function FileManagerPage() {
             <div
               key={`files-${domainId}-${path || 'root'}`}
               ref={listScrollRef}
-              className="max-h-[min(62vh,560px)] overflow-x-auto overflow-y-auto"
+              className="min-h-[min(52vh,28rem)] max-h-[min(78vh,calc(100vh-11rem))] overflow-x-auto overflow-y-auto overscroll-x-contain"
             >
               {viewMode === 'list' ? (
                 <table className="w-full min-w-[960px] text-sm">
@@ -2244,7 +1925,362 @@ export default function FileManagerPage() {
               </div>
             </div>
           </>
-        )}
+          )}
+        </div>
+
+        <aside
+          className={clsx(
+            'card order-2 flex w-full min-w-0 flex-col gap-3.5 rounded-xl border border-gray-200 p-3 shadow-sm dark:border-gray-700 dark:shadow-none md:sticky md:top-[max(1rem,env(safe-area-inset-top,0px))] md:z-[5] md:self-start xl:p-4',
+            domainId === '' && 'opacity-95',
+          )}
+        >
+          <div>
+            <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+              {t('files.sidebar_site')}
+            </p>
+            <label className="sr-only" htmlFor="file-manager-domain">
+              {t('domains.name')}
+            </label>
+            <select
+              id="file-manager-domain"
+              className="input w-full min-w-0 text-sm"
+              value={domainId === '' ? '' : String(domainId)}
+              onChange={(e) => {
+                onDomainSelectChange(e.target.value)
+                setSelected(null)
+                setSearchHits([])
+              }}
+            >
+              <option value="">{t('common.select')}</option>
+              {domainOptions.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className={clsx(domainId === '' && 'pointer-events-none opacity-50')}>
+            <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+              {t('files.search_field_label')}
+            </p>
+            <input
+              id="file-manager-search"
+              className="input mb-2 min-h-[38px] w-full py-2 text-sm"
+              value={searchQ}
+              disabled={domainId === ''}
+              onChange={(e) => setSearchQ(e.target.value)}
+              placeholder={t('files.toolbar_search_placeholder')}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && searchQ.trim().length >= 2) {
+                  searchM.mutate(searchQ.trim())
+                }
+              }}
+            />
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                role="switch"
+                aria-checked={searchIncludeSubdirs}
+                title={t('files.search_include_subdirs')}
+                disabled={domainId === ''}
+                onClick={() => setSearchIncludeSubdirs((v) => !v)}
+                className={clsx(
+                  'inline-flex min-h-[44px] flex-1 items-center justify-center gap-1 rounded-lg border px-2 text-xs font-semibold transition-colors sm:min-h-10',
+                  searchIncludeSubdirs
+                    ? 'border-primary-500/60 bg-primary-50 text-primary-800 dark:border-primary-500/40 dark:bg-primary-950/45 dark:text-primary-200'
+                    : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800',
+                )}
+              >
+                <Folder className="h-3.5 w-3.5 shrink-0 opacity-80" aria-hidden />
+                <span className="truncate">{t('files.search_subdirs_short')}</span>
+              </button>
+              <button
+                type="button"
+                className="btn-primary inline-flex min-h-[44px] flex-1 items-center justify-center gap-1 px-2 text-xs sm:min-h-10 sm:text-sm"
+                disabled={domainId === '' || searchQ.trim().length < 2 || searchM.isPending}
+                onClick={() => searchM.mutate(searchQ.trim())}
+                title={t('files.search_run')}
+              >
+                <Search className="h-4 w-4 shrink-0" />
+                {t('files.search_run')}
+              </button>
+            </div>
+          </div>
+
+          <div className={clsx('flex gap-2', domainId === '' && 'pointer-events-none opacity-50')}>
+            <button
+              type="button"
+              className="btn-secondary inline-flex flex-1 items-center justify-center gap-2 py-2 text-sm"
+              onClick={() => {
+                void domainsQ.refetch()
+                void filesQ.refetch()
+              }}
+              title={t('common.refresh')}
+            >
+              <RefreshCw className="h-4 w-4" />
+              {t('common.refresh')}
+            </button>
+          </div>
+
+          <div className={clsx(domainId === '' && 'pointer-events-none opacity-50')}>
+            <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+              {t('files.file_operations')}
+            </p>
+            <div className="relative w-full" ref={fileOpsRef}>
+              <button
+                type="button"
+                aria-expanded={fileOpsOpen}
+                aria-haspopup="menu"
+                className="inline-flex min-h-[44px] w-full items-center justify-between gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-medium text-gray-800 hover:bg-gray-100 dark:border-gray-600 dark:bg-gray-800/80 dark:text-gray-100 dark:hover:bg-gray-800"
+                onClick={() => setFileOpsOpen((o) => !o)}
+              >
+                <span className="inline-flex items-center gap-2 truncate">
+                  <Folder className="h-4 w-4 shrink-0 text-amber-500" />
+                  {t('files.file_operations')}
+                </span>
+                <ChevronDown className="h-4 w-4 shrink-0 opacity-70" />
+              </button>
+              {fileOpsOpen && (
+                <div
+                  role="menu"
+                  className="absolute left-0 right-0 top-full z-40 mt-1 max-h-[min(70vh,28rem)] overflow-y-auto rounded-lg border border-gray-200 bg-white py-1 shadow-xl dark:border-gray-700 dark:bg-gray-900"
+                >
+                  <button
+                    type="button"
+                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-gray-50 disabled:opacity-40 dark:hover:bg-gray-800"
+                    disabled={uploadBusy}
+                    onClick={() => {
+                      setFileOpsOpen(false)
+                      open()
+                    }}
+                  >
+                    <Upload className="h-4 w-4" />
+                    {t('files.op_upload')}
+                  </button>
+                  <button
+                    type="button"
+                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-800"
+                    onClick={() => {
+                      setFileOpsOpen(false)
+                      const name = window.prompt(t('files.op_new_folder'), '')
+                      if (name?.trim()) mkdirM.mutate(name.trim())
+                    }}
+                  >
+                    <Folder className="h-4 w-4 text-amber-500" />
+                    {t('files.op_new_folder')}
+                  </button>
+                  <button
+                    type="button"
+                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-800"
+                    onClick={() => {
+                      setFileOpsOpen(false)
+                      const name = window.prompt(t('files.op_new_file'), '')
+                      if (!name?.trim()) return
+                      const base = name.trim()
+                      if (!isSafeNewFileName(base)) {
+                        toast.error(t('files.invalid_filename'))
+                        return
+                      }
+                      if (entries.some((e) => e.name === base && !e.is_dir)) {
+                        toast.error(t('files.file_exists'))
+                        return
+                      }
+                      createFileM.mutate(base)
+                    }}
+                  >
+                    <FilePlus className="h-4 w-4" />
+                    {t('files.op_new_file')}
+                  </button>
+                  <button
+                    type="button"
+                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-800"
+                    onClick={() => {
+                      setFileOpsOpen(false)
+                      void filesQ.refetch()
+                    }}
+                  >
+                    <RefreshCw className="h-4 w-4" />
+                    {t('files.op_refresh')}
+                  </button>
+                  <div className="my-1 border-t border-gray-100 dark:border-gray-800" />
+                  <button
+                    type="button"
+                    disabled={selectedIds.size === 0 || bulkTrashMoveM.isPending}
+                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40 dark:text-red-300 dark:hover:bg-red-950/30"
+                    onClick={() => {
+                      setFileOpsOpen(false)
+                      confirmBulkTrashSelection()
+                    }}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    {t('files.op_bulk_delete', { count: selectedIds.size })}
+                  </button>
+                  <button
+                    type="button"
+                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-800"
+                    onClick={() => {
+                      setFileOpsOpen(false)
+                      const base = selected ? joinRel(path, selected) : ''
+                      const from = window.prompt(t('files.copy_source_prompt'), base)
+                      if (!from?.trim() || !isSafeRelativePath(from.trim())) return
+                      const to = window.prompt(t('files.copy_target_prompt'), `${from.trim()}-copy`)
+                      if (!to?.trim() || !isSafeRelativePath(to.trim())) return
+                      copyM.mutate({ from: from.trim(), to: to.trim() })
+                    }}
+                  >
+                    {t('files.op_copy')}
+                  </button>
+                  <button
+                    type="button"
+                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-800"
+                    onClick={() => {
+                      setFileOpsOpen(false)
+                      const rel = selected ? joinRel(path, selected) : path
+                      setChmodDialog({ path: rel, mode: '644' })
+                    }}
+                  >
+                    <Unlock className="h-4 w-4" />
+                    {t('files.op_chmod')}
+                  </button>
+                  <button
+                    type="button"
+                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-800"
+                    onClick={() => {
+                      setFileOpsOpen(false)
+                      const sourceDefault = selected ? joinRel(path, selected) : path
+                      if (!sourceDefault.trim()) {
+                        toast.error(t('files.zip_pick_source'))
+                        return
+                      }
+                      const source = window.prompt(t('files.zip_source_prompt'), sourceDefault)
+                      if (!source?.trim() || !isSafeRelativePath(source.trim())) return
+                      const cleaned = source.trim().replace(/\/+$/g, '')
+                      const defaultZip = `${cleaned || 'archive'}.zip`
+                      const target = window.prompt(t('files.zip_target_prompt'), defaultZip)
+                      if (!target?.trim() || !isSafeRelativePath(target.trim())) return
+                      const targetZip = target.trim().toLowerCase().endsWith('.zip')
+                        ? target.trim()
+                        : `${target.trim()}.zip`
+                      zipM.mutate({ source: source.trim(), target: targetZip })
+                    }}
+                  >
+                    {t('files.op_zip')}
+                  </button>
+                  <button
+                    type="button"
+                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-800"
+                    onClick={() => {
+                      setFileOpsOpen(false)
+                      const archiveDefault = selected ? joinRel(path, selected) : ''
+                      const archive = window.prompt(t('files.unzip_archive_prompt'), archiveDefault)
+                      if (!archive?.trim() || !isSafeRelativePath(archive.trim())) return
+                      const targetDir = window.prompt(t('files.unzip_target_prompt'), path || '')
+                      if (targetDir === null) return
+                      if (!isSafeRelativePath(targetDir.trim())) return
+                      unzipM.mutate({ archive: archive.trim(), target_dir: targetDir.trim() })
+                    }}
+                  >
+                    {t('files.op_unzip')}
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <button
+            type="button"
+            className={clsx(
+              'btn-secondary inline-flex w-full items-center justify-center gap-2 py-2.5 text-sm font-medium',
+              domainId === '' && 'pointer-events-none opacity-50',
+            )}
+            disabled={domainId === ''}
+            onClick={() => setTrashOpen(true)}
+          >
+            <Trash2 className="h-4 w-4" />
+            {t('files.recycle_bin')}
+          </button>
+
+          {typeof domainId === 'number' && domainId > 0 && (
+            <div>
+              <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                {t('files.smart_shortcuts')}
+              </p>
+              <div className="grid grid-cols-2 gap-1.5">
+                <button
+                  type="button"
+                  className="rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-center text-[11px] font-medium leading-tight hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-900 dark:hover:bg-gray-800 sm:text-xs"
+                  onClick={() => {
+                    setFilePath('')
+                    void openFileWrapped('wp-config.php')
+                  }}
+                >
+                  {t('files.shortcut_wp_config')}
+                </button>
+                <button
+                  type="button"
+                  className="rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-center text-[11px] font-medium leading-tight hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-900 dark:hover:bg-gray-800 sm:text-xs"
+                  onClick={() => {
+                    setFilePath('')
+                    void openFileWrapped('.env')
+                  }}
+                >
+                  {t('files.shortcut_env')}
+                </button>
+                <button
+                  type="button"
+                  className="rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-center text-[11px] font-medium leading-tight hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-900 dark:hover:bg-gray-800 sm:text-xs"
+                  onClick={() => setFilePath('storage')}
+                >
+                  {t('files.shortcut_storage')}
+                </button>
+                <button
+                  type="button"
+                  className="rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-center text-[11px] font-medium leading-tight hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-900 dark:hover:bg-gray-800 sm:text-xs"
+                  onClick={() => setFilePath('public')}
+                >
+                  {t('files.shortcut_public')}
+                </button>
+              </div>
+            </div>
+          )}
+
+          <div className={clsx('pt-1', domainId === '' && 'pointer-events-none opacity-50')}>
+            <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+              {t('files.view_mode_label')}
+            </p>
+            <div className="inline-flex w-full overflow-hidden rounded-lg border border-gray-200 dark:border-gray-600">
+              <button
+                type="button"
+                className={clsx(
+                  'flex flex-1 items-center justify-center gap-1.5 py-2 text-xs font-medium sm:text-sm',
+                  viewMode === 'grid'
+                    ? 'bg-primary-100 text-primary-800 dark:bg-primary-900/40 dark:text-primary-200'
+                    : 'bg-white text-gray-500 hover:bg-gray-50 dark:bg-gray-900 dark:hover:bg-gray-800',
+                )}
+                title={t('files.view_grid')}
+                onClick={() => setViewMode('grid')}
+              >
+                <LayoutGrid className="h-4 w-4" />
+                {t('files.view_grid')}
+              </button>
+              <button
+                type="button"
+                className={clsx(
+                  'flex flex-1 items-center justify-center gap-1.5 border-l border-gray-200 py-2 text-xs font-medium dark:border-gray-600 sm:text-sm',
+                  viewMode === 'list'
+                    ? 'bg-primary-100 text-primary-800 dark:bg-primary-900/40 dark:text-primary-200'
+                    : 'bg-white text-gray-500 hover:bg-gray-50 dark:bg-gray-900 dark:hover:bg-gray-800',
+                )}
+                title={t('files.view_list')}
+                onClick={() => setViewMode('list')}
+              >
+                <ListIcon className="h-4 w-4" />
+                {t('files.view_list')}
+              </button>
+            </div>
+          </div>
+        </aside>
       </div>
 
       {helpModalOpen && (
