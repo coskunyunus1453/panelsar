@@ -11,7 +11,6 @@ use App\Models\InstallerRun;
 use App\Services\EngineApiService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
@@ -163,7 +162,7 @@ class InstallerController extends Controller
                 ]);
             }
 
-            Bus::dispatch(new RunInstallerJob($run->id, $domain->name, $engineApp, $payload))->afterResponse();
+            RunInstallerJob::dispatch($run->id, $domain->name, $engineApp, $payload)->afterResponse();
 
             return response()->json([
                 'message' => __('installer.started_background'),

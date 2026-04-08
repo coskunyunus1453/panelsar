@@ -28,6 +28,7 @@ import clsx from 'clsx'
 import FileUploadProgressOverlay, {
   type FileUploadProgressView,
 } from '../components/files/FileUploadProgressOverlay'
+import FileArchiveProgressOverlay from '../components/files/FileArchiveProgressOverlay'
 
 type ListEntry = {
   name: string
@@ -182,6 +183,20 @@ function parentPath(p: string): string {
   if (!t) return ''
   const i = t.lastIndexOf('/')
   return i === -1 ? '' : t.slice(0, i)
+}
+
+function isZipArchiveFileName(name: string): boolean {
+  return /\.zip$/i.test(name)
+}
+
+/** Mevcut öğe ile aynı klasörde .zip oluşturma yolu (sıkıştır için). */
+function suggestedZipTargetPath(rel: string, isDir: boolean): string {
+  const parent = parentPath(rel)
+  const base = rel.split('/').filter(Boolean).pop() || 'archive'
+  if (isDir) return joinRel(parent, `${base}.zip`)
+  const i = base.lastIndexOf('.')
+  const stem = i > 0 ? base.slice(0, i) : base
+  return joinRel(parent, `${stem || 'archive'}.zip`)
 }
 
 function splitBreadcrumbs(p: string): { label: string; path: string }[] {
@@ -432,6 +447,7 @@ export default function FileManagerPage() {
   const [clipboardPath, setClipboardPath] = useState<string | null>(null)
   const [clipboardMode, setClipboardMode] = useState<'copy' | 'cut'>('copy')
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; rel: string; isDir: boolean } | null>(null)
+  const [archiveUi, setArchiveUi] = useState<{ kind: 'zip' | 'unzip'; complete: boolean } | null>(null)
   const [pasteConflictDialog, setPasteConflictDialog] = useState<{
     open: boolean
     sourcePath: string
@@ -1115,6 +1131,38 @@ export default function FileManagerPage() {
     },
   })
 
+  const runZipArchive = useCallback(
+    async (vars: { source: string; target: string }) => {
+      setArchiveUi({ kind: 'zip', complete: false })
+      try {
+        await zipM.mutateAsync(vars)
+        setArchiveUi({ kind: 'zip', complete: true })
+        await new Promise((r) => setTimeout(r, 680))
+      } catch {
+        /* toast zipM */
+      } finally {
+        setArchiveUi(null)
+      }
+    },
+    [zipM],
+  )
+
+  const runUnzipArchive = useCallback(
+    async (vars: { archive: string; target_dir: string }) => {
+      setArchiveUi({ kind: 'unzip', complete: false })
+      try {
+        await unzipM.mutateAsync(vars)
+        setArchiveUi({ kind: 'unzip', complete: true })
+        await new Promise((r) => setTimeout(r, 680))
+      } catch {
+        /* toast unzipM */
+      } finally {
+        setArchiveUi(null)
+      }
+    },
+    [unzipM],
+  )
+
   const searchM = useMutation({
     mutationFn: async (q: string) => {
       const basePath = searchIncludeSubdirs ? '' : path
@@ -1325,7 +1373,7 @@ export default function FileManagerPage() {
   const contextMenuPos = useMemo(() => {
     if (!contextMenu) return null
     const menuW = 224
-    const menuH = 320
+    const menuH = 480
     const pad = 8
     const ww = window.innerWidth || 1280
     const wh = window.innerHeight || 720
@@ -2148,21 +2196,17 @@ export default function FileManagerPage() {
                     className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-800"
                     onClick={() => {
                       setFileOpsOpen(false)
-                      const sourceDefault = selected ? joinRel(path, selected) : path
-                      if (!sourceDefault.trim()) {
-                        toast.error(t('files.zip_pick_source'))
+                      const source = selected ? joinRel(path, selected) : path
+                      const trimmed = source.trim()
+                      if (!isSafeRelativePath(trimmed)) {
+                        toast.error(t('files.invalid_path'))
                         return
                       }
-                      const source = window.prompt(t('files.zip_source_prompt'), sourceDefault)
-                      if (!source?.trim() || !isSafeRelativePath(source.trim())) return
-                      const cleaned = source.trim().replace(/\/+$/g, '')
-                      const defaultZip = `${cleaned || 'archive'}.zip`
-                      const target = window.prompt(t('files.zip_target_prompt'), defaultZip)
-                      if (!target?.trim() || !isSafeRelativePath(target.trim())) return
-                      const targetZip = target.trim().toLowerCase().endsWith('.zip')
-                        ? target.trim()
-                        : `${target.trim()}.zip`
-                      zipM.mutate({ source: source.trim(), target: targetZip })
+                      const isDir = selected
+                        ? (entries.find((e) => e.name === selected)?.is_dir ?? false)
+                        : true
+                      const target = suggestedZipTargetPath(selected ? joinRel(path, selected) : path, isDir)
+                      void runZipArchive({ source: trimmed, target })
                     }}
                   >
                     {t('files.op_zip')}
@@ -2173,12 +2217,23 @@ export default function FileManagerPage() {
                     onClick={() => {
                       setFileOpsOpen(false)
                       const archiveDefault = selected ? joinRel(path, selected) : ''
-                      const archive = window.prompt(t('files.unzip_archive_prompt'), archiveDefault)
-                      if (!archive?.trim() || !isSafeRelativePath(archive.trim())) return
-                      const targetDir = window.prompt(t('files.unzip_target_prompt'), path || '')
-                      if (targetDir === null) return
-                      if (!isSafeRelativePath(targetDir.trim())) return
-                      unzipM.mutate({ archive: archive.trim(), target_dir: targetDir.trim() })
+                      if (!archiveDefault.trim()) {
+                        const archive = window.prompt(t('files.unzip_archive_prompt'), '')
+                        if (!archive?.trim() || !isSafeRelativePath(archive.trim())) return
+                        const leaf = archive.trim().split('/').pop() || ''
+                        if (!isZipArchiveFileName(leaf)) {
+                          toast.error(t('files.only_zip_supported'))
+                          return
+                        }
+                        void runUnzipArchive({ archive: archive.trim(), target_dir: path })
+                        return
+                      }
+                      const leaf = archiveDefault.split('/').pop() || ''
+                      if (!isZipArchiveFileName(leaf)) {
+                        toast.error(t('files.only_zip_supported'))
+                        return
+                      }
+                      void runUnzipArchive({ archive: archiveDefault.trim(), target_dir: path })
                     }}
                   >
                     {t('files.op_unzip')}
@@ -2806,6 +2861,29 @@ export default function FileManagerPage() {
           >
             {t('files.ctx_chmod')}
           </button>
+          {!contextMenu.isDir && isZipArchiveFileName(contextMenu.rel.split('/').pop() || '') && (
+            <button
+              type="button"
+              className="block w-full px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-800"
+              onClick={() => {
+                void runUnzipArchive({ archive: contextMenu.rel, target_dir: path })
+                setContextMenu(null)
+              }}
+            >
+              {t('files.ctx_extract_here')}
+            </button>
+          )}
+          <button
+            type="button"
+            className="block w-full px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-800"
+            onClick={() => {
+              const target = suggestedZipTargetPath(contextMenu.rel, contextMenu.isDir)
+              void runZipArchive({ source: contextMenu.rel, target })
+              setContextMenu(null)
+            }}
+          >
+            {t('files.ctx_compress_zip')}
+          </button>
           <button
             type="button"
             className="block w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/40"
@@ -3160,6 +3238,11 @@ export default function FileManagerPage() {
       )}
 
       <FileUploadProgressOverlay open={uploadProgressView !== null} state={uploadProgressView} />
+      <FileArchiveProgressOverlay
+        open={archiveUi !== null}
+        kind={archiveUi?.kind ?? null}
+        complete={archiveUi?.complete ?? false}
+      />
     </div>
   )
 }

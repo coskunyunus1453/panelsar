@@ -8,7 +8,6 @@ use App\Models\StackInstallRun;
 use App\Services\EngineApiService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Bus;
 
 class StackController extends Controller
 {
@@ -41,7 +40,7 @@ class StackController extends Controller
             ]);
         }
 
-        Bus::dispatch(new RunStackInstallJob($run->id, $validated['bundle_id']))->afterResponse();
+        RunStackInstallJob::dispatch($run->id, $validated['bundle_id'])->afterResponse();
         return response()->json([
             'message' => 'Kurulum arka planda başlatıldı',
             'run_id' => $run->id,

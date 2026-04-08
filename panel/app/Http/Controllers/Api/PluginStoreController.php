@@ -13,7 +13,6 @@ use App\Support\MigrationCliResolver;
 use App\Support\MigrationSsh;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Crypt;
 use Symfony\Component\Process\Process;
 
@@ -236,7 +235,7 @@ class PluginStoreController extends Controller
             'output' => null,
             'error_message' => null,
         ]);
-        Bus::dispatch(new RunPluginMigrationJob($run->id))->afterResponse();
+        RunPluginMigrationJob::dispatch($run->id)->afterResponse();
 
         SafeAuditLogger::info('hostvim.plugin_audit', [
             'action' => 'migration_start',
