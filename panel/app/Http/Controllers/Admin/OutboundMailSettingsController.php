@@ -7,8 +7,10 @@ use App\Models\Domain;
 use App\Models\PanelSetting;
 use App\Services\EngineApiService;
 use App\Services\OutboundMailConfigurator;
+use App\Services\WhiteLabelBrandingService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -18,6 +20,7 @@ class OutboundMailSettingsController extends Controller
 {
     public function __construct(
         private EngineApiService $engine,
+        private WhiteLabelBrandingService $whiteLabelBranding,
     ) {}
 
     public function show(): JsonResponse
@@ -122,12 +125,23 @@ class OutboundMailSettingsController extends Controller
         $to = $request->input('to') ?: $request->user()->email;
 
         try {
-            Mail::raw(__('stack.mail_test_body'), function ($message) use ($to): void {
+            $body = $this->whiteLabelBranding->appendMailFooter(
+                $request->user(),
+                (string) __('stack.mail_test_body')
+            );
+            Mail::raw($body, function ($message) use ($to): void {
                 $message->to($to)->subject(__('stack.mail_test_subject'));
             });
         } catch (\Throwable $e) {
+            Log::warning('Outbound mail test failed', [
+                'user_id' => $request->user()?->id,
+                'to' => $to,
+                'error' => $e->getMessage(),
+            ]);
             return response()->json([
-                'message' => $e->getMessage(),
+                'message' => app()->isProduction()
+                    ? __('stack.mail_test_failed_generic')
+                    : $e->getMessage(),
             ], 422);
         }
 

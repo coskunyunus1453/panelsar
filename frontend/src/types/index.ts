@@ -7,12 +7,27 @@ export interface User {
   roles: Role[]
   /** Sanctum yetenekleri; '*' tam yetki. */
   abilities?: string[]
+  /** Bayi altında oluşturulan müşteri hesabı. */
+  parent_id?: number | null
   hosting_package?: HostingPackage
   /** Admin panelden paket atanırsa true; otomatik fatura senkronu bu kullanıcıda paketi güncellemez. */
   hosting_package_manual_override?: boolean
   two_factor_enabled?: boolean
   force_password_change?: boolean
+  onboarding_completed_at?: string | null
   created_at: string
+}
+
+/** Oturum / giriş sonrası bayi markası (CSS ve içerik). */
+export interface WhiteLabelUi {
+  primary_color: string | null
+  secondary_color: string | null
+  logo_customer_url: string | null
+  logo_admin_url: string | null
+  login_title: string | null
+  login_subtitle: string | null
+  mail_footer_plain: string | null
+  onboarding_html: string | null
 }
 
 export interface Role {

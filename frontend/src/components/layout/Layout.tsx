@@ -19,6 +19,8 @@ export default function Layout() {
   const enforceAdmin2fa = useAuthStore((s) => s.enforceAdmin2fa)
   const updateUser = useAuthStore((s) => s.updateUser)
   const setEnforceAdmin2fa = useAuthStore((s) => s.setEnforceAdmin2fa)
+  const setWhiteLabelUi = useAuthStore((s) => s.setWhiteLabelUi)
+  const whiteLabel = useAuthStore((s) => s.whiteLabel)
   const location = useLocation()
   const onboardingSeen = useUiModeStore((s) => s.onboardingSeen)
   const setMode = useUiModeStore((s) => s.setMode)
@@ -32,12 +34,31 @@ export default function Layout() {
       .me()
       .then((d) => {
         updateUser(d.user)
+        setWhiteLabelUi(d.white_label ?? null)
         if (typeof d.enforce_admin_2fa === 'boolean') {
           setEnforceAdmin2fa(d.enforce_admin_2fa)
         }
       })
       .catch(() => {})
-  }, [token, updateUser, setEnforceAdmin2fa])
+  }, [token, updateUser, setEnforceAdmin2fa, setWhiteLabelUi])
+
+  useEffect(() => {
+    const root = document.documentElement
+    if (whiteLabel?.primary_color) {
+      root.style.setProperty('--wl-primary', whiteLabel.primary_color)
+    } else {
+      root.style.removeProperty('--wl-primary')
+    }
+    if (whiteLabel?.secondary_color) {
+      root.style.setProperty('--wl-secondary', whiteLabel.secondary_color)
+    } else {
+      root.style.removeProperty('--wl-secondary')
+    }
+    return () => {
+      root.style.removeProperty('--wl-primary')
+      root.style.removeProperty('--wl-secondary')
+    }
+  }, [whiteLabel])
 
   useEffect(() => {
     if (!mobileSidebarOpen) {
@@ -56,6 +77,16 @@ export default function Layout() {
       document.body.style.overflow = prevOverflow
     }
   }, [mobileSidebarOpen, closeMobileSidebar])
+
+  const needsResellerCustomerOnboarding =
+    !!user &&
+    !!user.parent_id &&
+    !user.onboarding_completed_at &&
+    !user.roles?.some((r) => r.name === 'admin' || r.name === 'reseller')
+
+  if (needsResellerCustomerOnboarding && location.pathname !== '/onboarding') {
+    return <Navigate to="/onboarding" replace />
+  }
 
   if (user && mustEnrollTwoFactor(user, enforceAdmin2fa) && !location.pathname.startsWith('/settings')) {
     return <Navigate to="/settings?mandatory2fa=1" replace />

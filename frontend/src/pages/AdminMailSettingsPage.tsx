@@ -500,13 +500,13 @@ export default function AdminMailSettingsPage() {
               {wizardM.isPending ? runningLabel : 'DNS, SMTP, IMAP ve webmail kontrolleri gerçek bağlantı testi ile yapılır.'}
             </p>
             {(setupStackM.isPending || stackOutput) && (
-              <div className="rounded-lg border border-blue-200 bg-blue-50/70 p-3 text-xs text-blue-900 dark:border-blue-900/40 dark:bg-blue-950/20 dark:text-blue-200">
+              <div className="rounded-lg border border-secondary-200 bg-secondary-50/70 p-3 text-xs text-secondary-900 dark:border-secondary-900/40 dark:bg-secondary-950/20 dark:text-secondary-200">
                 <div className="mb-2 flex items-center justify-between gap-2">
                   <span className="font-medium">Kurulum durumu</span>
                   <span>{setupStackM.isPending ? stackRunningLabel : 'Tamamlandı'}</span>
                 </div>
-                <div className="h-2 w-full rounded bg-blue-100 dark:bg-blue-900/50 overflow-hidden">
-                  <div className="h-full bg-blue-600 transition-all duration-200" style={{ width: `${stackProgress}%` }} />
+                <div className="h-2 w-full rounded bg-secondary-100 dark:bg-secondary-900/50 overflow-hidden">
+                  <div className="h-full bg-secondary-600 transition-all duration-200" style={{ width: `${stackProgress}%` }} />
                 </div>
                 {stackOutput && (
                   <pre className="mt-2 max-h-44 overflow-auto rounded bg-black p-2 text-[11px] text-green-200 whitespace-pre-wrap">{stackOutput}</pre>
@@ -514,7 +514,7 @@ export default function AdminMailSettingsPage() {
                 {stackValidation.length > 0 && (
                   <div className="mt-2 space-y-1">
                     {stackValidation.map((c) => (
-                      <div key={`sv-${c.key}`} className="flex items-start gap-2 rounded border border-blue-200/60 dark:border-blue-900/40 px-2 py-1">
+                      <div key={`sv-${c.key}`} className="flex items-start gap-2 rounded border border-secondary-200/60 dark:border-secondary-900/40 px-2 py-1">
                         {c.ok ? <CheckCircle2 className="h-3.5 w-3.5 mt-0.5 text-emerald-500" /> : <XCircle className="h-3.5 w-3.5 mt-0.5 text-red-500" />}
                         <div>
                           <div className="text-[11px] font-semibold">{c.label}</div>

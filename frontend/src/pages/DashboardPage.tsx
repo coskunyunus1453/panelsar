@@ -82,8 +82,8 @@ export default function DashboardPage() {
       label: t('dashboard.domains_count'),
       value: d?.domains_count ?? '—',
       icon: Globe,
-      color: 'text-blue-500',
-      bg: 'bg-blue-50 dark:bg-blue-900/20',
+      color: 'text-secondary-500',
+      bg: 'bg-secondary-50 dark:bg-secondary-900/20',
     },
     {
       label: t('dashboard.databases_count'),
@@ -125,8 +125,8 @@ export default function DashboardPage() {
           label: t('nav.domains'),
           value: d.total_domains ?? '—',
           icon: Globe,
-          color: 'text-cyan-500',
-          bg: 'bg-cyan-50 dark:bg-cyan-900/20',
+          color: 'text-secondary-500',
+          bg: 'bg-secondary-50 dark:bg-secondary-900/20',
         },
       ]
     : []

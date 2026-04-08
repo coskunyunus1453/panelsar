@@ -62,6 +62,11 @@ func Catalog() []Module {
 			Title: "OpenDKIM", Description: "DKIM imzalama (DNS TXT kayıtları ve postfix entegrasyonu elle tamamlanır)",
 			CheckPkg: "opendkim",
 		},
+		{
+			ID: "mail-stack-webmail", Category: "mail",
+			Title: "Tam posta + Roundcube webmail", Description: "Postfix (25/587/465 TLS) + Dovecot (IMAP) + OpenDKIM + Nginx + Roundcube (SQLite); müşteri webmail.* üzerinden",
+			CheckPkg: "roundcube-core",
+		},
 	}
 }
 

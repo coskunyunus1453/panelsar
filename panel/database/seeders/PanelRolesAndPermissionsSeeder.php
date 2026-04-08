@@ -37,6 +37,7 @@ class PanelRolesAndPermissionsSeeder extends Seeder
             'reseller:users',
             'reseller:packages',
             'reseller:roles',
+            'reseller:white_label',
         ];
         $userAllow = array_values(array_diff($allNames, $userDeny));
         $resellerDeny = [

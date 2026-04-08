@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
+import { useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '../store/authStore'
 import { authService, type LoginResponse } from '../services/authService'
-import { useBranding } from '../hooks/useBranding'
+import { useBranding, WL_SESSION_KEY } from '../hooks/useBranding'
 import { Server, Eye, EyeOff } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { mustEnrollTwoFactor } from '../lib/authRoles'
@@ -27,6 +28,15 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const { data: branding } = useBranding()
   const customerLogoUrl = safeBrandingImageUrl(branding?.logo_customer_url)
+  const qc = useQueryClient()
+
+  useEffect(() => {
+    const wl = searchParams.get('wl')?.trim()
+    if (wl) {
+      sessionStorage.setItem(WL_SESSION_KEY, wl)
+      qc.invalidateQueries({ queryKey: ['branding'] })
+    }
+  }, [searchParams, qc])
 
   useEffect(() => {
     const pid = searchParams.get('package_id')
@@ -54,7 +64,10 @@ export default function LoginPage() {
   }
 
   const finishLogin = (data: LoginResponse) => {
-    setAuth(data.user, data.token, portal, { enforce_admin_2fa: data.enforce_admin_2fa })
+    setAuth(data.user, data.token, portal, {
+      enforce_admin_2fa: data.enforce_admin_2fa,
+      white_label: data.white_label,
+    })
     if (data.force_password_change || data.user.force_password_change) {
       toast('İlk giriş: Şifrenizi şimdi değiştirin.', { icon: '🔒' })
       navigate('/settings?mandatoryPassword=1')
@@ -125,8 +138,22 @@ export default function LoginPage() {
     }
   }
 
+  const loginTitle = branding?.login_title?.trim() || t('app.name')
+  const loginSubtitle = branding?.login_subtitle?.trim() || t('auth.login_subtitle')
+  const accent = branding?.primary_color || undefined
+  const accent2 = branding?.secondary_color || undefined
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 via-blue-950 to-gray-900 px-4">
+    <div
+      className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 via-primary-950 to-gray-900 px-4"
+      style={
+        accent && accent2
+          ? {
+              background: `linear-gradient(to bottom right, ${accent}22, rgb(3 7 18), ${accent2}18)`,
+            }
+          : undefined
+      }
+    >
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           {customerLogoUrl ? (
@@ -134,12 +161,15 @@ export default function LoginPage() {
               <img src={customerLogoUrl} alt="" className="max-h-20 object-contain" />
             </div>
           ) : (
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary-600 mb-4">
+            <div
+              className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary-600 mb-4"
+              style={accent ? { backgroundColor: accent } : undefined}
+            >
               <Server className="h-8 w-8 text-white" />
             </div>
           )}
-          <h1 className="text-3xl font-bold text-white">{t('app.name')}</h1>
-          <p className="text-gray-400 mt-2">{t('auth.login_subtitle')}</p>
+          <h1 className="text-3xl font-bold text-white">{loginTitle}</h1>
+          <p className="text-gray-400 mt-2">{loginSubtitle}</p>
         </div>
 
         <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-8">
@@ -196,6 +226,11 @@ export default function LoginPage() {
                   type="submit"
                   disabled={loading}
                   className="w-full py-3 bg-primary-600 hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold rounded-xl transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 focus:ring-offset-gray-900"
+                  style={
+                    accent
+                      ? { backgroundColor: accent, borderColor: accent }
+                      : undefined
+                  }
                 >
                   {loading ? t('common.loading') : t('auth.login')}
                 </button>

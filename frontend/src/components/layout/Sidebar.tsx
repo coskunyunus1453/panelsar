@@ -41,6 +41,7 @@ import {
   Rocket,
   Sparkles,
   Store,
+  Palette,
 } from 'lucide-react'
 
 type NavLeaf = {
@@ -82,6 +83,9 @@ export default function Sidebar() {
   const headerLogo = safeBrandingImageUrl(headerLogoRaw)
 
   const navOk = (ability: string | null, path: string) => {
+    if (path === '/reseller/branding') {
+      return tokenHasAbility(abilities, 'reseller:white_label')
+    }
     if (path === '/reseller') {
       return (
         tokenHasAbility(abilities, 'reseller:users') ||
@@ -132,6 +136,7 @@ export default function Sidebar() {
       title: 'nav.group_account',
       items: [
         { path: '/reseller', icon: Users, label: 'nav.reseller', ability: '__reseller__' },
+        { path: '/reseller/branding', icon: Palette, label: 'nav.reseller_branding', ability: 'reseller:white_label' },
         { path: '/settings', icon: Settings, label: 'nav.settings', ability: null },
       ],
     },
@@ -181,6 +186,7 @@ export default function Sidebar() {
     '/ai-advisor',
     '/billing',
     '/reseller',
+    '/reseller/branding',
   ])
 
   const visibleCustomerGroups = customerGroups

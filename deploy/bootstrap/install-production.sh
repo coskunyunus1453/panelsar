@@ -452,6 +452,9 @@ fi
 if [[ -f "$REPO_ROOT/deploy/host/hostvim-stack-install" ]]; then
   install -m 755 "$REPO_ROOT/deploy/host/hostvim-stack-install" /usr/local/sbin/hostvim-stack-install
 fi
+if [[ -f "$REPO_ROOT/deploy/host/hostvim-mail-stack-setup.sh" ]]; then
+  install -m 755 "$REPO_ROOT/deploy/host/hostvim-mail-stack-setup.sh" /usr/local/sbin/hostvim-mail-stack-setup.sh
+fi
 if [[ -f "$REPO_ROOT/deploy/host/hostvim-terminal-root" ]]; then
   install -m 755 "$REPO_ROOT/deploy/host/hostvim-terminal-root" /usr/local/sbin/hostvim-terminal-root
 fi

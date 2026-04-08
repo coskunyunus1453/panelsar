@@ -439,7 +439,7 @@ export default function BackupsPage() {
                 <td className="px-4 py-2 text-right">
                   <button
                     type="button"
-                    className="p-1.5 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 text-gray-500 mr-1"
+                    className="p-1.5 rounded-lg hover:bg-secondary-50 dark:hover:bg-secondary-900/20 text-gray-500 mr-1"
                     title={t('backups.restore')}
                     disabled={restoreM.isPending || !b.engine_backup_id?.trim()}
                     onClick={() => {

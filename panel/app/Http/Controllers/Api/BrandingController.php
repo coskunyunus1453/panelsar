@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\PanelSetting;
 use App\Services\SafeAuditLogger;
+use App\Services\WhiteLabelBrandingService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\File;
@@ -16,23 +17,20 @@ use Throwable;
 
 class BrandingController extends Controller
 {
+    public function __construct(
+        private WhiteLabelBrandingService $whiteLabelBranding,
+    ) {}
+
     private const DEFAULT_MAX_UPLOAD_KB = 900;
 
     private const MIN_MAX_UPLOAD_KB = 128;
 
     private const HARD_CAP_UPLOAD_KB = 2048;
 
-    public function showPublic(): JsonResponse
+    public function showPublic(Request $request): JsonResponse
     {
-        if (! Schema::hasTable('panel_settings')) {
-            return response()->json([
-                'logo_customer_url' => null,
-                'logo_admin_url' => null,
-            ]);
-        }
-
         try {
-            return response()->json($this->brandingPayload());
+            return response()->json($this->whiteLabelBranding->publicPayload($request));
         } catch (Throwable $e) {
             report($e);
 
@@ -53,6 +51,23 @@ class BrandingController extends Controller
         }
 
         $relative = 'branding/'.$filename;
+        if (! Storage::disk('public')->exists($relative)) {
+            abort(404);
+        }
+
+        return Storage::disk('public')->response($relative);
+    }
+
+    /**
+     * Bayi white-label logoları (storage/app/public/branding/wl/{userId}/...).
+     */
+    public function serveWlFile(int $userId, string $filename): StreamedResponse
+    {
+        if ($userId < 1 || ! preg_match('/^[A-Za-z0-9._-]+$/', $filename)) {
+            abort(404);
+        }
+
+        $relative = 'branding/wl/'.$userId.'/'.$filename;
         if (! Storage::disk('public')->exists($relative)) {
             abort(404);
         }

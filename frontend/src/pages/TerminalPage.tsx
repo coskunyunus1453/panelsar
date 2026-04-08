@@ -168,8 +168,9 @@ export default function TerminalPage() {
             </div>
             <div>
               <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-                {t('terminal.title')}
+                {t('terminal.branded_title', { brand: t('app.name') })}
               </h1>
+              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{t('terminal.subtitle')}</p>
             </div>
           </div>
           <div className="flex items-center gap-2">

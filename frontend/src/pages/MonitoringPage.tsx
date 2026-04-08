@@ -309,8 +309,8 @@ export default function MonitoringPage() {
       label: t('nav.domains'),
       value: s?.domains ?? '—',
       icon: Server,
-      accent: 'from-blue-500/20 to-blue-600/5',
-      iconBg: 'bg-blue-500/15 text-blue-600 dark:text-blue-400',
+      accent: 'from-secondary-500/20 to-secondary-600/5',
+      iconBg: 'bg-secondary-500/15 text-secondary-600 dark:text-secondary-400',
     },
     {
       label: t('nav.databases'),
@@ -341,7 +341,7 @@ export default function MonitoringPage() {
     healthScore >= 90
       ? 'from-emerald-500 to-emerald-400'
       : healthScore >= 75
-        ? 'from-blue-500 to-sky-400'
+        ? 'from-secondary-500 to-secondary-400'
         : healthScore >= 60
           ? 'from-amber-500 to-orange-400'
           : 'from-red-500 to-rose-400'
@@ -560,7 +560,7 @@ export default function MonitoringPage() {
               it.score >= 90
                 ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300'
                 : it.score >= 75
-                  ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300'
+                  ? 'bg-secondary-100 text-secondary-800 dark:bg-secondary-900/30 dark:text-secondary-300'
                   : it.score >= 60
                     ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300'
                     : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300'
@@ -706,11 +706,11 @@ export default function MonitoringPage() {
                 <div className="card p-5">
                   <div className="mb-3 flex items-center justify-between">
                     <span className="text-sm font-medium text-gray-600 dark:text-gray-400">{t('monitoring.cpu')}</span>
-                    <Cpu className="h-4 w-4 text-blue-500" />
+                    <Cpu className="h-4 w-4 text-secondary-500" />
                   </div>
                   <p className="text-3xl font-bold tabular-nums text-gray-900 dark:text-white">{cpuPct}%</p>
                   <div className="mt-3">
-                    <AnimatedBar value={cpuPct} colorClass="bg-gradient-to-r from-blue-600 to-blue-400" />
+                    <AnimatedBar value={cpuPct} colorClass="bg-gradient-to-r from-secondary-600 to-secondary-400" />
                   </div>
                 </div>
                 <div className="card p-5">

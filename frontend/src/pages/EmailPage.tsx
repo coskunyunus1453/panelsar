@@ -332,6 +332,53 @@ export default function EmailPage() {
               </button>
             </div>
           </div>
+          <p className="mt-4 text-xs text-gray-600 dark:text-gray-400">{t('email.auth_full_email_hint')}</p>
+
+          <div className="mt-4 overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
+            <table className="w-full min-w-[320px] text-left text-xs">
+              <caption className="border-b border-gray-200 bg-gray-50 px-3 py-2 text-left text-sm font-semibold text-gray-900 dark:border-gray-700 dark:bg-gray-800/50 dark:text-white">
+                {t('email.ports_table_title')}
+              </caption>
+              <thead>
+                <tr className="border-b border-gray-100 bg-gray-50/80 text-gray-600 dark:border-gray-800 dark:bg-gray-800/40 dark:text-gray-400">
+                  <th className="px-3 py-2 font-medium">{t('email.port_col_service')}</th>
+                  <th className="px-3 py-2 font-medium">{t('email.port_col_port')}</th>
+                  <th className="px-3 py-2 font-medium">{t('email.port_col_encryption')}</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                {(
+                  [
+                    ['port_imaps', '993', 'enc_ssl_tls'],
+                    ['port_imap_starttls', '143', 'enc_starttls'],
+                    ['port_smtp_submission', '587', 'enc_starttls'],
+                    ['port_smtps', '465', 'enc_ssl_tls'],
+                  ] as const
+                ).map(([label, port, enc]) => (
+                  <tr key={label}>
+                    <td className="px-3 py-2 text-gray-900 dark:text-gray-100">{t(`email.${label}`)}</td>
+                    <td className="px-3 py-2 font-mono text-gray-800 dark:text-gray-200">{port}</td>
+                    <td className="px-3 py-2 text-gray-700 dark:text-gray-300">{t(`email.${enc}`)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="mt-4 rounded-lg border border-sky-200 bg-sky-50/80 p-3 text-xs text-sky-950 dark:border-sky-900/40 dark:bg-sky-950/25 dark:text-sky-100">
+            <div className="font-semibold">{t('email.deliverability_title')}</div>
+            <p className="mt-1 leading-relaxed">{t('email.deliverability_intro')}</p>
+          </div>
+
+          {isAdmin && (
+            <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
+              <span>{t('email.stack_webmail_hint')}</span>
+              <Link to="/admin/stack" className="font-medium text-primary-600 hover:underline dark:text-primary-400">
+                {t('email.stack_webmail_cta')} →
+              </Link>
+            </div>
+          )}
+
           {webmailUrl && (
             <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50/70 px-3 py-2 dark:border-emerald-900/40 dark:bg-emerald-950/20">
               <div className="flex flex-wrap items-center gap-2">
@@ -698,7 +745,7 @@ export default function EmailPage() {
         <div className="grid gap-4 md:grid-cols-3">
           <div className="rounded-lg border border-gray-200 bg-white/80 p-4 dark:border-gray-600 dark:bg-gray-800/50">
             <div className="mb-2 flex items-center gap-2 font-medium text-gray-900 dark:text-white">
-              <BookOpen className="h-4 w-4 text-cyan-500" />
+              <BookOpen className="h-4 w-4 text-secondary-500" />
               {t('email.card_incoming_title')}
             </div>
             <p className="text-sm text-gray-600 dark:text-gray-400">{t('email.card_incoming_body')}</p>

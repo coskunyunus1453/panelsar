@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\TwoFactorBackupCode;
 use App\Models\User;
 use App\Services\TotpService;
+use App\Services\WhiteLabelBrandingService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -13,6 +14,10 @@ use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
 {
+    public function __construct(
+        private WhiteLabelBrandingService $whiteLabelBranding,
+    ) {}
+
     public function login(Request $request): JsonResponse
     {
         $request->validate([
@@ -137,6 +142,7 @@ class AuthController extends Controller
             'expires_at' => $expiresAt,
             'enforce_admin_2fa' => (bool) config('hostvim.enforce_admin_2fa', false),
             'force_password_change' => (bool) $user->force_password_change,
+            'white_label' => $this->whiteLabelBranding->uiPayloadForUser($user),
         ]);
     }
 
@@ -157,6 +163,7 @@ class AuthController extends Controller
             'user' => $userPayload,
             'enforce_admin_2fa' => (bool) config('hostvim.enforce_admin_2fa', false),
             'force_password_change' => (bool) $user->force_password_change,
+            'white_label' => $this->whiteLabelBranding->uiPayloadForUser($user),
         ]);
     }
 

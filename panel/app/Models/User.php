@@ -26,6 +26,7 @@ class User extends Authenticatable
         'hosting_package_manual_override',
         'two_factor_secret',
         'two_factor_enabled',
+        'onboarding_completed_at',
     ];
 
     protected $hidden = [
@@ -42,6 +43,7 @@ class User extends Authenticatable
             'force_password_change' => 'boolean',
             'two_factor_enabled' => 'boolean',
             'hosting_package_manual_override' => 'boolean',
+            'onboarding_completed_at' => 'datetime',
         ];
     }
 
@@ -85,6 +87,11 @@ class User extends Authenticatable
     public function parentUser()
     {
         return $this->belongsTo(User::class, 'parent_id');
+    }
+
+    public function resellerWhiteLabel()
+    {
+        return $this->hasOne(ResellerWhiteLabel::class, 'user_id');
     }
 
     public function subscriptions()

@@ -177,9 +177,18 @@ class SystemController extends Controller
 
         $report = $this->buildPanelHealthReport();
         $report['repair_steps'] = $steps;
+        $failedChecks = array_values(array_filter(
+            $report['checks'] ?? [],
+            static fn (array $c): bool => ! (bool) ($c['ok'] ?? false)
+        ));
+        $failedSummary = implode('; ', array_map(
+            static fn (array $c): string => sprintf('%s: %s', (string) ($c['id'] ?? 'unknown'), (string) ($c['message'] ?? 'failed')),
+            array_slice($failedChecks, 0, 5)
+        ));
         $report['message'] = $report['ok']
             ? 'Panel checks passed. Safe repairs applied.'
-            : 'Panel checked. Some items still require manual action.';
+            : ('Panel checked. Some items still require manual action.'
+                .($failedSummary !== '' ? ' Remaining: '.$failedSummary : ''));
 
         return response()->json($report);
     }
@@ -264,9 +273,20 @@ class SystemController extends Controller
             }
             @unlink($linkPath);
         } elseif (file_exists($linkPath)) {
-            $steps[] = ['id' => $id, 'ok' => false, 'message' => 'Path exists and is not a symlink'];
+            $backup = $linkPath.'.bak.'.date('YmdHis');
+            try {
+                @rename($linkPath, $backup);
+                if (file_exists($linkPath)) {
+                    $steps[] = ['id' => $id, 'ok' => false, 'message' => 'Path exists and cannot be moved for symlink repair'];
 
-            return;
+                    return;
+                }
+                $steps[] = ['id' => $id.'_backup', 'ok' => true, 'message' => 'Existing path moved to '.$backup];
+            } catch (\Throwable) {
+                $steps[] = ['id' => $id, 'ok' => false, 'message' => 'Path exists and backup move failed'];
+
+                return;
+            }
         }
 
         $relative = $this->relativePath(dirname($linkPath), $targetPath);

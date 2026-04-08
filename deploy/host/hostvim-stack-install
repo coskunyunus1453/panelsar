@@ -47,6 +47,18 @@ case "$BUNDLE" in
     systemctl enable opendkim 2>/dev/null || true
     systemctl restart opendkim 2>/dev/null || true
     ;;
+  mail-stack-webmail)
+    _HERE="$(cd "$(dirname "$0")" && pwd)"
+    MSETUP="${_HERE}/hostvim-mail-stack-setup.sh"
+    if [[ ! -f "$MSETUP" ]]; then
+      MSETUP="/usr/local/sbin/hostvim-mail-stack-setup.sh"
+    fi
+    if [[ ! -f "$MSETUP" ]]; then
+      echo "hostvim-stack-install: hostvim-mail-stack-setup.sh bulunamadı (beklenen: /usr/local/sbin/hostvim-mail-stack-setup.sh)" >&2
+      exit 1
+    fi
+    bash "$MSETUP"
+    ;;
   *)
     echo "hostvim-stack-install: bilinmeyen demet: $BUNDLE" >&2
     exit 1

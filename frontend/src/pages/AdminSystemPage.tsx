@@ -229,17 +229,17 @@ export default function AdminSystemPage() {
           {t('system.resources')}
         </h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-          <div className="card p-5 border-t-4 border-t-blue-500">
+          <div className="card p-5 border-t-4 border-t-secondary-500">
             <div className="flex items-center justify-between mb-3">
               <span className="text-sm text-gray-500 dark:text-gray-400">{t('system.cpu')}</span>
-              <Cpu className="h-5 w-5 text-blue-500" />
+              <Cpu className="h-5 w-5 text-secondary-500" />
             </div>
             <p className="text-3xl font-bold tabular-nums text-gray-900 dark:text-white">
               {statsQ.isLoading ? '…' : `${Math.round(s?.cpu_usage ?? 0)}%`}
             </p>
             <div className="mt-3 h-1.5 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden">
               <div
-                className="h-full rounded-full bg-blue-500 transition-all duration-500"
+                className="h-full rounded-full bg-secondary-500 transition-all duration-500"
                 style={{ width: `${Math.min(100, Math.round(s?.cpu_usage ?? 0))}%` }}
               />
             </div>
@@ -283,10 +283,10 @@ export default function AdminSystemPage() {
             </div>
           </div>
 
-          <div className="card p-5 border-t-4 border-t-teal-500">
+          <div className="card p-5 border-t-4 border-t-secondary-500">
             <div className="flex items-center justify-between mb-3">
               <span className="text-sm text-gray-500 dark:text-gray-400">{t('system.uptime')}</span>
-              <Clock className="h-5 w-5 text-teal-500" />
+              <Clock className="h-5 w-5 text-secondary-500" />
             </div>
             <p className="text-2xl font-bold tabular-nums text-gray-900 dark:text-white">
               {statsQ.isLoading ? '…' : formatUptime(s?.uptime != null ? Number(s.uptime) : undefined)}
@@ -366,7 +366,7 @@ export default function AdminSystemPage() {
                           </button>
                           <button
                             type="button"
-                            className="inline-flex items-center gap-1 rounded-lg border border-gray-200 dark:border-gray-600 px-2 py-1 text-xs font-medium hover:bg-blue-50 dark:hover:bg-blue-900/20 text-blue-700 dark:text-blue-400 disabled:opacity-40"
+                            className="inline-flex items-center gap-1 rounded-lg border border-gray-200 dark:border-gray-600 px-2 py-1 text-xs font-medium hover:bg-secondary-50 dark:hover:bg-secondary-900/20 text-secondary-700 dark:text-secondary-400 disabled:opacity-40"
                             disabled={serviceM.isPending}
                             onClick={() => serviceM.mutate({ name: svc.name, action: 'restart' })}
                             title={t('system.action_restart')}

@@ -53,4 +53,13 @@ class ProfileController extends Controller
 
         return response()->json(['message' => 'Şifre güncellendi.']);
     }
+
+    public function completeOnboarding(Request $request): JsonResponse
+    {
+        $request->user()->update(['onboarding_completed_at' => now()]);
+
+        return response()->json([
+            'user' => $request->user()->fresh()->load(['roles', 'hostingPackage']),
+        ]);
+    }
 }

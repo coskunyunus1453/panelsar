@@ -232,7 +232,7 @@ SKIP_APT=1 sudo -E bash deploy/bootstrap/install-production.sh
    Kurulum betiği varsayılan olarak **Postfix + mailutils** kurar ve `sendmail` yolunu kullanır. Ayarlar veritabanında tutulur; **Admin → Giden posta** ekranından SSH’sız **SMTP’ye geçiş**, test postası ve gönderen adresi yönetilir (şifre Laravel ile şifrelenir).
 
 2. **Müşteri alan adı posta kutuları (MX, IMAP, tam DKIM)**  
-   Hâlâ **DNS kayıtları** ve (isteğe bağlı) **Dovecot / OpenDKIM** ince ayarı gerekir; **Admin → Sunucu paketleri** ile paket kurulumu panelden tetiklenir. Tam otomatik “sihirbaz” roadmap maddesidir; giden panel postasından farklıdır.
+   **Tam posta + Roundcube webmail** demeti (`mail-stack-webmail`) ile sunucuda Postfix (25/587/465), Dovecot (IMAP), OpenDKIM, Nginx ve Roundcube kurulur; müşteri **webmail.alanadı** üzerinden bağlanır. Hâlâ **MX/SPF/DKIM/DMARC/PTR** DNS tarafı ve çok kiracılı DKIM anahtarları için ek operasyon gerekebilir. **Admin → Sunucu paketleri** ile tetiklenir; giden panel postasından (Laravel SMTP) ayrıdır.
 
 Özet: Tek sunucuda **panel e-postası** kurulum + **Giden posta** sayfasıyla uçtan uca yönetilir; **barındırma müşterisi** `.env` veya Git ile uğraşmaz.
 
@@ -244,6 +244,7 @@ SKIP_APT=1 sudo -E bash deploy/bootstrap/install-production.sh
 | `bootstrap/remote-install.sh` | Aynı mantık; GitHub raw veya başka CDN’den de verilebilir |
 | `bootstrap/install-production.sh` | Ana kurulum |
 | `host/hostvim-stack-install` | Admin “Sunucu paketleri” için apt demetleri (→ `/usr/local/sbin/`) |
+| `host/hostvim-mail-stack-setup.sh` | `mail-stack-webmail` demeti: Postfix+Dovecot+OpenDKIM+Nginx+Roundcube (→ `/usr/local/sbin/`) |
 | `scripts/deploy-panel.sh` | `git pull` (repo kökü), composer, migrate, frontend build |
 | `nginx/hostvim.conf` | Site şablonu |
 | `systemd/hostvim-engine.service` | Engine servisi |

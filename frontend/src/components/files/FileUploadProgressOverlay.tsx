@@ -72,7 +72,7 @@ export default function FileUploadProgressOverlay({ open, state }: Props) {
           aria-hidden
         />
         <div
-          className="pointer-events-none absolute -bottom-12 -left-12 h-36 w-36 rounded-full bg-cyan-500/15 blur-3xl"
+          className="pointer-events-none absolute -bottom-12 -left-12 h-36 w-36 rounded-full bg-secondary-500/15 blur-3xl"
           aria-hidden
         />
 
@@ -122,7 +122,7 @@ export default function FileUploadProgressOverlay({ open, state }: Props) {
           <div className="h-3 overflow-hidden rounded-full bg-slate-800/90 ring-1 ring-inset ring-white/5">
             <div
               className={clsx(
-                'h-full rounded-full bg-gradient-to-r from-primary-500 via-cyan-500 to-emerald-400',
+                'h-full rounded-full bg-gradient-to-r from-primary-500 via-secondary-500 to-emerald-400',
                 'transition-[width] duration-200 ease-out',
                 'relative overflow-hidden',
               )}

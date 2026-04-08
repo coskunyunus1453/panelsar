@@ -506,7 +506,7 @@ export default function DatabasesPage() {
                         className={`px-2.5 py-1 text-xs font-medium rounded-full ${
                           db.type === 'mysql'
                             ? 'bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-400'
-                            : 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400'
+                            : 'bg-secondary-50 dark:bg-secondary-900/20 text-secondary-700 dark:text-secondary-400'
                         }`}
                       >
                         {db.type === 'mysql' ? 'MySQL' : 'PostgreSQL'}

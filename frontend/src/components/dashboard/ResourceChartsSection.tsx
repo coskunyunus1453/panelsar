@@ -121,18 +121,18 @@ export default function ResourceChartsSection({
       )}
     >
       <div className="flex items-start justify-between gap-2">
-        <div className="flex items-center gap-2">
+        <div className="min-w-0 flex items-center gap-2">
           <div className="rounded-lg bg-gray-100 p-2 dark:bg-gray-800">
             <Icon className="h-5 w-5 text-gray-700 dark:text-gray-200" />
           </div>
-          <div>
-            <p className="text-sm font-medium text-gray-600 dark:text-gray-400">{title}</p>
-            <p className="text-2xl font-bold tabular-nums text-gray-900 dark:text-white">
+          <div className="min-w-0">
+            <p className="truncate text-sm font-medium text-gray-600 dark:text-gray-400">{title}</p>
+            <p className="text-xl font-bold tabular-nums text-gray-900 dark:text-white sm:text-2xl">
               {Math.round(percent)}%
             </p>
           </div>
         </div>
-        <div className="h-20 w-20 shrink-0">
+        <div className="h-16 w-16 shrink-0 sm:h-20 sm:w-20">
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
               <Pie
@@ -190,7 +190,7 @@ export default function ResourceChartsSection({
 
   return (
     <>
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
         <Card
           title={t('dashboard.cpu_usage')}
           icon={Cpu}
@@ -208,7 +208,7 @@ export default function ResourceChartsSection({
           fill={memFill}
           hist={memHist}
           onOpen={() => setDetail('ram')}
-          accent="hover:ring-blue-400/60"
+          accent="hover:ring-secondary-400/60"
           gradientId="dash-spark-mem"
         />
         <Card
@@ -335,7 +335,7 @@ export default function ResourceChartsSection({
                       <span className="min-w-0 flex-1 truncate text-gray-800 dark:text-gray-200">
                         {p.name}
                       </span>
-                      <span className="font-mono text-sm font-semibold text-blue-600 dark:text-blue-400">
+                      <span className="font-mono text-sm font-semibold text-secondary-600 dark:text-secondary-400">
                         {formatBytes(p.rss_bytes)}
                       </span>
                     </li>

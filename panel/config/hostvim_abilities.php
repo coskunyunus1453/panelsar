@@ -44,6 +44,7 @@ return [
     ['name' => 'reseller:users', 'group' => 'reseller'],
     ['name' => 'reseller:packages', 'group' => 'reseller'],
     ['name' => 'reseller:roles', 'group' => 'reseller'],
+    ['name' => 'reseller:white_label', 'group' => 'reseller'],
     ['name' => 'vendor:read', 'group' => 'vendor'],
     ['name' => 'vendor:write', 'group' => 'vendor'],
     ['name' => 'vendor:nodes', 'group' => 'vendor'],

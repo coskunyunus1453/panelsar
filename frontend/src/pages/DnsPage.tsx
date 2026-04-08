@@ -65,7 +65,7 @@ export default function DnsPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <Globe className="h-8 w-8 text-cyan-500" />
+          <Globe className="h-8 w-8 text-secondary-500" />
           <div>
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white">DNS</h1>
             <p className="text-gray-500 dark:text-gray-400 text-sm">{t('dns.subtitle')}</p>

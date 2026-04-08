@@ -47,11 +47,15 @@ use App\Http\Controllers\Api\Vendor\SecurityController as VendorSecurityControll
 use App\Http\Controllers\Api\Vendor\SupportController as VendorSupportController;
 use App\Http\Controllers\Api\Vendor\TenantController as VendorTenantController;
 use App\Http\Controllers\Reseller\ResellerRoleController;
+use App\Http\Controllers\Reseller\ResellerWhiteLabelController;
 use App\Services\EngineApiService;
 use Illuminate\Support\Facades\Route;
 
 Route::get('branding', [BrandingController::class, 'showPublic']);
 Route::get('branding/files/{filename}', [BrandingController::class, 'serveFile'])
+    ->where('filename', '[A-Za-z0-9._-]+');
+Route::get('branding/wl/{userId}/{filename}', [BrandingController::class, 'serveWlFile'])
+    ->whereNumber('userId')
     ->where('filename', '[A-Za-z0-9._-]+');
 
 Route::prefix('auth')->group(function () {
@@ -73,6 +77,7 @@ Route::prefix('auth')->group(function () {
 Route::middleware(['auth:sanctum', 'abilities:access:customer-panel', 'require_password_change'])->group(function () {
     Route::patch('user/profile', [ProfileController::class, 'update']);
     Route::post('user/password', [ProfileController::class, 'password']);
+    Route::post('user/onboarding/complete', [ProfileController::class, 'completeOnboarding']);
 
     Route::middleware('ability:dashboard:read')->group(function () {
         Route::get('dashboard', [SystemController::class, 'dashboard']);
@@ -359,6 +364,10 @@ Route::middleware(['auth:sanctum', 'abilities:access:customer-panel', 'require_p
             Route::post('roles', [ResellerRoleController::class, 'store']);
             Route::put('roles/{role}', [ResellerRoleController::class, 'update']);
             Route::delete('roles/{role}', [ResellerRoleController::class, 'destroy']);
+        });
+        Route::middleware('ability:reseller:white_label')->group(function () {
+            Route::get('white-label', [ResellerWhiteLabelController::class, 'show']);
+            Route::post('white-label', [ResellerWhiteLabelController::class, 'update']);
         });
     });
 

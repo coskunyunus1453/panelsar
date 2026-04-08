@@ -1,5 +1,5 @@
 import api from './api'
-import type { User } from '../types'
+import type { User, WhiteLabelUi } from '../types'
 
 export interface LoginResponse {
   user: User
@@ -7,6 +7,7 @@ export interface LoginResponse {
   expires_at: string
   enforce_admin_2fa?: boolean
   force_password_change?: boolean
+  white_label?: WhiteLabelUi | null
 }
 
 export type LoginResult =
@@ -46,7 +47,12 @@ export const authService = {
     await api.post('/auth/logout')
   },
 
-  me: async (): Promise<{ user: User; enforce_admin_2fa?: boolean; force_password_change?: boolean }> => {
+  me: async (): Promise<{
+    user: User
+    enforce_admin_2fa?: boolean
+    force_password_change?: boolean
+    white_label?: WhiteLabelUi | null
+  }> => {
     const { data } = await api.get('/auth/me')
     return data
   },

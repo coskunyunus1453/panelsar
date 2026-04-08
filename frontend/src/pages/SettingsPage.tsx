@@ -461,7 +461,7 @@ export default function SettingsPage() {
                 : 'border-gray-200 dark:border-gray-700'
             }`}
           >
-            <Moon className="h-6 w-6 mx-auto mb-2 text-blue-500" />
+            <Moon className="h-6 w-6 mx-auto mb-2 text-secondary-500" />
             <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
               {t('settings.dark_mode')}
             </p>

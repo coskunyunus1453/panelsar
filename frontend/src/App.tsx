@@ -34,6 +34,8 @@ import AdminRolesPage from './pages/AdminRolesPage'
 import AdminWebServerSettingsPage from './pages/AdminWebServerSettingsPage'
 import AdminPhpSettingsPage from './pages/AdminPhpSettingsPage'
 import ResellerPage from './pages/ResellerPage'
+import ResellerBrandingPage from './pages/ResellerBrandingPage'
+import OnboardingPage from './pages/OnboardingPage'
 import AiAdvisorPage from './pages/AiAdvisorPage'
 import PluginsStorePage from './pages/PluginsStorePage'
 
@@ -105,6 +107,8 @@ export default function App() {
         <Route path="deploy" element={<AdvancedRoute><DeployPage /></AdvancedRoute>} />
         <Route path="billing" element={<AdvancedRoute><BillingPage /></AdvancedRoute>} />
         <Route path="reseller" element={<AdvancedRoute><ResellerPage /></AdvancedRoute>} />
+        <Route path="reseller/branding" element={<AdvancedRoute><ResellerBrandingPage /></AdvancedRoute>} />
+        <Route path="onboarding" element={<OnboardingPage />} />
         <Route path="ai-advisor" element={<AdvancedRoute><AiAdvisorPage /></AdvancedRoute>} />
         <Route path="plugins" element={<AdvancedRoute><PluginsStorePage /></AdvancedRoute>} />
         <Route path="admin/users" element={<AdvancedRoute><AdminUsersPage /></AdvancedRoute>} />

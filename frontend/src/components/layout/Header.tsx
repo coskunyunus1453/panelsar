@@ -95,7 +95,13 @@ export default function Header() {
       if (failed === 0) {
         toast.success(t('panel_self_heal.repair_success'))
       } else {
-        toast((data?.message || t('panel_self_heal.repair_partial')) as string, { icon: '⚠️' })
+        const checks = (data as { checks?: Array<{ ok?: boolean; id?: string; message?: string }> })?.checks ?? []
+        const remaining = checks
+          .filter((c) => !c.ok)
+          .slice(0, 3)
+          .map((c) => `${c.id}: ${c.message}`)
+          .join(' | ')
+        toast((remaining || data?.message || t('panel_self_heal.repair_partial')) as string, { icon: '⚠️', duration: 8000 })
       }
     },
     onError: (err: unknown) => {
@@ -166,7 +172,7 @@ export default function Header() {
           'absolute left-3 top-1/2 z-[60] -translate-y-1/2 rounded-xl border p-2 transition-colors md:hidden',
           mode === 'easy'
             ? 'border-emerald-400/70 bg-emerald-50 text-emerald-700 shadow-sm shadow-emerald-500/10 hover:bg-emerald-100/90 dark:border-emerald-600/50 dark:bg-emerald-950/35 dark:text-emerald-300 dark:hover:bg-emerald-950/55'
-            : 'border-blue-400/70 bg-blue-50 text-blue-700 shadow-sm shadow-blue-500/10 hover:bg-blue-100/90 dark:border-blue-600/50 dark:bg-blue-950/35 dark:text-blue-300 dark:hover:bg-blue-950/55',
+            : 'border-secondary-400/70 bg-secondary-50 text-secondary-700 shadow-sm shadow-secondary-500/10 hover:bg-secondary-100/90 dark:border-secondary-600/50 dark:bg-secondary-950/35 dark:text-secondary-300 dark:hover:bg-secondary-950/55',
         )}
         title={mode === 'easy' ? t('ui_mode.switch_to_advanced') : t('ui_mode.switch_to_easy')}
         aria-label={mode === 'easy' ? t('ui_mode.easy') : t('ui_mode.advanced')}
@@ -186,7 +192,7 @@ export default function Header() {
             'relative z-0 hidden shrink-0 rounded-xl border p-2 transition-colors md:inline-flex',
             mode === 'easy'
               ? 'border-emerald-400/70 bg-emerald-50 text-emerald-700 shadow-sm shadow-emerald-500/10 hover:bg-emerald-100/90 dark:border-emerald-600/50 dark:bg-emerald-950/35 dark:text-emerald-300 dark:hover:bg-emerald-950/55'
-              : 'border-blue-400/70 bg-blue-50 text-blue-700 shadow-sm shadow-blue-500/10 hover:bg-blue-100/90 dark:border-blue-600/50 dark:bg-blue-950/35 dark:text-blue-300 dark:hover:bg-blue-950/55',
+              : 'border-secondary-400/70 bg-secondary-50 text-secondary-700 shadow-sm shadow-secondary-500/10 hover:bg-secondary-100/90 dark:border-secondary-600/50 dark:bg-secondary-950/35 dark:text-secondary-300 dark:hover:bg-secondary-950/55',
           )}
           title={mode === 'easy' ? t('ui_mode.switch_to_advanced') : t('ui_mode.switch_to_easy')}
           aria-label={mode === 'easy' ? t('ui_mode.easy') : t('ui_mode.advanced')}
@@ -325,7 +331,7 @@ export default function Header() {
                   <div key={n.id} className="rounded-md border border-gray-200 dark:border-gray-700 p-2">
                     <div className="flex items-start gap-2">
                       <span className={`mt-1 inline-block h-2 w-2 rounded-full ${
-                        n.level === 'error' ? 'bg-red-500' : n.level === 'success' ? 'bg-emerald-500' : 'bg-blue-500'
+                        n.level === 'error' ? 'bg-red-500' : n.level === 'success' ? 'bg-emerald-500' : 'bg-secondary-500'
                       }`} />
                       <div className="min-w-0 flex-1">
                         <button
