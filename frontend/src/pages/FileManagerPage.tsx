@@ -241,9 +241,25 @@ async function fetchAllFileEntries(domainId: number, dirRel: string): Promise<Li
     u.set('sort', 'name')
     u.set('order', 'asc')
     if (dirRel) u.set('path', dirRel)
-    const { data } = await api.get<{ entries?: ListEntry[]; total?: number }>(
-      `/domains/${domainId}/files?${u.toString()}`,
-    )
+    let data: { entries?: ListEntry[]; total?: number } | null = null
+    try {
+      const res = await api.get<{ entries?: ListEntry[]; total?: number }>(
+        `/domains/${domainId}/files?${u.toString()}`,
+      )
+      data = res.data
+    } catch (err: unknown) {
+      // Klasör sürükle-bırakta yeni alt dizinler henüz sunucuda olmayabilir; bunu çakışma kontrolünde "boş dizin" say.
+      const ax = err as { response?: { status?: number; data?: { message?: string } } }
+      const status = ax.response?.status ?? 0
+      const msg = String(ax.response?.data?.message ?? '').toLowerCase()
+      const missingDir = status === 503 && (
+        msg.includes('no such file or directory') ||
+        msg.includes('not found') ||
+        msg.includes('directory not found')
+      )
+      if (missingDir) return []
+      throw err
+    }
     const chunk = data?.entries ?? []
     all.push(...chunk)
     const total = data?.total ?? 0

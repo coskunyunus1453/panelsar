@@ -27,6 +27,11 @@ const tplHTTP = `# Hostvim — {{.Domain}} (Apache HTTP)
         Require all granted
     </Directory>
 
+    # Dotfile/Dotdir erişimi kapat (örn. .env, .git, .hostvim). ACME challenge hariç.
+    <LocationMatch "(^|/)\.(?!well-known(?:/|$))">
+        Require all denied
+    </LocationMatch>
+
     SetEnvIfNoCase Authorization "(.+)" HTTP_AUTHORIZATION=$1
 
     <FilesMatch "\.php$">
@@ -63,6 +68,11 @@ const tplHTTPS = `# Hostvim — {{.Domain}} (Apache HTTPS)
         AllowOverride All
         Require all granted
     </Directory>
+
+    # Dotfile/Dotdir erişimi kapat (örn. .env, .git, .hostvim). ACME challenge hariç.
+    <LocationMatch "(^|/)\.(?!well-known(?:/|$))">
+        Require all denied
+    </LocationMatch>
 
     SetEnvIfNoCase Authorization "(.+)" HTTP_AUTHORIZATION=$1
 
