@@ -488,6 +488,25 @@ export default function FileManagerPage() {
   }, [domainParam])
 
   useEffect(() => {
+    if (domainOptions.length === 0) return
+    const hasCurrent = domainId !== '' && domainOptions.some((d) => d.id === domainId)
+    if (hasCurrent) return
+
+    const firstId = domainOptions[0]?.id
+    if (!firstId || !Number.isFinite(firstId)) return
+
+    setDomainId(firstId)
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev)
+        next.set('domain', String(firstId))
+        return next
+      },
+      { replace: true },
+    )
+  }, [domainOptions, domainId, setSearchParams])
+
+  useEffect(() => {
     if (domainId === '') return
     try {
       if (!localStorage.getItem(FILEMGR_HELP_KEY)) {
@@ -1393,6 +1412,7 @@ export default function FileManagerPage() {
   const hasDirtyReadOnly = tabs.some(
     (tab) => !tab.loading && tab.content !== tab.original && isExecutionRiskFilePath(tab.path),
   )
+  const contextBaseDir = contextMenu ? (contextMenu.isDir ? contextMenu.rel : parentPath(contextMenu.rel)) : path
 
   return (
     <div
@@ -1466,6 +1486,172 @@ export default function FileManagerPage() {
                 >
                   <RefreshCw className={clsx('h-4 w-4', filesQ.isFetching && 'animate-spin')} />
                 </button>
+                <div className="relative shrink-0" ref={fileOpsRef}>
+                  <button
+                    type="button"
+                    aria-expanded={fileOpsOpen}
+                    aria-haspopup="menu"
+                    className="inline-flex min-h-[34px] items-center justify-between gap-2 rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-1.5 text-xs font-medium text-gray-800 hover:bg-gray-100 dark:border-gray-600 dark:bg-gray-800/80 dark:text-gray-100 dark:hover:bg-gray-800 sm:text-sm"
+                    onClick={() => setFileOpsOpen((o) => !o)}
+                  >
+                    <span className="inline-flex items-center gap-2 truncate">
+                      <Folder className="h-4 w-4 shrink-0 text-amber-500" />
+                      {t('files.file_operations')}
+                    </span>
+                    <ChevronDown className="h-4 w-4 shrink-0 opacity-70" />
+                  </button>
+                  {fileOpsOpen && (
+                    <div
+                      role="menu"
+                      className="absolute right-0 top-full z-40 mt-1 w-72 max-h-[min(70vh,28rem)] overflow-y-auto rounded-lg border border-gray-200 bg-white py-1 shadow-xl dark:border-gray-700 dark:bg-gray-900"
+                    >
+                      <button
+                        type="button"
+                        className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-gray-50 disabled:opacity-40 dark:hover:bg-gray-800"
+                        disabled={uploadBusy}
+                        onClick={() => {
+                          setFileOpsOpen(false)
+                          open()
+                        }}
+                      >
+                        <Upload className="h-4 w-4" />
+                        {t('files.op_upload')}
+                      </button>
+                      <button
+                        type="button"
+                        className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-800"
+                        onClick={() => {
+                          setFileOpsOpen(false)
+                          const name = window.prompt(t('files.op_new_folder'), '')
+                          if (name?.trim()) mkdirM.mutate(name.trim())
+                        }}
+                      >
+                        <Folder className="h-4 w-4 text-amber-500" />
+                        {t('files.op_new_folder')}
+                      </button>
+                      <button
+                        type="button"
+                        className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-800"
+                        onClick={() => {
+                          setFileOpsOpen(false)
+                          const name = window.prompt(t('files.op_new_file'), '')
+                          if (!name?.trim()) return
+                          const base = name.trim()
+                          if (!isSafeNewFileName(base)) {
+                            toast.error(t('files.invalid_filename'))
+                            return
+                          }
+                          if (entries.some((e) => e.name === base && !e.is_dir)) {
+                            toast.error(t('files.file_exists'))
+                            return
+                          }
+                          createFileM.mutate(base)
+                        }}
+                      >
+                        <FilePlus className="h-4 w-4" />
+                        {t('files.op_new_file')}
+                      </button>
+                      <button
+                        type="button"
+                        className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-800"
+                        onClick={() => {
+                          setFileOpsOpen(false)
+                          void filesQ.refetch()
+                        }}
+                      >
+                        <RefreshCw className="h-4 w-4" />
+                        {t('files.op_refresh')}
+                      </button>
+                      <div className="my-1 border-t border-gray-100 dark:border-gray-800" />
+                      <button
+                        type="button"
+                        disabled={selectedIds.size === 0 || bulkTrashMoveM.isPending}
+                        className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40 dark:text-red-300 dark:hover:bg-red-950/30"
+                        onClick={() => {
+                          setFileOpsOpen(false)
+                          confirmBulkTrashSelection()
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                        {t('files.op_bulk_delete', { count: selectedIds.size })}
+                      </button>
+                      <button
+                        type="button"
+                        className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-800"
+                        onClick={() => {
+                          setFileOpsOpen(false)
+                          const base = selected ? joinRel(path, selected) : ''
+                          const from = window.prompt(t('files.copy_source_prompt'), base)
+                          if (!from?.trim() || !isSafeRelativePath(from.trim())) return
+                          const to = window.prompt(t('files.copy_target_prompt'), `${from.trim()}-copy`)
+                          if (!to?.trim() || !isSafeRelativePath(to.trim())) return
+                          copyM.mutate({ from: from.trim(), to: to.trim() })
+                        }}
+                      >
+                        {t('files.op_copy')}
+                      </button>
+                      <button
+                        type="button"
+                        className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-800"
+                        onClick={() => {
+                          setFileOpsOpen(false)
+                          const rel = selected ? joinRel(path, selected) : path
+                          setChmodDialog({ path: rel, mode: '644' })
+                        }}
+                      >
+                        <Unlock className="h-4 w-4" />
+                        {t('files.op_chmod')}
+                      </button>
+                      <button
+                        type="button"
+                        className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-800"
+                        onClick={() => {
+                          setFileOpsOpen(false)
+                          const source = selected ? joinRel(path, selected) : path
+                          const trimmed = source.trim()
+                          if (!isSafeRelativePath(trimmed)) {
+                            toast.error(t('files.invalid_path'))
+                            return
+                          }
+                          const isDir = selected
+                            ? (entries.find((e) => e.name === selected)?.is_dir ?? false)
+                            : true
+                          const target = suggestedZipTargetPath(selected ? joinRel(path, selected) : path, isDir)
+                          void runZipArchive({ source: trimmed, target })
+                        }}
+                      >
+                        {t('files.op_zip')}
+                      </button>
+                      <button
+                        type="button"
+                        className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-800"
+                        onClick={() => {
+                          setFileOpsOpen(false)
+                          const archiveDefault = selected ? joinRel(path, selected) : ''
+                          if (!archiveDefault.trim()) {
+                            const archive = window.prompt(t('files.unzip_archive_prompt'), '')
+                            if (!archive?.trim() || !isSafeRelativePath(archive.trim())) return
+                            const leaf = archive.trim().split('/').pop() || ''
+                            if (!isZipArchiveFileName(leaf)) {
+                              toast.error(t('files.only_zip_supported'))
+                              return
+                            }
+                            void runUnzipArchive({ archive: archive.trim(), target_dir: path })
+                            return
+                          }
+                          const leaf = archiveDefault.split('/').pop() || ''
+                          if (!isZipArchiveFileName(leaf)) {
+                            toast.error(t('files.only_zip_supported'))
+                            return
+                          }
+                          void runUnzipArchive({ archive: archiveDefault.trim(), target_dir: path })
+                        }}
+                      >
+                        {t('files.op_unzip')}
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
               {selectedIds.size > 0 && (
                 <div className="flex flex-wrap items-center gap-2 border-t border-amber-200/70 bg-amber-50/95 px-2 py-1.5 dark:border-amber-900/50 dark:bg-amber-950/35 sm:px-3">
@@ -2071,178 +2257,6 @@ export default function FileManagerPage() {
             </button>
           </div>
 
-          <div className={clsx(domainId === '' && 'pointer-events-none opacity-50')}>
-            <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-              {t('files.file_operations')}
-            </p>
-            <div className="relative w-full" ref={fileOpsRef}>
-              <button
-                type="button"
-                aria-expanded={fileOpsOpen}
-                aria-haspopup="menu"
-                className="inline-flex min-h-[44px] w-full items-center justify-between gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-medium text-gray-800 hover:bg-gray-100 dark:border-gray-600 dark:bg-gray-800/80 dark:text-gray-100 dark:hover:bg-gray-800"
-                onClick={() => setFileOpsOpen((o) => !o)}
-              >
-                <span className="inline-flex items-center gap-2 truncate">
-                  <Folder className="h-4 w-4 shrink-0 text-amber-500" />
-                  {t('files.file_operations')}
-                </span>
-                <ChevronDown className="h-4 w-4 shrink-0 opacity-70" />
-              </button>
-              {fileOpsOpen && (
-                <div
-                  role="menu"
-                  className="absolute left-0 right-0 top-full z-40 mt-1 max-h-[min(70vh,28rem)] overflow-y-auto rounded-lg border border-gray-200 bg-white py-1 shadow-xl dark:border-gray-700 dark:bg-gray-900"
-                >
-                  <button
-                    type="button"
-                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-gray-50 disabled:opacity-40 dark:hover:bg-gray-800"
-                    disabled={uploadBusy}
-                    onClick={() => {
-                      setFileOpsOpen(false)
-                      open()
-                    }}
-                  >
-                    <Upload className="h-4 w-4" />
-                    {t('files.op_upload')}
-                  </button>
-                  <button
-                    type="button"
-                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-800"
-                    onClick={() => {
-                      setFileOpsOpen(false)
-                      const name = window.prompt(t('files.op_new_folder'), '')
-                      if (name?.trim()) mkdirM.mutate(name.trim())
-                    }}
-                  >
-                    <Folder className="h-4 w-4 text-amber-500" />
-                    {t('files.op_new_folder')}
-                  </button>
-                  <button
-                    type="button"
-                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-800"
-                    onClick={() => {
-                      setFileOpsOpen(false)
-                      const name = window.prompt(t('files.op_new_file'), '')
-                      if (!name?.trim()) return
-                      const base = name.trim()
-                      if (!isSafeNewFileName(base)) {
-                        toast.error(t('files.invalid_filename'))
-                        return
-                      }
-                      if (entries.some((e) => e.name === base && !e.is_dir)) {
-                        toast.error(t('files.file_exists'))
-                        return
-                      }
-                      createFileM.mutate(base)
-                    }}
-                  >
-                    <FilePlus className="h-4 w-4" />
-                    {t('files.op_new_file')}
-                  </button>
-                  <button
-                    type="button"
-                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-800"
-                    onClick={() => {
-                      setFileOpsOpen(false)
-                      void filesQ.refetch()
-                    }}
-                  >
-                    <RefreshCw className="h-4 w-4" />
-                    {t('files.op_refresh')}
-                  </button>
-                  <div className="my-1 border-t border-gray-100 dark:border-gray-800" />
-                  <button
-                    type="button"
-                    disabled={selectedIds.size === 0 || bulkTrashMoveM.isPending}
-                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40 dark:text-red-300 dark:hover:bg-red-950/30"
-                    onClick={() => {
-                      setFileOpsOpen(false)
-                      confirmBulkTrashSelection()
-                    }}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                    {t('files.op_bulk_delete', { count: selectedIds.size })}
-                  </button>
-                  <button
-                    type="button"
-                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-800"
-                    onClick={() => {
-                      setFileOpsOpen(false)
-                      const base = selected ? joinRel(path, selected) : ''
-                      const from = window.prompt(t('files.copy_source_prompt'), base)
-                      if (!from?.trim() || !isSafeRelativePath(from.trim())) return
-                      const to = window.prompt(t('files.copy_target_prompt'), `${from.trim()}-copy`)
-                      if (!to?.trim() || !isSafeRelativePath(to.trim())) return
-                      copyM.mutate({ from: from.trim(), to: to.trim() })
-                    }}
-                  >
-                    {t('files.op_copy')}
-                  </button>
-                  <button
-                    type="button"
-                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-800"
-                    onClick={() => {
-                      setFileOpsOpen(false)
-                      const rel = selected ? joinRel(path, selected) : path
-                      setChmodDialog({ path: rel, mode: '644' })
-                    }}
-                  >
-                    <Unlock className="h-4 w-4" />
-                    {t('files.op_chmod')}
-                  </button>
-                  <button
-                    type="button"
-                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-800"
-                    onClick={() => {
-                      setFileOpsOpen(false)
-                      const source = selected ? joinRel(path, selected) : path
-                      const trimmed = source.trim()
-                      if (!isSafeRelativePath(trimmed)) {
-                        toast.error(t('files.invalid_path'))
-                        return
-                      }
-                      const isDir = selected
-                        ? (entries.find((e) => e.name === selected)?.is_dir ?? false)
-                        : true
-                      const target = suggestedZipTargetPath(selected ? joinRel(path, selected) : path, isDir)
-                      void runZipArchive({ source: trimmed, target })
-                    }}
-                  >
-                    {t('files.op_zip')}
-                  </button>
-                  <button
-                    type="button"
-                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-800"
-                    onClick={() => {
-                      setFileOpsOpen(false)
-                      const archiveDefault = selected ? joinRel(path, selected) : ''
-                      if (!archiveDefault.trim()) {
-                        const archive = window.prompt(t('files.unzip_archive_prompt'), '')
-                        if (!archive?.trim() || !isSafeRelativePath(archive.trim())) return
-                        const leaf = archive.trim().split('/').pop() || ''
-                        if (!isZipArchiveFileName(leaf)) {
-                          toast.error(t('files.only_zip_supported'))
-                          return
-                        }
-                        void runUnzipArchive({ archive: archive.trim(), target_dir: path })
-                        return
-                      }
-                      const leaf = archiveDefault.split('/').pop() || ''
-                      if (!isZipArchiveFileName(leaf)) {
-                        toast.error(t('files.only_zip_supported'))
-                        return
-                      }
-                      void runUnzipArchive({ archive: archiveDefault.trim(), target_dir: path })
-                    }}
-                  >
-                    {t('files.op_unzip')}
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-
           <button
             type="button"
             className={clsx(
@@ -2721,60 +2735,56 @@ export default function FileManagerPage() {
           style={{ left: contextMenuPos?.left ?? contextMenu.x, top: contextMenuPos?.top ?? contextMenu.y }}
           role="menu"
         >
-          {contextMenu.isDir && (
-            <>
-              <button
-                type="button"
-                className="block w-full px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-800"
-                onClick={() => {
-                  const name = window.prompt(t('files.op_new_folder'), '')
-                  if (name?.trim()) {
-                    const rel = joinRel(contextMenu.rel, name.trim())
-                  api
-                    .post(`/domains/${domainId}/files/mkdir`, { path: rel })
-                    .then(() => {
-                      toast.success(t('files.folder_created'))
-                      qc.invalidateQueries({ queryKey: ['files', domainId, path] })
-                    })
-                    .catch((err: unknown) => {
-                      const ax = err as { response?: { data?: { message?: string } } }
-                      toast.error(ax.response?.data?.message ?? t('files.mkdir_err'))
-                    })
-                  }
-                  setContextMenu(null)
-                }}
-              >
-                {t('files.ctx_new_folder')}
-              </button>
-              <button
-                type="button"
-                className="block w-full px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-800"
-                onClick={() => {
-                  const name = window.prompt(t('files.op_new_file'), '')
-                  if (!name?.trim()) return
-                  const base = name.trim()
-                  if (!isSafeNewFileName(base)) {
-                    toast.error(t('files.invalid_filename'))
-                    return
-                  }
-                  const rel = joinRel(contextMenu.rel, base)
-                  api
-                    .post(`/domains/${domainId}/files/create`, { path: rel, content: '' })
-                    .then(() => {
-                      toast.success(t('files.file_created'))
-                      qc.invalidateQueries({ queryKey: ['files', domainId, path] })
-                    })
-                    .catch((err: unknown) => {
-                      const ax = err as { response?: { data?: { message?: string } } }
-                      toast.error(ax.response?.data?.message ?? t('files.create_file_err'))
-                    })
-                  setContextMenu(null)
-                }}
-              >
-                {t('files.ctx_new_file')}
-              </button>
-            </>
-          )}
+          <button
+            type="button"
+            className="block w-full px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-800"
+            onClick={() => {
+              const name = window.prompt(t('files.op_new_folder'), '')
+              if (name?.trim()) {
+                const rel = joinRel(contextBaseDir, name.trim())
+                api
+                  .post(`/domains/${domainId}/files/mkdir`, { path: rel })
+                  .then(() => {
+                    toast.success(t('files.folder_created'))
+                    qc.invalidateQueries({ queryKey: ['files', domainId, path] })
+                  })
+                  .catch((err: unknown) => {
+                    const ax = err as { response?: { data?: { message?: string } } }
+                    toast.error(ax.response?.data?.message ?? t('files.mkdir_err'))
+                  })
+              }
+              setContextMenu(null)
+            }}
+          >
+            {t('files.ctx_new_folder')}
+          </button>
+          <button
+            type="button"
+            className="block w-full px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-800"
+            onClick={() => {
+              const name = window.prompt(t('files.op_new_file'), '')
+              if (!name?.trim()) return
+              const base = name.trim()
+              if (!isSafeNewFileName(base)) {
+                toast.error(t('files.invalid_filename'))
+                return
+              }
+              const rel = joinRel(contextBaseDir, base)
+              api
+                .post(`/domains/${domainId}/files/create`, { path: rel, content: '' })
+                .then(() => {
+                  toast.success(t('files.file_created'))
+                  qc.invalidateQueries({ queryKey: ['files', domainId, path] })
+                })
+                .catch((err: unknown) => {
+                  const ax = err as { response?: { data?: { message?: string } } }
+                  toast.error(ax.response?.data?.message ?? t('files.create_file_err'))
+                })
+              setContextMenu(null)
+            }}
+          >
+            {t('files.ctx_new_file')}
+          </button>
           {!contextMenu.isDir && (
             <button
               type="button"

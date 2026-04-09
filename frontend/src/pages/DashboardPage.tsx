@@ -9,6 +9,11 @@ import { Globe, Database, Mail, HardDrive, Plus, Users, Power, RefreshCcw, Rotat
 import toast from 'react-hot-toast'
 import ResourceChartsSection from '../components/dashboard/ResourceChartsSection'
 
+function fmtGb(nBytes?: number | null): string {
+  if (nBytes == null || !Number.isFinite(nBytes)) return '—'
+  return `${Math.round((nBytes / 1024 / 1024 / 1024) * 10) / 10} GB`
+}
+
 export default function DashboardPage() {
   const { t } = useTranslation()
   const qc = useQueryClient()
@@ -79,54 +84,61 @@ export default function DashboardPage() {
 
   const statCards = [
     {
+      key: 'domains',
       label: t('dashboard.domains_count'),
-      value: d?.domains_count ?? '—',
+      value: d?.domains_count ?? 0,
       icon: Globe,
-      color: 'text-secondary-500',
-      bg: 'bg-secondary-50 dark:bg-secondary-900/20',
+      color: 'text-sky-600 dark:text-sky-400',
+      ring: 'ring-sky-200 dark:ring-sky-900/60',
+      bg: 'bg-sky-50/80 dark:bg-sky-950/30',
+      to: '/domains',
+      cta: t('dashboard.create_site'),
     },
     {
+      key: 'databases',
       label: t('dashboard.databases_count'),
-      value: d?.databases_count ?? '—',
+      value: d?.databases_count ?? 0,
       icon: Database,
-      color: 'text-green-500',
-      bg: 'bg-green-50 dark:bg-green-900/20',
+      color: 'text-emerald-600 dark:text-emerald-400',
+      ring: 'ring-emerald-200 dark:ring-emerald-900/60',
+      bg: 'bg-emerald-50/80 dark:bg-emerald-950/30',
+      to: '/databases',
+      cta: t('dashboard.create_database'),
     },
     {
+      key: 'emails',
       label: t('dashboard.email_count'),
-      value: d?.email_accounts_count ?? '—',
+      value: d?.email_accounts_count ?? 0,
       icon: Mail,
-      color: 'text-purple-500',
-      bg: 'bg-purple-50 dark:bg-purple-900/20',
-    },
-    {
-      label: t('dashboard.disk_usage'),
-      value:
-        sys != null && sys.disk_used != null && sys.disk_total != null
-          ? `${Math.round((sys.disk_used / 1024 / 1024 / 1024) * 10) / 10} / ${Math.round((sys.disk_total / 1024 / 1024 / 1024) * 10) / 10} GB`
-          : `${t('dashboard.disk_usage')} (—)`,
-      icon: HardDrive,
-      color: 'text-orange-500',
-      bg: 'bg-orange-50 dark:bg-orange-900/20',
-      progress: sys?.disk_percent ?? undefined,
+      color: 'text-violet-600 dark:text-violet-400',
+      ring: 'ring-violet-200 dark:ring-violet-900/60',
+      bg: 'bg-violet-50/80 dark:bg-violet-950/30',
+      to: '/email',
+      cta: t('dashboard.create_email'),
     },
   ]
 
   const adminExtras = isSuper && d
     ? [
         {
+          key: 'users',
           label: t('nav.users'),
-          value: d.total_users ?? '—',
+          value: d.total_users ?? 0,
           icon: Users,
-          color: 'text-indigo-500',
-          bg: 'bg-indigo-50 dark:bg-indigo-900/20',
+          color: 'text-indigo-600 dark:text-indigo-400',
+          ring: 'ring-indigo-200 dark:ring-indigo-900/60',
+          bg: 'bg-indigo-50/80 dark:bg-indigo-950/30',
+          to: '/users',
         },
         {
+          key: 'total-domains',
           label: t('nav.domains'),
-          value: d.total_domains ?? '—',
+          value: d.total_domains ?? 0,
           icon: Globe,
-          color: 'text-secondary-500',
-          bg: 'bg-secondary-50 dark:bg-secondary-900/20',
+          color: 'text-cyan-600 dark:text-cyan-400',
+          ring: 'ring-cyan-200 dark:ring-cyan-900/60',
+          bg: 'bg-cyan-50/80 dark:bg-cyan-950/30',
+          to: '/domains',
         },
       ]
     : []
@@ -213,27 +225,60 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {[...statCards, ...adminExtras].map((stat) => (
-          <div key={stat.label} className="card p-5">
-            <div className="flex items-center justify-between mb-3">
-              <div className={`p-2.5 rounded-xl ${stat.bg}`}>
-                <stat.icon className={`h-5 w-5 ${stat.color}`} />
-              </div>
+        <div className="card p-5 sm:col-span-2 lg:col-span-2">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                {t('dashboard.disk_usage')}
+              </p>
+              <p className="mt-2 text-2xl font-bold text-gray-900 dark:text-white">
+                {dashQ.isLoading ? '…' : `${fmtGb(sys?.disk_used)} / ${fmtGb(sys?.disk_total)}`}
+              </p>
+              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                {sys?.disk_percent != null ? `%${Math.round(sys.disk_percent)} dolu` : '—'}
+              </p>
             </div>
-            <p className="text-2xl font-bold text-gray-900 dark:text-white">
-              {dashQ.isLoading ? '…' : stat.value}
-            </p>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-              {stat.label}
-            </p>
-            {'progress' in stat && stat.progress !== undefined && (
-              <div className="mt-3 w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5">
-                <div
-                  className="bg-primary-500 h-1.5 rounded-full transition-all"
-                  style={{ width: `${stat.progress}%` }}
-                />
+            <div className="rounded-xl bg-orange-50 p-2.5 ring-1 ring-orange-200 dark:bg-orange-950/30 dark:ring-orange-900/60">
+              <HardDrive className="h-5 w-5 text-orange-600 dark:text-orange-400" />
+            </div>
+          </div>
+          <div className="mt-4 h-2 w-full rounded-full bg-gray-200 dark:bg-gray-700">
+            <div
+              className="h-2 rounded-full bg-gradient-to-r from-orange-500 to-rose-500 transition-all"
+              style={{ width: `${Math.min(100, Math.max(0, sys?.disk_percent ?? 0))}%` }}
+            />
+          </div>
+        </div>
+
+        {[...statCards, ...adminExtras].map((stat) => (
+          <div key={stat.key} className="card p-4">
+            <div className="flex items-center justify-between gap-3">
+              <div className={`rounded-xl p-2 ring-1 ${stat.bg} ${stat.ring}`}>
+                <stat.icon className={`h-4 w-4 ${stat.color}`} />
               </div>
-            )}
+              <p className="text-2xl font-bold leading-none text-gray-900 dark:text-white">
+                {dashQ.isLoading ? '…' : stat.value}
+              </p>
+            </div>
+            <p className="mt-2 text-sm font-medium text-gray-700 dark:text-gray-200">{stat.label}</p>
+            <div className="mt-2 min-h-[20px]">
+              {Number(stat.value) === 0 && 'cta' in stat && stat.cta ? (
+                <Link
+                  to={stat.to}
+                  className="inline-flex items-center gap-1 text-xs font-medium text-primary-600 hover:underline dark:text-primary-400"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  {String(stat.cta)}
+                </Link>
+              ) : stat.to ? (
+                <Link
+                  to={stat.to}
+                  className="text-xs font-medium text-gray-500 hover:text-primary-600 dark:text-gray-400 dark:hover:text-primary-400"
+                >
+                  Detayları gör
+                </Link>
+              ) : null}
+            </div>
           </div>
         ))}
       </div>
