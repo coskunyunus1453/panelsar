@@ -29,6 +29,7 @@
     "dns": "DNS",
     "billing": "Faturalama",
     "system": "Sistem",
+    "logs": "Loglar",
     "license": "Lisans",
     "admin_community": "Topluluk",
     "open_menu": "Menüyü aç",
@@ -421,6 +422,13 @@
     "traffic_source": "Kaynak",
     "traffic_no_log": "Access log bulunamadı veya henüz kayıt yok."
   },
+  "logs_page": {
+    "title": "Site Logları",
+    "subtitle": "Seçilen alan adı için hata/access loglarını tek ekranda inceleyin.",
+    "select_domain": "Alan adı seçin",
+    "quick_diagnosis": "Hızlı teşhis",
+    "no_critical_found": "Kritik bir desen bulunamadı. Yine de log satırlarını kontrol edin."
+  },
   "databases": {
     "title": "Veritabanı Yönetimi",
     "add": "Veritabanı Oluştur",
@@ -454,7 +462,20 @@
     "import_started": "İçe aktarma başlatıldı…",
     "export_failed": "Dışa aktarma başarısız",
     "import_confirm_expected": "TÜMVERİSİLİNECEK",
-    "import_confirm_mismatch": "Onay ifadesi eşleşmiyor."
+    "import_confirm_mismatch": "Onay ifadesi eşleşmiyor.",
+    "copy_name": "Veritabanı adını kopyala",
+    "copy_username": "Kullanıcı adını kopyala",
+    "name_copied": "Veritabanı adı kopyalandı",
+    "username_copied": "Kullanıcı adı kopyalandı",
+    "password_copied": "Yeni şifre panoya kopyalandı",
+    "copy_failed": "Kopyalama başarısız",
+    "edit_credentials": "Ad / kullanıcı / şifre değiştir",
+    "edit_credentials_warning": "Bu işlem canlı bağlantıları etkileyebilir. Yanlış değişiklik uygulamaların veritabanına bağlanamamasına neden olabilir.",
+    "edit_credentials_ack": "Riski anladım ve değişikliği uygulamayı onaylıyorum.",
+    "new_password_optional": "Yeni şifre (opsiyonel)",
+    "new_password_optional_hint": "Boş bırakırsanız mevcut şifre korunur.",
+    "password_temp_title": "Yeni şifre (geçici görünüm)",
+    "password_temp_desc": "Bu şifre güvenlik nedeniyle {{seconds}} sn sonra gizlenecek. Hemen kopyalayın."
   },
   "common": {
     "create": "Oluştur",

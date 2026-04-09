@@ -24,6 +24,7 @@ use App\Http\Controllers\Admin\SaasLicenseProductController;
 use App\Http\Controllers\Admin\SaasProductModuleController;
 use App\Http\Controllers\Admin\SitePageController as AdminSitePageController;
 use App\Http\Controllers\Admin\SiteSettingsController;
+use App\Http\Controllers\Admin\SystemLogsController;
 use App\Http\Controllers\Admin\ThemeSettingsController;
 use App\Http\Controllers\Site\Auth\LoginController as SiteLoginController;
 use App\Http\Controllers\Site\Auth\NewPasswordController;
@@ -159,6 +160,8 @@ Route::prefix('admin')->name('admin.')->group(function (): void {
 
             Route::get('site-settings', [SiteSettingsController::class, 'edit'])->name('site-settings.edit');
             Route::put('site-settings', [SiteSettingsController::class, 'update'])->name('site-settings.update');
+            Route::get('system/logs', [SystemLogsController::class, 'index'])->name('system.logs.index');
+            Route::get('system/logs/export.csv', [SystemLogsController::class, 'exportCsv'])->name('system.logs.export');
 
             Route::get('locale-settings', [LocaleSettingsController::class, 'edit'])->name('locale-settings.edit');
             Route::put('locale-settings', [LocaleSettingsController::class, 'update'])->name('locale-settings.update');

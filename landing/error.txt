@@ -1,0 +1,329 @@
+www-data@vmi2616585:/$ cd /var/www/hostvim/data/www/hostvim.com/public_html
+
+# .env ve config yüklenmiş mi?
+php artisan about
+
+# Route / config / view cache temizle (debug için)
+php artisan optimize:clear
+
+# Son Laravel logları
+tail -n 200 storage/logs/laravel.log
+
+# DB bağlantı testi
+php artisan tinker --execute="DB::connection()->getPdo(); echo 'DB OK'.PHP_EOL;"
+
+# Migration durumu
+php artisan migrate:status
+
+  Environment ......................................................................................................................................  
+  Application Name ......................................................................................................................... Laravel  
+  Laravel Version .......................................................................................................................... 11.51.0  
+  PHP Version ............................................................................................................................... 8.4.19  
+  Composer Version ........................................................................................................................... 2.9.5  
+  Environment ........................................................................................................................... production  
+  Debug Mode ................................................................................................................................... OFF  
+  URL .................................................................................................................................. hostvim.com  
+  Maintenance Mode ............................................................................................................................. OFF  
+  Timezone ..................................................................................................................................... UTC  
+  Locale ........................................................................................................................................ en  
+
+  Cache ............................................................................................................................................  
+  Config .................................................................................................................................... CACHED  
+  Events ................................................................................................................................ NOT CACHED  
+  Routes .................................................................................................................................... CACHED  
+  Views ..................................................................................................................................... CACHED  
+
+  Drivers ..........................................................................................................................................  
+  Broadcasting ................................................................................................................................ null  
+  Cache ................................................................................................................................... database  
+  Database ................................................................................................................................... mysql  
+  Logs .............................................................................................................................. stack / single  
+  Mail ......................................................................................................................................... log  
+  Queue ................................................................................................................................... database  
+  Session ................................................................................................................................. database  
+
+
+   INFO  Clearing cached bootstrap files.  
+
+  cache ............................................................................................................................... 17.59ms DONE
+  compiled ............................................................................................................................. 2.74ms DONE
+  config ............................................................................................................................... 3.25ms DONE
+  events ............................................................................................................................... 2.25ms DONE
+  routes ............................................................................................................................... 3.33ms DONE
+  views ............................................................................................................................... 19.31ms DONE
+
+#9 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/View/Concerns/ManagesComponents.php(103): Illuminate\\View\\View->render()
+#10 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/storage/framework/views/adba475a7f35d58e00fdd05751063a90.php(28): Illuminate\\View\\Factory->renderComponent()
+#11 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Filesystem/Filesystem.php(123): require('/Applications/X...')
+#12 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Filesystem/Filesystem.php(124): Illuminate\\Filesystem\\Filesystem::Illuminate\\Filesystem\\{closure}()
+#13 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/View/Engines/PhpEngine.php(58): Illuminate\\Filesystem\\Filesystem->getRequire('/Applications/X...', Array)
+#14 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/View/Engines/CompilerEngine.php(75): Illuminate\\View\\Engines\\PhpEngine->evaluatePath('/Applications/X...', Array)
+#15 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/View/View.php(209): Illuminate\\View\\Engines\\CompilerEngine->get('/Applications/X...', Array)
+#16 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/View/View.php(192): Illuminate\\View\\View->getContents()
+#17 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/View/View.php(161): Illuminate\\View\\View->renderContents()
+#18 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Http/Response.php(79): Illuminate\\View\\View->render()
+#19 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Http/Response.php(35): Illuminate\\Http\\Response->setContent(Object(Illuminate\\View\\View))
+#20 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Routing/Router.php(920): Illuminate\\Http\\Response->__construct(Object(Illuminate\\View\\View), 200, Array)
+#21 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Routing/Router.php(887): Illuminate\\Routing\\Router::toResponse(Object(Illuminate\\Http\\Request), Object(Illuminate\\View\\View))
+#22 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Routing/Router.php(807): Illuminate\\Routing\\Router->prepareResponse(Object(Illuminate\\Http\\Request), Object(Illuminate\\View\\View))
+#23 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(170): Illuminate\\Routing\\Router->Illuminate\\Routing\\{closure}(Object(Illuminate\\Http\\Request))
+#24 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/app/Http/Middleware/EnsureUserIsAdmin.php(28): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#25 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): App\\Http\\Middleware\\EnsureUserIsAdmin->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#26 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/app/Http/Middleware/SecurityHeaders.php(16): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#27 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): App\\Http\\Middleware\\SecurityHeaders->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#28 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/app/Http/Middleware/SetLandingLocale.php(48): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#29 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): App\\Http\\Middleware\\SetLandingLocale->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#30 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Routing/Middleware/SubstituteBindings.php(51): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#31 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Routing\\Middleware\\SubstituteBindings->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#32 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Auth/Middleware/Authenticate.php(64): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#33 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Auth\\Middleware\\Authenticate->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#34 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/VerifyCsrfToken.php(88): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#35 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Foundation\\Http\\Middleware\\VerifyCsrfToken->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#36 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/View/Middleware/ShareErrorsFromSession.php(49): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#37 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\View\\Middleware\\ShareErrorsFromSession->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#38 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Session/Middleware/StartSession.php(121): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#39 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Session/Middleware/StartSession.php(64): Illuminate\\Session\\Middleware\\StartSession->handleStatefulRequest(Object(Illuminate\\Http\\Request), Object(Illuminate\\Session\\Store), Object(Closure))
+#40 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Session\\Middleware\\StartSession->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#41 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Cookie/Middleware/AddQueuedCookiesToResponse.php(37): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#42 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Cookie\\Middleware\\AddQueuedCookiesToResponse->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#43 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Cookie/Middleware/EncryptCookies.php(75): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#44 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Cookie\\Middleware\\EncryptCookies->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#45 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(127): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#46 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Routing/Router.php(807): Illuminate\\Pipeline\\Pipeline->then(Object(Closure))
+#47 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Routing/Router.php(786): Illuminate\\Routing\\Router->runRouteWithinStack(Object(Illuminate\\Routing\\Route), Object(Illuminate\\Http\\Request))
+#48 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Routing/Router.php(750): Illuminate\\Routing\\Router->runRoute(Object(Illuminate\\Http\\Request), Object(Illuminate\\Routing\\Route))
+#49 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Routing/Router.php(739): Illuminate\\Routing\\Router->dispatchToRoute(Object(Illuminate\\Http\\Request))
+#50 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Foundation/Http/Kernel.php(201): Illuminate\\Routing\\Router->dispatch(Object(Illuminate\\Http\\Request))
+#51 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(170): Illuminate\\Foundation\\Http\\Kernel->Illuminate\\Foundation\\Http\\{closure}(Object(Illuminate\\Http\\Request))
+#52 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/TransformsRequest.php(21): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#53 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/ConvertEmptyStringsToNull.php(31): Illuminate\\Foundation\\Http\\Middleware\\TransformsRequest->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#54 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Foundation\\Http\\Middleware\\ConvertEmptyStringsToNull->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#55 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/TransformsRequest.php(21): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#56 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/TrimStrings.php(51): Illuminate\\Foundation\\Http\\Middleware\\TransformsRequest->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#57 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Foundation\\Http\\Middleware\\TrimStrings->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#58 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Http/Middleware/ValidatePostSize.php(27): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#59 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Http\\Middleware\\ValidatePostSize->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#60 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/PreventRequestsDuringMaintenance.php(110): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#61 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Foundation\\Http\\Middleware\\PreventRequestsDuringMaintenance->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#62 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Http/Middleware/HandleCors.php(49): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#63 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Http\\Middleware\\HandleCors->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#64 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Http/Middleware/TrustProxies.php(58): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#65 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Http\\Middleware\\TrustProxies->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#66 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/InvokeDeferredCallbacks.php(22): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#67 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Foundation\\Http\\Middleware\\InvokeDeferredCallbacks->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#68 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(127): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#69 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Foundation/Http/Kernel.php(176): Illuminate\\Pipeline\\Pipeline->then(Object(Closure))
+#70 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Foundation/Http/Kernel.php(145): Illuminate\\Foundation\\Http\\Kernel->sendRequestThroughRouter(Object(Illuminate\\Http\\Request))
+#71 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Foundation/Application.php(1220): Illuminate\\Foundation\\Http\\Kernel->handle(Object(Illuminate\\Http\\Request))
+#72 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/public/index.php(20): Illuminate\\Foundation\\Application->handleRequest(Object(Illuminate\\Http\\Request))
+#73 {main}
+"} 
+[2026-04-08 21:08:50] local.ERROR: file_put_contents(/Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/storage/framework/views/97207ad3e5f30051468850d17bcf238d.php): Failed to open stream: Permission denied {"userId":1,"exception":"[object] (ErrorException(code: 0): file_put_contents(/Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/storage/framework/views/97207ad3e5f30051468850d17bcf238d.php): Failed to open stream: Permission denied at /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Filesystem/Filesystem.php:204)
+[stacktrace]
+#0 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Foundation/Bootstrap/HandleExceptions.php(258): Illuminate\\Foundation\\Bootstrap\\HandleExceptions->handleError(2, 'file_put_conten...', '/Applications/X...', 204)
+#1 [internal function]: Illuminate\\Foundation\\Bootstrap\\HandleExceptions->Illuminate\\Foundation\\Bootstrap\\{closure}(2, 'file_put_conten...', '/Applications/X...', 204)
+#2 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Filesystem/Filesystem.php(204): file_put_contents('/Applications/X...', '<?php if (isset...', 0)
+#3 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/View/Compilers/BladeCompiler.php(196): Illuminate\\Filesystem\\Filesystem->put('/Applications/X...', '<?php if (isset...')
+#4 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/View/Engines/CompilerEngine.php(67): Illuminate\\View\\Compilers\\BladeCompiler->compile('/Applications/X...')
+#5 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/View/View.php(209): Illuminate\\View\\Engines\\CompilerEngine->get('/Applications/X...', Array)
+#6 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/View/View.php(192): Illuminate\\View\\View->getContents()
+#7 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/View/View.php(161): Illuminate\\View\\View->renderContents()
+#8 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Http/Response.php(79): Illuminate\\View\\View->render()
+#9 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Http/Response.php(35): Illuminate\\Http\\Response->setContent(Object(Illuminate\\View\\View))
+#10 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Routing/Router.php(920): Illuminate\\Http\\Response->__construct(Object(Illuminate\\View\\View), 200, Array)
+#11 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Routing/Router.php(887): Illuminate\\Routing\\Router::toResponse(Object(Illuminate\\Http\\Request), Object(Illuminate\\View\\View))
+#12 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Routing/Router.php(807): Illuminate\\Routing\\Router->prepareResponse(Object(Illuminate\\Http\\Request), Object(Illuminate\\View\\View))
+#13 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(170): Illuminate\\Routing\\Router->Illuminate\\Routing\\{closure}(Object(Illuminate\\Http\\Request))
+#14 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/app/Http/Middleware/EnsureUserIsAdmin.php(28): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#15 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): App\\Http\\Middleware\\EnsureUserIsAdmin->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#16 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/app/Http/Middleware/SecurityHeaders.php(16): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#17 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): App\\Http\\Middleware\\SecurityHeaders->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#18 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/app/Http/Middleware/SetLandingLocale.php(48): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#19 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): App\\Http\\Middleware\\SetLandingLocale->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#20 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Routing/Middleware/SubstituteBindings.php(51): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#21 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Routing\\Middleware\\SubstituteBindings->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#22 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Auth/Middleware/Authenticate.php(64): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#23 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Auth\\Middleware\\Authenticate->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#24 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/VerifyCsrfToken.php(88): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#25 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Foundation\\Http\\Middleware\\VerifyCsrfToken->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#26 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/View/Middleware/ShareErrorsFromSession.php(49): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#27 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\View\\Middleware\\ShareErrorsFromSession->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#28 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Session/Middleware/StartSession.php(121): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#29 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Session/Middleware/StartSession.php(64): Illuminate\\Session\\Middleware\\StartSession->handleStatefulRequest(Object(Illuminate\\Http\\Request), Object(Illuminate\\Session\\Store), Object(Closure))
+#30 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Session\\Middleware\\StartSession->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#31 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Cookie/Middleware/AddQueuedCookiesToResponse.php(37): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#32 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Cookie\\Middleware\\AddQueuedCookiesToResponse->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#33 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Cookie/Middleware/EncryptCookies.php(75): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#34 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Cookie\\Middleware\\EncryptCookies->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#35 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(127): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#36 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Routing/Router.php(807): Illuminate\\Pipeline\\Pipeline->then(Object(Closure))
+#37 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Routing/Router.php(786): Illuminate\\Routing\\Router->runRouteWithinStack(Object(Illuminate\\Routing\\Route), Object(Illuminate\\Http\\Request))
+#38 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Routing/Router.php(750): Illuminate\\Routing\\Router->runRoute(Object(Illuminate\\Http\\Request), Object(Illuminate\\Routing\\Route))
+#39 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Routing/Router.php(739): Illuminate\\Routing\\Router->dispatchToRoute(Object(Illuminate\\Http\\Request))
+#40 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Foundation/Http/Kernel.php(201): Illuminate\\Routing\\Router->dispatch(Object(Illuminate\\Http\\Request))
+#41 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(170): Illuminate\\Foundation\\Http\\Kernel->Illuminate\\Foundation\\Http\\{closure}(Object(Illuminate\\Http\\Request))
+#42 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/TransformsRequest.php(21): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#43 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/ConvertEmptyStringsToNull.php(31): Illuminate\\Foundation\\Http\\Middleware\\TransformsRequest->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#44 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Foundation\\Http\\Middleware\\ConvertEmptyStringsToNull->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#45 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/TransformsRequest.php(21): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#46 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/TrimStrings.php(51): Illuminate\\Foundation\\Http\\Middleware\\TransformsRequest->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#47 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Foundation\\Http\\Middleware\\TrimStrings->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#48 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Http/Middleware/ValidatePostSize.php(27): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#49 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Http\\Middleware\\ValidatePostSize->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#50 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/PreventRequestsDuringMaintenance.php(110): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#51 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Foundation\\Http\\Middleware\\PreventRequestsDuringMaintenance->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#52 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Http/Middleware/HandleCors.php(49): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#53 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Http\\Middleware\\HandleCors->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#54 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Http/Middleware/TrustProxies.php(58): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#55 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Http\\Middleware\\TrustProxies->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#56 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/InvokeDeferredCallbacks.php(22): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#57 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Foundation\\Http\\Middleware\\InvokeDeferredCallbacks->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#58 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(127): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#59 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Foundation/Http/Kernel.php(176): Illuminate\\Pipeline\\Pipeline->then(Object(Closure))
+#60 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Foundation/Http/Kernel.php(145): Illuminate\\Foundation\\Http\\Kernel->sendRequestThroughRouter(Object(Illuminate\\Http\\Request))
+#61 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Foundation/Application.php(1220): Illuminate\\Foundation\\Http\\Kernel->handle(Object(Illuminate\\Http\\Request))
+#62 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/public/index.php(20): Illuminate\\Foundation\\Application->handleRequest(Object(Illuminate\\Http\\Request))
+#63 {main}
+"} 
+[2026-04-08 21:09:08] local.ERROR: file_put_contents(/Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/storage/framework/views/19f63a8fb2b681b5283b91aa3984bfc3.php): Failed to open stream: Permission denied {"userId":1,"exception":"[object] (ErrorException(code: 0): file_put_contents(/Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/storage/framework/views/19f63a8fb2b681b5283b91aa3984bfc3.php): Failed to open stream: Permission denied at /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Filesystem/Filesystem.php:204)
+[stacktrace]
+#0 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Foundation/Bootstrap/HandleExceptions.php(258): Illuminate\\Foundation\\Bootstrap\\HandleExceptions->handleError(2, 'file_put_conten...', '/Applications/X...', 204)
+#1 [internal function]: Illuminate\\Foundation\\Bootstrap\\HandleExceptions->Illuminate\\Foundation\\Bootstrap\\{closure}(2, 'file_put_conten...', '/Applications/X...', 204)
+#2 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Filesystem/Filesystem.php(204): file_put_contents('/Applications/X...', '<?php if (isset...', 0)
+#3 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/View/Compilers/BladeCompiler.php(196): Illuminate\\Filesystem\\Filesystem->put('/Applications/X...', '<?php if (isset...')
+#4 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/View/Engines/CompilerEngine.php(67): Illuminate\\View\\Compilers\\BladeCompiler->compile('/Applications/X...')
+#5 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/View/View.php(209): Illuminate\\View\\Engines\\CompilerEngine->get('/Applications/X...', Array)
+#6 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/View/View.php(192): Illuminate\\View\\View->getContents()
+#7 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/View/View.php(161): Illuminate\\View\\View->renderContents()
+#8 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Http/Response.php(79): Illuminate\\View\\View->render()
+#9 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Http/Response.php(35): Illuminate\\Http\\Response->setContent(Object(Illuminate\\View\\View))
+#10 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Routing/Router.php(920): Illuminate\\Http\\Response->__construct(Object(Illuminate\\View\\View), 200, Array)
+#11 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Routing/Router.php(887): Illuminate\\Routing\\Router::toResponse(Object(Illuminate\\Http\\Request), Object(Illuminate\\View\\View))
+#12 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Routing/Router.php(807): Illuminate\\Routing\\Router->prepareResponse(Object(Illuminate\\Http\\Request), Object(Illuminate\\View\\View))
+#13 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(170): Illuminate\\Routing\\Router->Illuminate\\Routing\\{closure}(Object(Illuminate\\Http\\Request))
+#14 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/app/Http/Middleware/EnsureUserNotCommunityBanned.php(28): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#15 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): App\\Http\\Middleware\\EnsureUserNotCommunityBanned->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#16 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/app/Http/Middleware/SecurityHeaders.php(16): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#17 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): App\\Http\\Middleware\\SecurityHeaders->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#18 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/app/Http/Middleware/SetLandingLocale.php(48): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#19 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): App\\Http\\Middleware\\SetLandingLocale->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#20 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Routing/Middleware/SubstituteBindings.php(51): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#21 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Routing\\Middleware\\SubstituteBindings->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#22 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Auth/Middleware/Authenticate.php(64): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#23 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Auth\\Middleware\\Authenticate->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#24 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/VerifyCsrfToken.php(88): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#25 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Foundation\\Http\\Middleware\\VerifyCsrfToken->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#26 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/View/Middleware/ShareErrorsFromSession.php(49): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#27 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\View\\Middleware\\ShareErrorsFromSession->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#28 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Session/Middleware/StartSession.php(121): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#29 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Session/Middleware/StartSession.php(64): Illuminate\\Session\\Middleware\\StartSession->handleStatefulRequest(Object(Illuminate\\Http\\Request), Object(Illuminate\\Session\\Store), Object(Closure))
+#30 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Session\\Middleware\\StartSession->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#31 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Cookie/Middleware/AddQueuedCookiesToResponse.php(37): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#32 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Cookie\\Middleware\\AddQueuedCookiesToResponse->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#33 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Cookie/Middleware/EncryptCookies.php(75): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#34 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Cookie\\Middleware\\EncryptCookies->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#35 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(127): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#36 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Routing/Router.php(807): Illuminate\\Pipeline\\Pipeline->then(Object(Closure))
+#37 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Routing/Router.php(786): Illuminate\\Routing\\Router->runRouteWithinStack(Object(Illuminate\\Routing\\Route), Object(Illuminate\\Http\\Request))
+#38 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Routing/Router.php(750): Illuminate\\Routing\\Router->runRoute(Object(Illuminate\\Http\\Request), Object(Illuminate\\Routing\\Route))
+#39 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Routing/Router.php(739): Illuminate\\Routing\\Router->dispatchToRoute(Object(Illuminate\\Http\\Request))
+#40 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Foundation/Http/Kernel.php(201): Illuminate\\Routing\\Router->dispatch(Object(Illuminate\\Http\\Request))
+#41 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(170): Illuminate\\Foundation\\Http\\Kernel->Illuminate\\Foundation\\Http\\{closure}(Object(Illuminate\\Http\\Request))
+#42 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/TransformsRequest.php(21): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#43 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/ConvertEmptyStringsToNull.php(31): Illuminate\\Foundation\\Http\\Middleware\\TransformsRequest->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#44 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Foundation\\Http\\Middleware\\ConvertEmptyStringsToNull->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#45 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/TransformsRequest.php(21): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#46 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/TrimStrings.php(51): Illuminate\\Foundation\\Http\\Middleware\\TransformsRequest->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#47 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Foundation\\Http\\Middleware\\TrimStrings->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#48 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Http/Middleware/ValidatePostSize.php(27): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#49 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Http\\Middleware\\ValidatePostSize->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#50 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/PreventRequestsDuringMaintenance.php(110): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#51 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Foundation\\Http\\Middleware\\PreventRequestsDuringMaintenance->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#52 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Http/Middleware/HandleCors.php(49): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#53 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Http\\Middleware\\HandleCors->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#54 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Http/Middleware/TrustProxies.php(58): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#55 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Http\\Middleware\\TrustProxies->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#56 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/InvokeDeferredCallbacks.php(22): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#57 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(209): Illuminate\\Foundation\\Http\\Middleware\\InvokeDeferredCallbacks->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#58 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(127): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#59 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Foundation/Http/Kernel.php(176): Illuminate\\Pipeline\\Pipeline->then(Object(Closure))
+#60 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Foundation/Http/Kernel.php(145): Illuminate\\Foundation\\Http\\Kernel->sendRequestThroughRouter(Object(Illuminate\\Http\\Request))
+#61 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/vendor/laravel/framework/src/Illuminate/Foundation/Application.php(1220): Illuminate\\Foundation\\Http\\Kernel->handle(Object(Illuminate\\Http\\Request))
+#62 /Applications/XAMPP/xamppfiles/htdocs/hostvim/landing/public/index.php(20): Illuminate\\Foundation\\Application->handleRequest(Object(Illuminate\\Http\\Request))
+#63 {main}
+"} 
+
+In ConfigPaths.php line 456:
+                                                               
+  Writing to directory /var/www/.config/psysh is not allowed.  
+                                                               
+
+
+  Migration name .................................................................................................................... Batch / Status  
+  0001_01_01_000000_create_users_table ..................................................................................................... [1] Ran  
+  0001_01_01_000001_create_cache_table ..................................................................................................... [1] Ran  
+  0001_01_01_000002_create_jobs_table ...................................................................................................... [1] Ran  
+  2026_04_03_110437_add_is_admin_to_users_table ............................................................................................ [1] Ran  
+  2026_04_03_112231_create_blog_posts_table ................................................................................................ [1] Ran  
+  2026_04_03_112231_create_doc_pages_table ................................................................................................. [1] Ran  
+  2026_04_03_112231_create_plans_table ..................................................................................................... [1] Ran  
+  2026_04_03_112231_create_site_pages_table ................................................................................................ [1] Ran  
+  2026_04_03_200000_create_landing_site_settings_table ..................................................................................... [1] Ran  
+  2026_04_03_200001_create_landing_translations_table ...................................................................................... [1] Ran  
+  2026_04_04_120000_create_nav_menu_items_table ............................................................................................ [1] Ran  
+  2026_04_04_140000_create_blog_categories_and_seo_fields .................................................................................. [1] Ran  
+  2026_04_05_120000_add_site_page_full_seo_fields .......................................................................................... [1] Ran  
+  2026_04_06_100000_add_locale_and_english_slugs_to_content ................................................................................ [1] Ran  
+  2026_04_07_120000_create_hostvim_saas_tables ............................................................................................. [1] Ran  
+  2026_04_08_100000_saas_checkout_and_product_prices ....................................................................................... [1] Ran  
+  2026_04_08_160000_create_community_tables ................................................................................................ [1] Ran  
+  2026_04_08_180000_add_community_moderation_to_users ...................................................................................... [1] Ran  
+  2026_04_08_200000_community_moderation_tags_avatar ....................................................................................... [1] Ran  
+
+  www-data@vmi2616585:/$ # Proje izinleri + public dizini
+ls -la /var/www/hostvim/landing
+ls -la /var/www/hostvim/landing/public
+namei -l /var/www/hostvim/landing/public/index.php
+total 102012
+drwxr-xr-x 12 root root     4096 Apr  9 11:46  .
+drwxr-xr-x 14 root root     4096 Apr  8 09:08  ..
+-rw-r--r--  1 root root      252 Apr  8 09:01  .editorconfig
+-rw-r--r--  1 root root     3069 Apr  9 00:17  .env.example
+-rw-r--r--  1 root root      186 Apr  8 09:01  .gitattributes
+-rw-r--r--  1 root root      299 Apr  8 09:01  .gitignore
+-rw-r--r--  1 root root 52119921 Apr  9 11:46 'Arşiv 2.zip'
+-rw-r--r--  1 root root 51849979 Apr  8 09:01  Arşiv.zip
+-rw-r--r--  1 root root     3700 Apr  8 09:01  README.md
+drwxr-xr-x 10 root root     4096 Apr  9 00:17  app
+-rwxr-xr-x  1 root root      425 Apr  8 09:01  artisan
+drwxr-xr-x  3 root root     4096 Apr  9 00:17  bootstrap
+-rw-r--r--  1 root root     3029 Apr  8 09:01  composer.json
+-rw-r--r--  1 root root   309205 Apr  8 09:01  composer.lock
+drwxr-xr-x  2 root root     4096 Apr  9 00:17  config
+drwxr-xr-x  5 root root     4096 Apr  8 09:01  database
+drwxr-xr-x  4 root root     4096 Apr  8 09:01  lang
+-rw-r--r--  1 root root    79389 Apr  8 09:01  package-lock.json
+-rw-r--r--  1 root root      511 Apr  8 09:01  package.json
+-rw-r--r--  1 root root     1322 Apr  8 09:01  phpunit.xml
+drwxr-xr-x  2 root root     4096 Apr  8 09:01  public
+drwxr-xr-x  5 root root     4096 Apr  8 09:01  resources
+drwxr-xr-x  2 root root     4096 Apr  9 00:17  routes
+drwxr-xr-x  4 root root     4096 Apr  8 09:01  storage
+drwxr-xr-x  4 root root     4096 Apr  8 09:01  tests
+-rw-r--r--  1 root root      839 Apr  8 09:01  vite.config.js
+total 20
+drwxr-xr-x  2 root root 4096 Apr  8 09:01 .
+drwxr-xr-x 12 root root 4096 Apr  9 11:46 ..
+-rw-r--r--  1 root root  740 Apr  8 09:01 .htaccess
+-rw-r--r--  1 root root    0 Apr  8 09:01 favicon.ico
+-rw-r--r--  1 root root  543 Apr  8 09:01 index.php
+-rw-r--r--  1 root root   24 Apr  8 09:01 robots.txt
+f: /var/www/hostvim/landing/public/index.php
+drwxr-xr-x root root /
+drwxr-xr-x root root var
+drwxr-xr-x root root www
+drwxr-xr-x root root hostvim
+drwxr-xr-x root root landing
+drwxr-xr-x root root public
+-rw-r--r-- root root index.php
+www-data@vmi2616585:/$ 

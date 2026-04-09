@@ -80,17 +80,44 @@ class DatabaseController extends Controller
     public function update(Request $request, Database $database): JsonResponse
     {
         $this->authorize('update', $database);
+        $validated = $request->validate([
+            'grant_host' => 'nullable|string|max:64',
+            'name' => 'nullable|string|max:64',
+            'username' => 'nullable|string|max:64',
+            'password' => 'nullable|string|min:8|max:255',
+        ]);
 
-        if ($database->type !== 'mysql') {
+        $grantHost = isset($validated['grant_host']) ? trim((string) $validated['grant_host']) : null;
+        $name = isset($validated['name']) ? trim((string) $validated['name']) : null;
+        $username = isset($validated['username']) ? trim((string) $validated['username']) : null;
+        $password = isset($validated['password']) ? trim((string) $validated['password']) : null;
+
+        $hasCredentialChange = ($name !== null && $name !== '')
+            || ($username !== null && $username !== '')
+            || ($password !== null && $password !== '');
+        $hasGrantHost = $grantHost !== null && $grantHost !== '';
+
+        if (! $hasCredentialChange && ! $hasGrantHost) {
+            return response()->json(['message' => __('databases.update_no_changes')], 422);
+        }
+
+        if ($hasGrantHost && $database->type !== 'mysql') {
             return response()->json(['message' => __('databases.grant_host_mysql_only')], 422);
         }
 
-        $validated = $request->validate([
-            'grant_host' => 'required|string|max:64',
-        ]);
-
         try {
-            $this->databaseService->updateGrantHost($database, $validated['grant_host']);
+            if ($hasCredentialChange) {
+                $result = $this->databaseService->updateCredentials(
+                    $database,
+                    $name,
+                    $username,
+                    $password,
+                    $grantHost
+                );
+            } else {
+                $this->databaseService->updateGrantHost($database, (string) $grantHost);
+                $result = [];
+            }
         } catch (\InvalidArgumentException $e) {
             return response()->json(['message' => $e->getMessage()], 422);
         } catch (PDOException $e) {
@@ -110,6 +137,7 @@ class DatabaseController extends Controller
         return response()->json([
             'message' => __('databases.updated'),
             'database' => $database->fresh(),
+            'password_plain' => $result['password_plain'] ?? null,
         ]);
     }
 

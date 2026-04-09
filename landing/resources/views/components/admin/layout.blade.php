@@ -71,6 +71,9 @@
                 <a href="{{ route('admin.site-settings.edit') }}" class="flex items-center gap-2 rounded-xl px-3 py-2 {{ request()->routeIs('admin.site-settings.*') ? 'bg-orange-500/15 font-medium text-orange-800 ring-1 ring-orange-500/30 dark:text-orange-200' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-900/80' }}">
                     Site ayarları
                 </a>
+                <a href="{{ route('admin.system.logs.index') }}" class="flex items-center gap-2 rounded-xl px-3 py-2 {{ request()->routeIs('admin.system.logs.*') ? 'bg-orange-500/15 font-medium text-orange-800 ring-1 ring-orange-500/30 dark:text-orange-200' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-900/80' }}">
+                    Sistem logları
+                </a>
                 <a href="{{ route('admin.locale-settings.edit') }}" class="flex items-center gap-2 rounded-xl px-3 py-2 {{ request()->routeIs('admin.locale-settings.*') ? 'bg-orange-500/15 font-medium text-orange-800 ring-1 ring-orange-500/30 dark:text-orange-200' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-900/80' }}">
                     Dil ayarları
                 </a>
@@ -200,6 +203,7 @@
                 <a href="{{ route('admin.saas.modules.index') }}" class="block rounded-xl px-3 py-2 text-slate-700 hover:bg-orange-50 dark:text-slate-200 dark:hover:bg-slate-900/80">Modüller</a>
                 <a href="{{ route('admin.billing-settings.edit') }}" class="block rounded-xl px-3 py-2 text-slate-700 hover:bg-orange-50 dark:text-slate-200 dark:hover:bg-slate-900/80">Ödeme yöntemleri</a>
                 <a href="{{ route('admin.site-settings.edit') }}" class="block rounded-xl px-3 py-2 text-slate-700 hover:bg-orange-50 dark:text-slate-200 dark:hover:bg-slate-900/80">Site ayarları</a>
+                <a href="{{ route('admin.system.logs.index') }}" class="block rounded-xl px-3 py-2 text-slate-700 hover:bg-orange-50 dark:text-slate-200 dark:hover:bg-slate-900/80">Sistem logları</a>
                 <a href="{{ route('admin.locale-settings.edit') }}" class="block rounded-xl px-3 py-2 text-slate-700 hover:bg-orange-50 dark:text-slate-200 dark:hover:bg-slate-900/80">Dil ayarları</a>
                 <a href="{{ route('admin.translations.index') }}" class="block rounded-xl px-3 py-2 text-slate-700 hover:bg-orange-50 dark:text-slate-200 dark:hover:bg-slate-900/80">Çeviriler</a>
                 <a href="{{ route('admin.theme-settings.edit') }}" class="block rounded-xl px-3 py-2 text-slate-700 hover:bg-orange-50 dark:text-slate-200 dark:hover:bg-slate-900/80">Tema &amp; görünüm</a>

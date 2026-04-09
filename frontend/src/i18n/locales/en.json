@@ -29,6 +29,7 @@
     "dns": "DNS",
     "billing": "Billing",
     "system": "System",
+    "logs": "Logs",
     "license": "License",
     "admin_community": "Community",
     "open_menu": "Open menu",
@@ -421,6 +422,13 @@
     "traffic_source": "Source",
     "traffic_no_log": "No access log file or no entries yet."
   },
+  "logs_page": {
+    "title": "Site Logs",
+    "subtitle": "Inspect error/access logs for the selected domain in one screen.",
+    "select_domain": "Select domain",
+    "quick_diagnosis": "Quick diagnosis",
+    "no_critical_found": "No critical pattern found. Still review raw log lines."
+  },
   "databases": {
     "title": "Database Management",
     "add": "Create Database",
@@ -454,7 +462,20 @@
     "import_started": "Import started…",
     "export_failed": "Export failed",
     "import_confirm_expected": "REPLACEALLDATA",
-    "import_confirm_mismatch": "Confirmation phrase does not match."
+    "import_confirm_mismatch": "Confirmation phrase does not match.",
+    "copy_name": "Copy database name",
+    "copy_username": "Copy username",
+    "name_copied": "Database name copied",
+    "username_copied": "Username copied",
+    "password_copied": "New password copied to clipboard",
+    "copy_failed": "Copy failed",
+    "edit_credentials": "Change name / username / password",
+    "edit_credentials_warning": "This may affect live connections. A wrong change can break application database access.",
+    "edit_credentials_ack": "I understand the risk and approve this change.",
+    "new_password_optional": "New password (optional)",
+    "new_password_optional_hint": "Leave empty to keep current password.",
+    "password_temp_title": "New password (temporary view)",
+    "password_temp_desc": "For security, this password will be hidden in {{seconds}}s. Copy it now."
   },
   "common": {
     "create": "Create",

@@ -8,6 +8,7 @@ return [
     'rotate_mysql_only' => 'Şifre döndürme yalnızca MySQL veritabanları için geçerlidir.',
     'rotate_password_unsupported' => 'Bu veritabanı tipi için şifre döndürme yok.',
     'grant_host_mysql_only' => 'Erişim hostu yalnızca MySQL için geçerlidir.',
+    'update_no_changes' => 'Güncellenecek en az bir alan seçin.',
     'provision_failed' => 'Veritabanı sunucuda oluşturulamadı (paneldeki MySQL/MariaDB ayarlarını kontrol edin)',
 
     'export_not_mysql' => 'Dışa aktarma yalnızca MySQL veritabanları için geçerlidir.',

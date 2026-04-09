@@ -33,6 +33,7 @@ import AdminMailSettingsPage from './pages/AdminMailSettingsPage'
 import AdminRolesPage from './pages/AdminRolesPage'
 import AdminWebServerSettingsPage from './pages/AdminWebServerSettingsPage'
 import AdminPhpSettingsPage from './pages/AdminPhpSettingsPage'
+import AdminLogsPage from './pages/AdminLogsPage'
 import ResellerPage from './pages/ResellerPage'
 import ResellerBrandingPage from './pages/ResellerBrandingPage'
 import OnboardingPage from './pages/OnboardingPage'
@@ -121,6 +122,7 @@ export default function App() {
         <Route path="admin/mail-settings" element={<AdvancedRoute><AdminMailSettingsPage /></AdvancedRoute>} />
         <Route path="admin/webserver" element={<AdvancedRoute><AdminWebServerSettingsPage /></AdvancedRoute>} />
         <Route path="admin/php-settings" element={<AdvancedRoute><AdminPhpSettingsPage /></AdvancedRoute>} />
+        <Route path="admin/logs" element={<AdvancedRoute><AdminLogsPage /></AdvancedRoute>} />
         <Route path="settings" element={<SettingsPage />} />
       </Route>
       <Route path="*" element={<UnknownRoute />} />

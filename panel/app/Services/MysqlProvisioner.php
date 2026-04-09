@@ -105,6 +105,69 @@ class MysqlProvisioner
         $pdo->exec('FLUSH PRIVILEGES');
     }
 
+    public function renameDatabase(string $oldDbName, string $newDbName): void
+    {
+        $this->assertSafeIdentifier($oldDbName);
+        $this->assertSafeIdentifier($newDbName);
+        if ($oldDbName === $newDbName) {
+            return;
+        }
+
+        $pdo = $this->adminPdo();
+        $oldQ = '`'.$oldDbName.'`';
+        $newQ = '`'.$newDbName.'`';
+        $oldLike = $oldDbName.'\_%';
+
+        $pdo->exec("CREATE DATABASE IF NOT EXISTS {$newQ} CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
+
+        $stmt = $pdo->prepare(
+            'SELECT table_name FROM information_schema.tables WHERE table_schema = ? ORDER BY table_name ASC'
+        );
+        $stmt->execute([$oldDbName]);
+        $tables = $stmt->fetchAll(PDO::FETCH_COLUMN) ?: [];
+        foreach ($tables as $table) {
+            $tbl = (string) $table;
+            if ($tbl === '') {
+                continue;
+            }
+            if (! preg_match('/^[a-zA-Z0-9_.%-]+$/', $tbl)) {
+                throw new \InvalidArgumentException('Geçersiz MySQL tablo adı.');
+            }
+            $tblQ = '`'.$tbl.'`';
+            $pdo->exec("RENAME TABLE {$oldQ}.{$tblQ} TO {$newQ}.{$tblQ}");
+        }
+
+        $pdo->exec("DROP DATABASE IF EXISTS {$oldQ}");
+    }
+
+    public function renameUserAndRegrant(
+        string $oldUsername,
+        string $newUsername,
+        string $grantHost,
+        string $dbName,
+        string $plainPassword
+    ): void {
+        $this->assertSafeIdentifier($oldUsername);
+        $this->assertSafeIdentifier($newUsername);
+        $this->assertAllowedGrantHost($grantHost);
+        $this->assertSafeIdentifier($dbName);
+        if ($oldUsername === $newUsername) {
+            return;
+        }
+
+        $pdo = $this->adminPdo();
+        $h = $pdo->quote(trim($grantHost));
+        $oldU = $pdo->quote($oldUsername);
+        $newU = $pdo->quote($newUsername);
+        $dbQ = '`'.$dbName.'`';
+
+        $pdo->exec("DROP USER IF EXISTS {$newU}@{$h}");
+        $pdo->exec("RENAME USER {$oldU}@{$h} TO {$newU}@{$h}");
+        $pdo->exec("ALTER USER {$newU}@{$h} IDENTIFIED BY ".$pdo->quote($plainPassword));
+        $pdo->exec("GRANT ALL PRIVILEGES ON {$dbQ}.* TO {$newU}@{$h}");
+        $pdo->exec('FLUSH PRIVILEGES');
+    }
+
     /**
      * Aynı kullanıcı adıyla MySQL @host değiştirir (GRANT taşınır).
      */

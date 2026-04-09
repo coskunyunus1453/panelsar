@@ -139,6 +139,100 @@ class DatabaseService
         });
     }
 
+    /**
+     * @return array{password_plain?: string}
+     */
+    public function updateCredentials(
+        Database $database,
+        ?string $newName,
+        ?string $newUsername,
+        ?string $newPassword,
+        ?string $newGrantHost = null
+    ): array {
+        $name = trim((string) $newName);
+        $username = trim((string) $newUsername);
+        $password = trim((string) $newPassword);
+        $grantHost = trim((string) $newGrantHost);
+
+        $targetName = $name !== '' ? $name : $database->name;
+        $targetUser = $username !== '' ? $username : $database->username;
+        $targetPass = $password !== '' ? $password : (string) $database->password;
+        $targetGrant = $database->type === 'mysql'
+            ? ($grantHost !== '' ? $grantHost : $database->mysqlGrantHost())
+            : null;
+
+        $changed = $targetName !== $database->name
+            || $targetUser !== $database->username
+            || $password !== ''
+            || ($database->type === 'mysql' && $targetGrant !== $database->mysqlGrantHost());
+        if (! $changed) {
+            return [];
+        }
+
+        DB::transaction(function () use ($database, $targetName, $targetUser, $targetPass, $targetGrant): void {
+            if ($database->type === 'mysql') {
+                $oldName = $database->name;
+                $oldUser = $database->username;
+                $oldGrant = $database->mysqlGrantHost();
+                $newGrant = (string) $targetGrant;
+
+                if ($this->mysqlProvisioner->enabled()) {
+                    if ($oldName !== $targetName) {
+                        $this->mysqlProvisioner->renameDatabase($oldName, $targetName);
+                    }
+                    if ($oldUser !== $targetUser) {
+                        $this->mysqlProvisioner->renameUserAndRegrant(
+                            $oldUser,
+                            $targetUser,
+                            $oldGrant,
+                            $targetName,
+                            $targetPass
+                        );
+                    } elseif ($oldGrant !== $newGrant) {
+                        $this->mysqlProvisioner->changeGrantHost(
+                            $targetName,
+                            $targetUser,
+                            $oldGrant,
+                            $newGrant,
+                            $targetPass
+                        );
+                    }
+                    if ($targetPass !== (string) $database->password && $oldUser === $targetUser) {
+                        $this->mysqlProvisioner->rotatePassword($targetUser, $newGrant, $targetPass);
+                    }
+                }
+
+                $database->grant_host = $newGrant;
+            } elseif ($database->type === 'postgresql') {
+                $oldName = $database->name;
+                $oldUser = $database->username;
+
+                if ($this->postgresProvisioner->enabled()) {
+                    if ($oldName !== $targetName) {
+                        $this->postgresProvisioner->renameDatabase($oldName, $targetName);
+                    }
+                    if ($oldUser !== $targetUser) {
+                        $this->postgresProvisioner->renameRole($oldUser, $targetUser);
+                    }
+                    if ($targetPass !== (string) $database->password || $oldUser !== $targetUser) {
+                        $this->postgresProvisioner->rotatePassword($targetUser, $targetPass);
+                    }
+                }
+            }
+
+            Database::query()
+                ->whereKey($database->getKey())
+                ->update([
+                    'name' => $targetName,
+                    'username' => $targetUser,
+                    'password' => $targetPass,
+                    'grant_host' => $database->type === 'mysql' ? $database->grant_host : null,
+                ]);
+        });
+
+        return $password !== '' ? ['password_plain' => $targetPass] : [];
+    }
+
     public function delete(Database $database): void
     {
         $name = $database->name;

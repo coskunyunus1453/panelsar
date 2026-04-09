@@ -77,6 +77,35 @@ class PostgresProvisioner
         $pdo->exec('ALTER USER '.$qUser.' WITH PASSWORD '.$pdo->quote($newPassword));
     }
 
+    public function renameDatabase(string $oldDbName, string $newDbName): void
+    {
+        $this->assertSafeIdent($oldDbName);
+        $this->assertSafeIdent($newDbName);
+        if ($oldDbName === $newDbName) {
+            return;
+        }
+
+        $pdo = $this->adminPdoToMaintenanceDb();
+        $this->terminateBackends($pdo, $oldDbName);
+        $qOld = $this->quoteIdent($oldDbName);
+        $qNew = $this->quoteIdent($newDbName);
+        $pdo->exec("ALTER DATABASE {$qOld} RENAME TO {$qNew}");
+    }
+
+    public function renameRole(string $oldUsername, string $newUsername): void
+    {
+        $this->assertSafeIdent($oldUsername);
+        $this->assertSafeIdent($newUsername);
+        if ($oldUsername === $newUsername) {
+            return;
+        }
+
+        $pdo = $this->adminPdoToMaintenanceDb();
+        $qOld = $this->quoteIdent($oldUsername);
+        $qNew = $this->quoteIdent($newUsername);
+        $pdo->exec("ALTER ROLE {$qOld} RENAME TO {$qNew}");
+    }
+
     private function terminateBackends(PDO $pdo, string $dbName): void
     {
         $sql = 'SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '.$pdo->quote($dbName).' AND pid <> pg_backend_pid()';

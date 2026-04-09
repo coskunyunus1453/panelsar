@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import api, { apiBaseUrl } from '../services/api'
@@ -13,6 +13,7 @@ import {
   ExternalLink,
   KeyRound,
   Pencil,
+  Copy,
   Download,
   Upload,
 } from 'lucide-react'
@@ -50,7 +51,14 @@ export default function DatabasesPage() {
   const [showAdd, setShowAdd] = useState(false)
   const [createType, setCreateType] = useState('mysql')
   const [editAccessDb, setEditAccessDb] = useState<DbRow | null>(null)
+  const [editCredentialsDb, setEditCredentialsDb] = useState<DbRow | null>(null)
   const [importDb, setImportDb] = useState<DbRow | null>(null)
+  const [passwordReveal, setPasswordReveal] = useState<{
+    value: string
+    source: 'rotate' | 'edit'
+    expiresAt: number
+  } | null>(null)
+  const [nowTs, setNowTs] = useState<number>(Date.now())
 
   const databasesQ = useQuery({
     queryKey: ['databases', 'paginated'],
@@ -104,10 +112,18 @@ export default function DatabasesPage() {
       return data as { password_plain?: string }
     },
     onSuccess: (data) => {
-      const msg = data.password_plain
-        ? `${t('databases.password_rotated')}: ${data.password_plain}`
-        : t('databases.password_rotated')
-      toast.success(msg, { duration: data.password_plain ? 25_000 : 4000 })
+      toast.success(t('databases.password_rotated'))
+      if (data.password_plain) {
+        setPasswordReveal({
+          value: data.password_plain,
+          source: 'rotate',
+          expiresAt: Date.now() + 30_000,
+        })
+        void navigator.clipboard.writeText(data.password_plain).then(
+          () => toast.success(t('databases.password_copied')),
+          () => toast.error(t('databases.copy_failed')),
+        )
+      }
       qc.invalidateQueries({ queryKey: ['databases'] })
     },
     onError: (err: unknown) => {
@@ -124,6 +140,39 @@ export default function DatabasesPage() {
       toast.success(t('databases.access_updated'))
       qc.invalidateQueries({ queryKey: ['databases'] })
       setEditAccessDb(null)
+    },
+    onError: (err: unknown) => {
+      const ax = err as { response?: { data?: { message?: string } } }
+      toast.error(ax.response?.data?.message ?? String(err))
+    },
+  })
+
+  const patchCredentialsM = useMutation({
+    mutationFn: async (payload: {
+      id: number
+      name?: string
+      username?: string
+      password?: string
+      grant_host?: string
+    }) => {
+      const { data } = await api.patch(`/databases/${payload.id}`, payload)
+      return data as { password_plain?: string }
+    },
+    onSuccess: (data) => {
+      toast.success(t('databases.updated'))
+      if (data.password_plain) {
+        setPasswordReveal({
+          value: data.password_plain,
+          source: 'edit',
+          expiresAt: Date.now() + 30_000,
+        })
+        void navigator.clipboard.writeText(data.password_plain).then(
+          () => toast.success(t('databases.password_copied')),
+          () => toast.error(t('databases.copy_failed')),
+        )
+      }
+      qc.invalidateQueries({ queryKey: ['databases'] })
+      setEditCredentialsDb(null)
     },
     onError: (err: unknown) => {
       const ax = err as { response?: { data?: { message?: string } } }
@@ -231,6 +280,31 @@ export default function DatabasesPage() {
     }
     toast.error(t('databases.no_web_ui_for_type'))
   }
+
+  const copyText = async (text: string, okMsg: string) => {
+    try {
+      await navigator.clipboard.writeText(text)
+      toast.success(okMsg)
+    } catch {
+      toast.error(t('databases.copy_failed'))
+    }
+  }
+
+  useEffect(() => {
+    if (!passwordReveal) return
+    const tick = window.setInterval(() => {
+      const now = Date.now()
+      setNowTs(now)
+      if (now >= passwordReveal.expiresAt) {
+        setPasswordReveal(null)
+      }
+    }, 1000)
+    return () => window.clearInterval(tick)
+  }, [passwordReveal])
+
+  const secondsLeft = passwordReveal
+    ? Math.max(0, Math.ceil((passwordReveal.expiresAt - nowTs) / 1000))
+    : 0
 
   return (
     <div className="space-y-6">
@@ -392,6 +466,43 @@ export default function DatabasesPage() {
         </div>
       )}
 
+      {passwordReveal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="card max-w-md w-full p-6 space-y-4 bg-white dark:bg-gray-900">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+              {t('databases.password_temp_title')}
+            </h2>
+            <p className="text-sm text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg px-3 py-2">
+              {t('databases.password_temp_desc', { seconds: secondsLeft })}
+            </p>
+            <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-3 py-2 font-mono text-sm text-gray-900 dark:text-gray-100 break-all">
+              {passwordReveal.value}
+            </div>
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => {
+                  void navigator.clipboard.writeText(passwordReveal.value).then(
+                    () => toast.success(t('databases.password_copied')),
+                    () => toast.error(t('databases.copy_failed')),
+                  )
+                }}
+              >
+                {t('common.copy')}
+              </button>
+              <button
+                type="button"
+                className="btn-primary"
+                onClick={() => setPasswordReveal(null)}
+              >
+                {t('common.close')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {editAccessDb && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="card max-w-md w-full p-6 space-y-4 bg-white dark:bg-gray-900">
@@ -433,6 +544,89 @@ export default function DatabasesPage() {
                   {t('common.cancel')}
                 </button>
                 <button type="submit" className="btn-primary" disabled={patchAccessM.isPending}>
+                  {t('common.save')}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {editCredentialsDb && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="card max-w-lg w-full p-6 space-y-4 bg-white dark:bg-gray-900">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+              {t('databases.edit_credentials')}
+            </h2>
+            <p className="text-sm text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg px-3 py-2">
+              {t('databases.edit_credentials_warning')}
+            </p>
+            <form
+              className="space-y-3"
+              onSubmit={(ev) => {
+                ev.preventDefault()
+                const fd = new FormData(ev.currentTarget)
+                const payload = {
+                  id: editCredentialsDb.id,
+                  name: String(fd.get('name') || '').trim(),
+                  username: String(fd.get('username') || '').trim(),
+                  password: String(fd.get('password') || '').trim(),
+                  grant_host: editCredentialsDb.type === 'mysql'
+                    ? String(fd.get('grant_host') || '').trim()
+                    : undefined,
+                }
+                patchCredentialsM.mutate(payload)
+              }}
+            >
+              <div>
+                <label className="label">{t('databases.name')}</label>
+                <input name="name" className="input w-full font-mono" defaultValue={editCredentialsDb.name} required />
+              </div>
+              <div>
+                <label className="label">{t('databases.username')}</label>
+                <input
+                  name="username"
+                  className="input w-full font-mono"
+                  defaultValue={editCredentialsDb.username}
+                  required
+                />
+              </div>
+              <div>
+                <label className="label">{t('databases.new_password_optional')}</label>
+                <input name="password" type="text" className="input w-full font-mono" autoComplete="off" />
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  {t('databases.new_password_optional_hint')}
+                </p>
+              </div>
+              {editCredentialsDb.type === 'mysql' && (
+                <div>
+                  <label className="label">{t('databases.grant_host')}</label>
+                  <select
+                    name="grant_host"
+                    className="input w-full"
+                    defaultValue={editCredentialsDb.grant_host?.trim() || 'localhost'}
+                  >
+                    {grantHostSelectOptions(editCredentialsDb.grant_host).map((h) => (
+                      <option key={h} value={h}>
+                        {h}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              <label className="flex items-start gap-2 text-sm text-gray-700 dark:text-gray-300">
+                <input name="ack" type="checkbox" required className="mt-1" />
+                <span>{t('databases.edit_credentials_ack')}</span>
+              </label>
+              <div className="flex gap-2 justify-end pt-2">
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={() => setEditCredentialsDb(null)}
+                >
+                  {t('common.cancel')}
+                </button>
+                <button type="submit" className="btn-primary" disabled={patchCredentialsM.isPending}>
                   {t('common.save')}
                 </button>
               </div>
@@ -499,6 +693,14 @@ export default function DatabasesPage() {
                         <span className="font-medium text-gray-900 dark:text-white">
                           {db.name}
                         </span>
+                        <button
+                          type="button"
+                          className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500"
+                          title={t('databases.copy_name')}
+                          onClick={() => copyText(db.name, t('databases.name_copied'))}
+                        >
+                          <Copy className="h-3.5 w-3.5" />
+                        </button>
                       </div>
                     </td>
                     <td className="px-6 py-4">
@@ -513,7 +715,17 @@ export default function DatabasesPage() {
                       </span>
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400 font-mono">
-                      {db.username}
+                      <div className="inline-flex items-center gap-2">
+                        <span>{db.username}</span>
+                        <button
+                          type="button"
+                          className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500"
+                          title={t('databases.copy_username')}
+                          onClick={() => copyText(db.username, t('databases.username_copied'))}
+                        >
+                          <Copy className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400 font-mono">
                       {db.type === 'mysql' ? db.grant_host || 'localhost' : '—'}
@@ -529,6 +741,16 @@ export default function DatabasesPage() {
                             className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500"
                             title={t('databases.edit_access')}
                             onClick={() => setEditAccessDb(db)}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </button>
+                        )}
+                        {(db.type === 'mysql' || db.type === 'postgresql') && (
+                          <button
+                            type="button"
+                            className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500"
+                            title={t('databases.edit_credentials')}
+                            onClick={() => setEditCredentialsDb(db)}
                           >
                             <Pencil className="h-4 w-4" />
                           </button>
