@@ -18,6 +18,12 @@ import (
 	"time"
 )
 
+const (
+	// ZIP bomb koruması: aşırı entry ve aşırı açılmış boyut sınırı.
+	maxUnzipEntries = 20000
+	maxUnzipBytes   = int64(5 << 30) // 5 GiB
+)
+
 type ListEntry struct {
 	Name    string `json:"name"`
 	IsDir   bool   `json:"is_dir"`
@@ -448,10 +454,17 @@ func writeZipFile(zw *zip.Writer, srcPath, zipName string, info fs.FileInfo) err
 // unzipIntoDirectory zip girdilerini rootDir altına yazar (zip slip kontrolü rootDir’e göre).
 func unzipIntoDirectory(rootDir string, r *zip.Reader) error {
 	sep := string(os.PathSeparator)
+	if len(r.File) > maxUnzipEntries {
+		return fmt.Errorf("archive has too many entries (%d > %d)", len(r.File), maxUnzipEntries)
+	}
+	var totalUncompressed int64
 	for _, f := range r.File {
 		name := filepath.Clean(filepath.FromSlash(strings.ReplaceAll(f.Name, "\\", "/")))
 		if name == "." || name == ".." || filepath.IsAbs(name) || strings.HasPrefix(name, ".."+sep) {
 			return fmt.Errorf("archive entry escapes target")
+		}
+		if strings.Contains(name, "\x00") {
+			return fmt.Errorf("archive entry contains NUL byte")
 		}
 		dst := filepath.Join(rootDir, name)
 		if dst != rootDir && !strings.HasPrefix(dst, rootDir+sep) {
@@ -466,11 +479,18 @@ func unzipIntoDirectory(rootDir string, r *zip.Reader) error {
 			}
 			continue
 		}
+		if f.UncompressedSize64 > uint64(maxUnzipBytes) {
+			return fmt.Errorf("archive entry too large: %s", filepath.ToSlash(name))
+		}
+		if totalUncompressed > maxUnzipBytes-int64(f.UncompressedSize64) {
+			return fmt.Errorf("archive uncompressed size exceeds limit (%d bytes)", maxUnzipBytes)
+		}
+		totalUncompressed += int64(f.UncompressedSize64)
 		rc, err := f.Open()
 		if err != nil {
 			return err
 		}
-		out, err := os.OpenFile(dst, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, f.Mode())
+		out, err := os.OpenFile(dst, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, f.Mode().Perm())
 		if err != nil {
 			rc.Close()
 			return err
@@ -486,7 +506,79 @@ func unzipIntoDirectory(rootDir string, r *zip.Reader) error {
 	return nil
 }
 
-func UnzipPath(root, archiveRel, targetDirRel string) error {
+func normalizeUnzipIfExists(s string) string {
+	switch strings.ToLower(strings.TrimSpace(s)) {
+	case "overwrite":
+		return "overwrite"
+	case "skip":
+		return "skip"
+	default:
+		return "fail"
+	}
+}
+
+func collectUnzipConflicts(srcDir, dstDir string) ([]string, error) {
+	conflicts := make([]string, 0, 8)
+	err := filepath.Walk(srcDir, func(path string, info fs.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		rel, err := filepath.Rel(srcDir, path)
+		if err != nil {
+			return err
+		}
+		if rel == "." || info.IsDir() {
+			return nil
+		}
+		dst := filepath.Join(dstDir, rel)
+		if _, err := os.Stat(dst); err == nil {
+			conflicts = append(conflicts, filepath.ToSlash(rel))
+		} else if !errors.Is(err, os.ErrNotExist) {
+			return err
+		}
+		return nil
+	})
+	return conflicts, err
+}
+
+func mergeUnzippedDirectory(srcDir, dstDir, ifExists string) error {
+	return filepath.Walk(srcDir, func(path string, info fs.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		rel, err := filepath.Rel(srcDir, path)
+		if err != nil {
+			return err
+		}
+		if rel == "." {
+			return nil
+		}
+		dst := filepath.Join(dstDir, rel)
+		if info.IsDir() {
+			return os.MkdirAll(dst, 0o755)
+		}
+		if st, err := os.Stat(dst); err == nil {
+			if st.IsDir() {
+				return fmt.Errorf("cannot overwrite directory with file: %s", filepath.ToSlash(rel))
+			}
+			switch ifExists {
+			case "skip":
+				return nil
+			case "overwrite":
+				if err := os.Remove(dst); err != nil {
+					return err
+				}
+			default:
+				return fmt.Errorf("target already exists: %s", filepath.ToSlash(rel))
+			}
+		} else if !errors.Is(err, os.ErrNotExist) {
+			return err
+		}
+		return copyFile(path, dst, info.Mode())
+	})
+}
+
+func UnzipPath(root, archiveRel, targetDirRel, ifExists string) error {
 	arc, err := ResolveUnderRoot(root, archiveRel)
 	if err != nil {
 		return err
@@ -526,42 +618,39 @@ func UnzipPath(root, archiveRel, targetDirRel string) error {
 		return err
 	}
 
+	ifExists = normalizeUnzipIfExists(ifExists)
+
 	fi, err := os.Stat(finalDir)
 	if errors.Is(err, os.ErrNotExist) {
-		if err := os.Rename(tmpDir, finalDir); err != nil {
+		if err := os.MkdirAll(finalDir, 0o755); err != nil {
 			return err
 		}
-		committed = true
-		return nil
 	}
 	if err != nil {
 		return err
 	}
-	if !fi.IsDir() {
+	if fi != nil && !fi.IsDir() {
 		return fmt.Errorf("unzip target exists and is not a directory")
 	}
 
-	oldBk := filepath.Join(parent, ".tmp_unzip_replace_"+id)
-	if _, err := os.Stat(oldBk); err == nil {
-		return fmt.Errorf("temporary backup path already exists")
-	}
-	if err := os.Rename(finalDir, oldBk); err != nil {
-		return err
-	}
-	restoreOld := true
-	defer func() {
-		if restoreOld {
-			_ = os.Rename(oldBk, finalDir)
+	if ifExists == "fail" {
+		conflicts, err := collectUnzipConflicts(tmpDir, finalDir)
+		if err != nil {
+			return err
 		}
-	}()
-	if err := os.Rename(tmpDir, finalDir); err != nil {
+		if len(conflicts) > 0 {
+			sample := conflicts
+			if len(sample) > 5 {
+				sample = sample[:5]
+			}
+			return fmt.Errorf("conflicts detected (%d): %s", len(conflicts), strings.Join(sample, ", "))
+		}
+	}
+	if err := mergeUnzippedDirectory(tmpDir, finalDir, ifExists); err != nil {
 		return err
 	}
-	restoreOld = false
+
 	committed = true
-	if err := os.RemoveAll(oldBk); err != nil {
-		return err
-	}
 	return nil
 }
 

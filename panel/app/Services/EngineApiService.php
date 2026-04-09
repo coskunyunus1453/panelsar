@@ -445,12 +445,13 @@ class EngineApiService
         ]);
     }
 
-    public function unzipPath(string $domain, string $archive, string $targetDir): array
+    public function unzipPath(string $domain, string $archive, string $targetDir, string $ifExists = 'fail'): array
     {
         return $this->postEngineJsonChecked('/api/v1/files/unzip', [
             'domain' => $domain,
             'archive' => $archive,
             'target_dir' => $targetDir,
+            'if_exists' => $ifExists,
         ]);
     }
 

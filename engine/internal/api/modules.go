@@ -1890,6 +1890,7 @@ func handleFileUnzip(cfg *config.Config) gin.HandlerFunc {
 			Domain    string `json:"domain" binding:"required"`
 			Archive   string `json:"archive" binding:"required"`
 			TargetDir string `json:"target_dir" binding:"required"`
+			IfExists  string `json:"if_exists"`
 		}
 		if err := c.ShouldBindJSON(&req); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -1900,7 +1901,7 @@ func handleFileUnzip(cfg *config.Config) gin.HandlerFunc {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		if err := files.UnzipPath(root, req.Archive, req.TargetDir); err != nil {
+		if err := files.UnzipPath(root, req.Archive, req.TargetDir, req.IfExists); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}

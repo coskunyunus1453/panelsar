@@ -9,6 +9,7 @@ import {
   ArrowLeft,
   ChevronDown,
   ChevronRight,
+  Copy,
   FileCode,
   FileText,
   Folder,
@@ -453,6 +454,11 @@ export default function FileManagerPage() {
     sourcePath: string
     destDir: string
     baseTarget: string
+  } | null>(null)
+  const [unzipConflictDialog, setUnzipConflictDialog] = useState<{
+    archive: string
+    targetDir: string
+    message: string
   } | null>(null)
 
   const [uploadBusy, setUploadBusy] = useState(false)
@@ -1137,8 +1143,13 @@ export default function FileManagerPage() {
   })
 
   const unzipM = useMutation({
-    mutationFn: async (vars: { archive: string; target_dir: string }) =>
-      api.post(`/domains/${domainId}/files/unzip`, vars),
+    mutationFn: async (vars: { archive: string; target_dir: string; if_exists?: 'fail' | 'overwrite' | 'skip' }) =>
+      api.post(`/domains/${domainId}/files/unzip`, {
+        archive: vars.archive,
+        target_dir: vars.target_dir,
+        targetDir: vars.target_dir,
+        if_exists: vars.if_exists ?? 'fail',
+      }),
     onSuccess: () => {
       toast.success(t('files.unzip_ok'))
       qc.invalidateQueries({ queryKey: ['files', domainId, path] })
@@ -1167,14 +1178,22 @@ export default function FileManagerPage() {
   )
 
   const runUnzipArchive = useCallback(
-    async (vars: { archive: string; target_dir: string }) => {
+    async (vars: { archive: string; target_dir: string; if_exists?: 'fail' | 'overwrite' | 'skip' }) => {
       setArchiveUi({ kind: 'unzip', complete: false })
       try {
         await unzipM.mutateAsync(vars)
         setArchiveUi({ kind: 'unzip', complete: true })
         await new Promise((r) => setTimeout(r, 680))
-      } catch {
-        /* toast unzipM */
+      } catch (err: unknown) {
+        const ax = err as { response?: { data?: { message?: string } } }
+        const msg = String(ax.response?.data?.message ?? '')
+        if (vars.if_exists !== 'overwrite' && vars.if_exists !== 'skip' && msg.toLowerCase().includes('conflicts detected')) {
+          setUnzipConflictDialog({
+            archive: vars.archive,
+            targetDir: vars.target_dir,
+            message: msg,
+          })
+        }
       } finally {
         setArchiveUi(null)
       }
@@ -1651,6 +1670,34 @@ export default function FileManagerPage() {
                       </button>
                     </div>
                   )}
+                </div>
+              </div>
+              <div className="border-t border-gray-100 bg-gray-50/70 px-2 py-1.5 dark:border-gray-800 dark:bg-gray-900/35 sm:px-3">
+                <div className="flex items-center gap-2">
+                  <span className="shrink-0 text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                    {t('files.full_path')}
+                  </span>
+                  <code
+                    className="min-w-0 flex-1 truncate rounded bg-white/80 px-2 py-1 text-[11px] text-gray-700 ring-1 ring-gray-200 dark:bg-gray-800 dark:text-gray-200 dark:ring-gray-700"
+                    title={fullPathDisplay}
+                  >
+                    {fullPathDisplay}
+                  </code>
+                  <button
+                    type="button"
+                    className="inline-flex shrink-0 items-center gap-1 rounded-md border border-gray-200 px-2 py-1 text-[11px] font-medium text-gray-700 hover:bg-gray-100 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800"
+                    onClick={async () => {
+                      try {
+                        await navigator.clipboard.writeText(fullPathDisplay)
+                        toast.success(t('files.copied'))
+                      } catch {
+                        window.prompt('Copy path:', fullPathDisplay)
+                      }
+                    }}
+                  >
+                    <Copy className="h-3.5 w-3.5" />
+                    {t('common.copy')}
+                  </button>
                 </div>
               </div>
               {selectedIds.size > 0 && (
@@ -3023,6 +3070,56 @@ export default function FileManagerPage() {
                 }}
               >
                 {t('files.upload_overwrite_conflicts')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {unzipConflictDialog && (
+        <div className="fixed inset-0 z-[78] flex items-center justify-center bg-black/60 p-3 sm:p-4">
+          <div className="w-full max-w-xl rounded-xl border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-900">
+            <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3 dark:border-gray-800">
+              <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">{t('files.unzip_conflict_title')}</h3>
+              <button
+                type="button"
+                className="rounded-md p-1.5 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800"
+                onClick={() => setUnzipConflictDialog(null)}
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="space-y-2 px-4 py-4 text-sm text-gray-700 dark:text-gray-300">
+              <p>{t('files.unzip_conflict_desc')}</p>
+              <p className="rounded-lg bg-gray-50 px-3 py-2 text-xs text-gray-600 dark:bg-gray-800 dark:text-gray-300">
+                {unzipConflictDialog.message}
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center justify-end gap-2 border-t border-gray-200 px-4 py-3 dark:border-gray-800">
+              <button type="button" className="btn-secondary text-xs sm:text-sm" onClick={() => setUnzipConflictDialog(null)}>
+                {t('common.cancel')}
+              </button>
+              <button
+                type="button"
+                className="btn-secondary text-xs sm:text-sm"
+                onClick={() => {
+                  const d = unzipConflictDialog
+                  setUnzipConflictDialog(null)
+                  void runUnzipArchive({ archive: d.archive, target_dir: d.targetDir, if_exists: 'skip' })
+                }}
+              >
+                {t('files.unzip_skip_all')}
+              </button>
+              <button
+                type="button"
+                className="btn-primary text-xs sm:text-sm"
+                onClick={() => {
+                  const d = unzipConflictDialog
+                  setUnzipConflictDialog(null)
+                  void runUnzipArchive({ archive: d.archive, target_dir: d.targetDir, if_exists: 'overwrite' })
+                }}
+              >
+                {t('files.unzip_overwrite_all')}
               </button>
             </div>
           </div>

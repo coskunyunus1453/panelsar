@@ -476,6 +476,13 @@ class FileManagerController extends Controller
         ]);
         $relPath = (string) ($validated['path'] ?? '');
         $engineRelPath = $this->panelRelToEngineRel($domain, $relPath);
+        // Klasör sürükle-bırakta derin/yeni dizinler gelebilir; upload öncesi dizini server tarafında garanti et.
+        if (trim($engineRelPath) !== '') {
+            $mk = $this->engine->mkdirFile($domain->name, $engineRelPath);
+            if (! empty($mk['error']) && ! str_contains(strtolower((string) $mk['error']), 'exist')) {
+                return response()->json(['message' => $mk['error']], 422);
+            }
+        }
         $up = $request->file('file');
         $baseName = basename((string) $up->getClientOriginalName());
         $engineTargetPath = trim($engineRelPath !== '' ? $engineRelPath.'/'.$baseName : $baseName, '/');
@@ -744,16 +751,20 @@ class FileManagerController extends Controller
         }
         $validated = $request->validate([
             'archive' => 'required|string',
-            'target_dir' => 'required|string',
+            'target_dir' => 'nullable|string',
+            'targetDir' => 'nullable|string',
+            'if_exists' => 'nullable|string|in:fail,overwrite,skip',
         ]);
         $archive = $validated['archive'];
-        $targetDir = $validated['target_dir'];
+        $targetDir = (string) ($validated['target_dir'] ?? $validated['targetDir'] ?? '');
+        $ifExists = (string) ($validated['if_exists'] ?? 'fail');
         $engineArchive = $this->panelRelToEngineRel($domain, $archive);
         $this->quota->ensureDiskHeadroom($request->user(), $this->quota->estimatedUnzipHeadroomBytes($domain->name, $engineArchive));
         $result = $this->engine->unzipPath(
             $domain->name,
             $engineArchive,
-            $this->panelRelToEngineRel($domain, $targetDir)
+            $this->panelRelToEngineRel($domain, $targetDir),
+            $ifExists
         );
         if (! empty($result['error'])) {
             $this->logFileAction($request, $domain, 'unzip', $archive, $targetDir, false, $result['error']);

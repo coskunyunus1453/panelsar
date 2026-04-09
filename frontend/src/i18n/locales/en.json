@@ -480,7 +480,8 @@
     "details": "Details",
     "close": "Close",
     "ok": "Got it",
-    "back": "Back"
+    "back": "Back",
+    "copy": "Copy"
   },
   "ui_mode": {
     "easy": "Easy Mode",
@@ -763,6 +764,10 @@
     "archive_progress_unzip_hint": "Writing files into this folder.",
     "archive_wait": "Working…",
     "archive_finishing": "Finishing…",
+    "unzip_conflict_title": "ZIP conflicts detected",
+    "unzip_conflict_desc": "Files with the same names already exist in the target folder. Choose one policy for all conflicts.",
+    "unzip_skip_all": "Skip all conflicts",
+    "unzip_overwrite_all": "Overwrite all",
     "view_list": "List view",
     "view_grid": "Grid view",
     "view_mode_label": "View",

@@ -480,7 +480,8 @@
     "details": "Detay",
     "close": "Kapat",
     "ok": "Anladım",
-    "back": "Geri"
+    "back": "Geri",
+    "copy": "Kopyala"
   },
   "ui_mode": {
     "easy": "Kolay Mod",
@@ -763,6 +764,10 @@
     "archive_progress_unzip_hint": "Dosyalar bu klasöre yazılıyor.",
     "archive_wait": "İşleniyor…",
     "archive_finishing": "Tamamlanıyor…",
+    "unzip_conflict_title": "ZIP çakışma tespit edildi",
+    "unzip_conflict_desc": "Hedef klasörde aynı adlı dosyalar var. Tek seferde tümü için bir politika seçin.",
+    "unzip_skip_all": "Hepsini atla",
+    "unzip_overwrite_all": "Tümünün üzerine yaz",
     "view_list": "Liste görünümü",
     "view_grid": "Izgara görünümü",
     "view_mode_label": "Görünüm",
