@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Database;
 use App\Models\User;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Symfony\Component\Process\Process;
@@ -41,6 +42,62 @@ class DatabaseService
             } catch (Throwable) {
                 return $raw;
             }
+        }
+    }
+
+    /**
+     * mysql / mysqldump / psql: localhost soket kullanır; kullanıcı çoğu zaman @127.0.0.1 veya TCP ile eşleşir → 1045.
+     */
+    private function cliConnectHost(Database $database): string
+    {
+        $h = trim((string) $database->host);
+        if ($h === '' || strcasecmp($h, 'localhost') === 0 || $h === '::1') {
+            return '127.0.0.1';
+        }
+
+        return $h;
+    }
+
+    public function hydrateDatabaseSizesOnPaginator(LengthAwarePaginator $paginator): void
+    {
+        $collection = $paginator->getCollection();
+        $mysql = $collection->filter(fn (Database $d) => $d->type === 'mysql');
+        if ($mysql->isNotEmpty() && $this->mysqlProvisioner->enabled()) {
+            $names = $mysql->pluck('name')->unique()->values()->all();
+            $map = $this->mysqlProvisioner->sumSizesMbByDatabase($names);
+            foreach ($mysql as $db) {
+                $mb = (int) round((float) ($map[$db->name] ?? 0.0));
+                if ($mb !== (int) $db->getRawOriginal('size_mb')) {
+                    Database::query()->whereKey($db->getKey())->update(['size_mb' => $mb]);
+                }
+                $db->setAttribute('size_mb', $mb);
+            }
+        }
+
+        $pg = $collection->filter(fn (Database $d) => $d->type === 'postgresql');
+        if ($pg->isNotEmpty() && $this->postgresProvisioner->enabled()) {
+            foreach ($pg as $db) {
+                $mb = (int) round($this->postgresProvisioner->databaseSizeMb($db->name));
+                if ($mb !== (int) $db->getRawOriginal('size_mb')) {
+                    Database::query()->whereKey($db->getKey())->update(['size_mb' => $mb]);
+                }
+                $db->setAttribute('size_mb', $mb);
+            }
+        }
+    }
+
+    public function refreshSingleDatabaseSize(Database $database): void
+    {
+        if ($database->type === 'mysql' && $this->mysqlProvisioner->enabled()) {
+            $map = $this->mysqlProvisioner->sumSizesMbByDatabase([(string) $database->name]);
+            $mb = (int) round((float) ($map[$database->name] ?? 0.0));
+            Database::query()->whereKey($database->getKey())->update(['size_mb' => $mb]);
+
+            return;
+        }
+        if ($database->type === 'postgresql' && $this->postgresProvisioner->enabled()) {
+            $mb = (int) round($this->postgresProvisioner->databaseSizeMb($database->name));
+            Database::query()->whereKey($database->getKey())->update(['size_mb' => $mb]);
         }
     }
 
@@ -287,7 +344,7 @@ class DatabaseService
         $bin = (string) config('hostvim.database_tools.mysqldump_path', 'mysqldump');
         $args = [
             $bin,
-            '-h', $database->host,
+            '-h', $this->cliConnectHost($database),
             '-P', (string) $database->port,
             '-u', $database->username,
             '--single-transaction',
@@ -326,7 +383,7 @@ class DatabaseService
         $bin = (string) config('hostvim.database_tools.pg_dump_path', 'pg_dump');
         $args = [
             $bin,
-            '-h', $database->host,
+            '-h', $this->cliConnectHost($database),
             '-p', (string) $database->port,
             '-U', $database->username,
             '--no-owner',
@@ -380,7 +437,7 @@ class DatabaseService
             $process = new Process(
                 [
                     $bin,
-                    '-h', $database->host,
+                    '-h', $this->cliConnectHost($database),
                     '-P', (string) $database->port,
                     '-u', $database->username,
                     '--default-character-set=utf8mb4',
@@ -398,6 +455,8 @@ class DatabaseService
                 fclose($input);
             }
         }
+
+        $this->refreshSingleDatabaseSize($database->fresh());
     }
 
     public function importPostgresFromSqlFile(Database $database, string $absolutePath): void
@@ -419,7 +478,7 @@ class DatabaseService
         $process = new Process(
             [
                 $bin,
-                '-h', $database->host,
+                '-h', $this->cliConnectHost($database),
                 '-p', (string) $database->port,
                 '-U', $database->username,
                 '-d', $database->name,
@@ -432,5 +491,7 @@ class DatabaseService
             3600.0,
         );
         $process->mustRun();
+
+        $this->refreshSingleDatabaseSize($database->fresh());
     }
 }

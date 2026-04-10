@@ -106,6 +106,21 @@ class PostgresProvisioner
         $pdo->exec("ALTER ROLE {$qOld} RENAME TO {$qNew}");
     }
 
+    /** Veritabanı disk kullanımı (MB). */
+    public function databaseSizeMb(string $dbName): float
+    {
+        $this->assertSafeIdent($dbName);
+        $pdo = $this->adminPdoToMaintenanceDb();
+        $stmt = $pdo->prepare('SELECT pg_database_size(d.oid) FROM pg_database d WHERE d.datname = ?');
+        $stmt->execute([$dbName]);
+        $bytes = $stmt->fetchColumn();
+        if ($bytes === false) {
+            return 0.0;
+        }
+
+        return round((float) $bytes / 1048576, 3);
+    }
+
     private function terminateBackends(PDO $pdo, string $dbName): void
     {
         $sql = 'SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '.$pdo->quote($dbName).' AND pid <> pg_backend_pid()';

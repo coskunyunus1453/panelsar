@@ -23,6 +23,7 @@ class DatabaseController extends Controller
     public function index(Request $request): JsonResponse
     {
         $databases = $request->user()->databases()->latest()->paginate(20);
+        $this->databaseService->hydrateDatabaseSizesOnPaginator($databases);
 
         return response()->json($databases);
     }

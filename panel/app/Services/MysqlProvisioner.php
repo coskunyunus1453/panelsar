@@ -262,6 +262,42 @@ class MysqlProvisioner
         $pdo->exec('FLUSH PRIVILEGES');
     }
 
+    /**
+     * Sayfa listesi / kota için şema boyutları (MB, ondalıklı).
+     *
+     * @param  list<string>  $dbNames
+     * @return array<string, float> veritabanı adı => MB
+     */
+    public function sumSizesMbByDatabase(array $dbNames): array
+    {
+        $dbNames = array_values(array_unique(array_filter(array_map('trim', $dbNames))));
+        if ($dbNames === []) {
+            return [];
+        }
+        foreach ($dbNames as $n) {
+            $this->assertSafeIdentifier($n);
+        }
+
+        $pdo = $this->adminPdo();
+        $placeholders = implode(',', array_fill(0, count($dbNames), '?'));
+        $sql = <<<SQL
+            SELECT s.SCHEMA_NAME AS dbname,
+                   COALESCE(ROUND(SUM(t.DATA_LENGTH + t.INDEX_LENGTH) / 1024 / 1024, 3), 0) AS mb
+            FROM information_schema.SCHEMATA s
+            LEFT JOIN information_schema.TABLES t ON t.TABLE_SCHEMA = s.SCHEMA_NAME
+            WHERE s.SCHEMA_NAME IN ({$placeholders})
+            GROUP BY s.SCHEMA_NAME
+            SQL;
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($dbNames);
+        $out = [];
+        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+            $out[(string) $row['dbname']] = (float) $row['mb'];
+        }
+
+        return $out;
+    }
+
     private function adminPdo(): PDO
     {
         $c = config('hostvim.mysql_provision');

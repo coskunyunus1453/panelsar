@@ -61,6 +61,27 @@ function legacyCopyText(value: string): boolean {
   }
 }
 
+/** HTTP / eski tarayıcı: navigator.clipboard bazen yok; execCommand fallback. */
+async function copyPlaintextWithToasts(text: string, messages: { ok: string; fail: string }): Promise<void> {
+  try {
+    const clip = typeof navigator !== 'undefined' ? navigator.clipboard : undefined
+    if (clip?.writeText && window.isSecureContext) {
+      await clip.writeText(text)
+    } else {
+      const ok = legacyCopyText(text)
+      if (!ok) throw new Error('copy-failed')
+    }
+    toast.success(messages.ok)
+  } catch {
+    const ok = legacyCopyText(text)
+    if (ok) {
+      toast.success(messages.ok)
+      return
+    }
+    toast.error(messages.fail)
+  }
+}
+
 export default function DatabasesPage() {
   const { t } = useTranslation()
   const qc = useQueryClient()
@@ -138,10 +159,10 @@ export default function DatabasesPage() {
           source: 'rotate',
           expiresAt: Date.now() + 30_000,
         })
-        void navigator.clipboard.writeText(data.password_plain).then(
-          () => toast.success(t('databases.password_copied')),
-          () => toast.error(t('databases.copy_failed')),
-        )
+        void copyPlaintextWithToasts(data.password_plain, {
+          ok: t('databases.password_copied'),
+          fail: t('databases.copy_failed'),
+        })
       }
       qc.invalidateQueries({ queryKey: ['databases'] })
     },
@@ -186,10 +207,10 @@ export default function DatabasesPage() {
           source: 'edit',
           expiresAt: Date.now() + 30_000,
         })
-        void navigator.clipboard.writeText(data.password_plain).then(
-          () => toast.success(t('databases.password_copied')),
-          () => toast.error(t('databases.copy_failed')),
-        )
+        void copyPlaintextWithToasts(data.password_plain, {
+          ok: t('databases.password_copied'),
+          fail: t('databases.copy_failed'),
+        })
       }
       qc.invalidateQueries({ queryKey: ['databases'] })
       setEditCredentialsDb(null)
@@ -307,24 +328,8 @@ export default function DatabasesPage() {
     toast.error(t('databases.no_web_ui_for_type'))
   }
 
-  const copyText = async (text: string, okMsg: string) => {
-    try {
-      if (navigator.clipboard?.writeText && window.isSecureContext) {
-        await navigator.clipboard.writeText(text)
-      } else {
-        const ok = legacyCopyText(text)
-        if (!ok) throw new Error('copy-failed')
-      }
-      toast.success(okMsg)
-    } catch {
-      const ok = legacyCopyText(text)
-      if (ok) {
-        toast.success(okMsg)
-        return
-      }
-      toast.error(t('databases.copy_failed'))
-    }
-  }
+  const copyText = (text: string, okMsg: string) =>
+    copyPlaintextWithToasts(text, { ok: okMsg, fail: t('databases.copy_failed') })
 
   useEffect(() => {
     if (!passwordReveal) return
@@ -518,12 +523,12 @@ export default function DatabasesPage() {
               <button
                 type="button"
                 className="btn-secondary"
-                onClick={() => {
-                  void navigator.clipboard.writeText(passwordReveal.value).then(
-                    () => toast.success(t('databases.password_copied')),
-                    () => toast.error(t('databases.copy_failed')),
-                  )
-                }}
+                onClick={() =>
+                  void copyPlaintextWithToasts(passwordReveal.value, {
+                    ok: t('databases.password_copied'),
+                    fail: t('databases.copy_failed'),
+                  })
+                }
               >
                 {t('common.copy')}
               </button>
