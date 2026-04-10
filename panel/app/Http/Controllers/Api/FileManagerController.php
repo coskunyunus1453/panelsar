@@ -40,7 +40,7 @@ class FileManagerController extends Controller
         $engineRoot = $hostingRoot.DIRECTORY_SEPARATOR.$domain->name;
 
         // Domain.document_root panelde tam path (örn. /var/www/example.com/public_html)
-        $docRoot = (string) $domain->document_root;
+        $docRoot = $this->fileManagerBasePath($domain);
 
         $panelRelNorm = str_replace('\\', '/', trim($panelRel));
         $panelRelNorm = ltrim($panelRelNorm, '/'); // engine tarafı leading slash'ları temizliyor ama biz net olsun diye
@@ -70,6 +70,33 @@ class FileManagerController extends Controller
         }
 
         return $baseRel.'/'.$panelRelNorm;
+    }
+
+    /**
+     * Dosya yöneticisi için baz dizin:
+     * - Varsayılan: domain.document_root
+     * - Laravel/Symfony gibi "public" giriş noktasında: bir üst dizin (kod kökü)
+     *   Böylece kullanıcı public_html/public'a sabitlenmez.
+     */
+    private function fileManagerBasePath(Domain $domain): string
+    {
+        $docRoot = str_replace('\\', '/', (string) $domain->document_root);
+        $docRoot = rtrim($docRoot, '/');
+        if ($docRoot === '') {
+            return (string) $domain->document_root;
+        }
+
+        if (str_ends_with(strtolower($docRoot), '/public')) {
+            $parent = dirname($docRoot);
+            $artisan = $parent.'/artisan';
+            $composer = $parent.'/composer.json';
+            // Laravel/Symfony olasılığında file manager'ı kod köküne taşı.
+            if (is_file($artisan) || is_file($composer)) {
+                return $parent;
+            }
+        }
+
+        return (string) $domain->document_root;
     }
 
     public function index(Request $request, Domain $domain): JsonResponse
