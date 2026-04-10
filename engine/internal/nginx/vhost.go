@@ -432,3 +432,158 @@ func RemoveVhostBestEffort(cfg *config.Config, domain string) {
 	_ = runNginxVhostHelper(cfg, "disable", "panelsar-"+strings.ToLower(domain)+".conf")
 	_ = os.Remove(legacy)
 }
+
+const maxRawVhostBytes = 512 << 10
+
+func vhostPrevPath(main string) string {
+	return main + ".hostvim-prev"
+}
+
+// VhostCanRevert son başarılı kayıttan önceki içerik dosyası var mı.
+func VhostCanRevert(cfg *config.Config, domain string) (bool, error) {
+	p, err := VhostFilePath(cfg, domain)
+	if err != nil {
+		return false, err
+	}
+	fi, err := os.Stat(vhostPrevPath(p))
+	if err != nil {
+		if os.IsNotExist(err) {
+			return false, nil
+		}
+		return false, err
+	}
+	return fi.Size() > 0, nil
+}
+
+// VhostFilePath yönetilen nginx sanal host dosyasının mutlak yolunu döndürür (hostvim-<domain>.conf).
+func VhostFilePath(cfg *config.Config, domain string) (string, error) {
+	domain = strings.ToLower(strings.TrimSpace(domain))
+	if domain == "" || strings.Contains(domain, "..") || !domainSafe.MatchString(domain) {
+		return "", fmt.Errorf("invalid domain")
+	}
+	vd := strings.TrimSpace(cfg.Paths.VhostsDir)
+	if vd == "" {
+		return "", fmt.Errorf("paths.vhosts_dir is not set")
+	}
+	vdClean, err := filepath.Abs(filepath.Clean(vd))
+	if err != nil {
+		return "", fmt.Errorf("vhosts_dir: %w", err)
+	}
+	base := confBaseName(domain)
+	p := filepath.Join(vdClean, base)
+	p = filepath.Clean(p)
+	rel, err := filepath.Rel(vdClean, p)
+	if err != nil || rel == ".." || strings.HasPrefix(rel, "../") {
+		return "", fmt.Errorf("invalid vhost path")
+	}
+	return p, nil
+}
+
+// ReadVhostFile mevcut vhost dosyasını okur (nginx_manage_vhosts açık olmalı).
+func ReadVhostFile(cfg *config.Config, domain string) ([]byte, error) {
+	if !cfg.Hosting.NginxManageVhosts {
+		return nil, fmt.Errorf("nginx vhost management is disabled")
+	}
+	p, err := VhostFilePath(cfg, domain)
+	if err != nil {
+		return nil, err
+	}
+	return os.ReadFile(p)
+}
+
+// WriteVhostRaw vhost içeriğini yazar, nginx -t ve reload için hostvim-nginx-vhost enable çalıştırır.
+// Başarısızlıkta önceki içerik geri yüklenmeye çalışılır.
+func WriteVhostRaw(cfg *config.Config, domain string, content []byte) error {
+	if !cfg.Hosting.NginxManageVhosts {
+		return fmt.Errorf("nginx vhost management is disabled")
+	}
+	if len(content) > maxRawVhostBytes {
+		return fmt.Errorf("vhost content too large (max %d bytes)", maxRawVhostBytes)
+	}
+	if bytes.IndexByte(content, 0) >= 0 {
+		return fmt.Errorf("invalid vhost content")
+	}
+	p, err := VhostFilePath(cfg, domain)
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+		return fmt.Errorf("vhosts dir: %w", err)
+	}
+
+	var oldContent []byte
+	hadOld := false
+	if _, statErr := os.Stat(p); statErr == nil {
+		b, rerr := os.ReadFile(p)
+		if rerr != nil {
+			return fmt.Errorf("read existing vhost: %w", rerr)
+		}
+		oldContent = b
+		hadOld = true
+	}
+
+	if err := os.WriteFile(p, content, 0o644); err != nil {
+		return fmt.Errorf("write vhost: %w", err)
+	}
+
+	if err := runNginxVhostHelper(cfg, "enable", p); err != nil {
+		if hadOld {
+			if werr := os.WriteFile(p, oldContent, 0o644); werr != nil {
+				return fmt.Errorf("%w; rollback write failed: %v", err, werr)
+			}
+			if e2 := runNginxVhostHelper(cfg, "enable", p); e2 != nil {
+				return fmt.Errorf("%w; rollback reload failed: %v", err, e2)
+			}
+		} else {
+			_ = os.Remove(p)
+		}
+		return err
+	}
+	// Başarılı kayıt: bir önceki sürümü geri alma için yan dosyada sakla.
+	prev := vhostPrevPath(p)
+	if hadOld && len(oldContent) > 0 {
+		_ = os.WriteFile(prev, oldContent, 0o600)
+	} else {
+		_ = os.Remove(prev)
+	}
+	return nil
+}
+
+// RevertVhostRaw son başarılı kayıttan önceki içeriği geri yükler (nginx -t + reload).
+// Başarılı olursa şu anki içerik .hostvim-prev içine alınır; tekrar geri al ile iki sürüm arasında geçilebilir.
+func RevertVhostRaw(cfg *config.Config, domain string) error {
+	if !cfg.Hosting.NginxManageVhosts {
+		return fmt.Errorf("nginx vhost management is disabled")
+	}
+	p, err := VhostFilePath(cfg, domain)
+	if err != nil {
+		return err
+	}
+	prev := vhostPrevPath(p)
+	prevBody, err := os.ReadFile(prev)
+	if err != nil || len(bytes.TrimSpace(prevBody)) == 0 {
+		return fmt.Errorf("no saved previous version to restore")
+	}
+	var curContent []byte
+	hadCur := false
+	if b, rerr := os.ReadFile(p); rerr == nil {
+		curContent = b
+		hadCur = true
+	}
+	if err := os.WriteFile(p, prevBody, 0o644); err != nil {
+		return fmt.Errorf("write vhost: %w", err)
+	}
+	if err := runNginxVhostHelper(cfg, "enable", p); err != nil {
+		if hadCur {
+			_ = os.WriteFile(p, curContent, 0o644)
+			_ = runNginxVhostHelper(cfg, "enable", p)
+		}
+		return err
+	}
+	if hadCur && len(curContent) > 0 {
+		_ = os.WriteFile(prev, curContent, 0o600)
+	} else {
+		_ = os.Remove(prev)
+	}
+	return nil
+}

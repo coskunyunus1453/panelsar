@@ -132,6 +132,31 @@ fi
 # Kritik helper dosyasını kurulumdan önce senkronla (install-production yine doğrulayacak).
 if [[ -f deploy/host/hostvim-security ]]; then
   install -m 755 deploy/host/hostvim-security /usr/local/sbin/hostvim-security
+  ln -sfn /usr/local/sbin/hostvim-security /usr/local/sbin/panelsar-security
+fi
+if [[ -f deploy/host/hostvim-nginx-vhost ]]; then
+  install -m 755 deploy/host/hostvim-nginx-vhost /usr/local/sbin/hostvim-nginx-vhost
+  ln -sfn /usr/local/sbin/hostvim-nginx-vhost /usr/local/sbin/panelsar-nginx-vhost
+fi
+if [[ -f deploy/host/hostvim-stack-install ]]; then
+  install -m 755 deploy/host/hostvim-stack-install /usr/local/sbin/hostvim-stack-install
+  ln -sfn /usr/local/sbin/hostvim-stack-install /usr/local/sbin/panelsar-stack-install
+fi
+if [[ -f deploy/host/hostvim-terminal-root ]]; then
+  install -m 755 deploy/host/hostvim-terminal-root /usr/local/sbin/hostvim-terminal-root
+  ln -sfn /usr/local/sbin/hostvim-terminal-root /usr/local/sbin/panelsar-terminal-root
+fi
+if [[ -f deploy/host/hostvim-php-ini ]]; then
+  install -m 755 deploy/host/hostvim-php-ini /usr/local/sbin/hostvim-php-ini
+  ln -sfn /usr/local/sbin/hostvim-php-ini /usr/local/sbin/panelsar-php-ini
+fi
+if [[ -f deploy/host/hostvim-cleaner ]]; then
+  install -m 755 deploy/host/hostvim-cleaner /usr/local/sbin/hostvim-cleaner
+  ln -sfn /usr/local/sbin/hostvim-cleaner /usr/local/sbin/panelsar-cleaner
+fi
+if [[ -f deploy/host/hostvim-mail-stack-setup.sh ]]; then
+  install -m 755 deploy/host/hostvim-mail-stack-setup.sh /usr/local/sbin/hostvim-mail-stack-setup.sh
+  ln -sfn /usr/local/sbin/hostvim-mail-stack-setup.sh /usr/local/sbin/panelsar-mail-stack-setup.sh
 fi
 
 # Panel/engine özellik güncellemeleri için bu dosyayı değiştirmeniz gerekmez: aynı komut repo’yu çeker;

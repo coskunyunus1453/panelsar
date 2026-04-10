@@ -13,6 +13,12 @@ import (
 	"hostvim/engine/internal/nginx"
 )
 
+const maxRawApacheVhostBytes = 512 << 10
+
+func apachePrevPath(main string) string {
+	return main + ".hostvim-prev"
+}
+
 const tplHTTP = `# Hostvim — {{.Domain}} (Apache HTTP)
 <VirtualHost *:{{.HTTPPort}}>
     ServerName {{.Domain}}
@@ -319,6 +325,209 @@ func reloadApacheErr() error {
 	out, err := exec.Command("apachectl", "graceful").CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("apachectl graceful: %w — %s", err, strings.TrimSpace(string(out)))
+	}
+	return nil
+}
+
+// VhostFilePath sites-available altındaki hostvim-<domain>.conf mutlak yolu.
+func VhostFilePath(cfg *config.Config, domain string) (string, error) {
+	domain = strings.ToLower(strings.TrimSpace(domain))
+	if domain == "" || strings.Contains(domain, "..") || !nginx.DomainSafe(domain) {
+		return "", fmt.Errorf("invalid domain")
+	}
+	availDir := sitesAvailable(cfg)
+	availClean, err := filepath.Abs(filepath.Clean(availDir))
+	if err != nil {
+		return "", fmt.Errorf("apache sites-available: %w", err)
+	}
+	base := confBaseName(domain)
+	p := filepath.Join(availClean, base)
+	p = filepath.Clean(p)
+	rel, err := filepath.Rel(availClean, p)
+	if err != nil || rel == ".." || strings.HasPrefix(rel, "../") {
+		return "", fmt.Errorf("invalid vhost path")
+	}
+	return p, nil
+}
+
+// VhostCanRevert son başarılı kayıttan önceki içerik dosyası var mı.
+func VhostCanRevert(cfg *config.Config, domain string) (bool, error) {
+	p, err := VhostFilePath(cfg, domain)
+	if err != nil {
+		return false, err
+	}
+	fi, err := os.Stat(apachePrevPath(p))
+	if err != nil {
+		if os.IsNotExist(err) {
+			return false, nil
+		}
+		return false, err
+	}
+	return fi.Size() > 0, nil
+}
+
+// ReadVhostFile mevcut Apache vhost dosyasını okur.
+func ReadVhostFile(cfg *config.Config, domain string) ([]byte, error) {
+	if !cfg.Hosting.ApacheManageVhosts {
+		return nil, fmt.Errorf("apache vhost management is disabled")
+	}
+	p, err := VhostFilePath(cfg, domain)
+	if err != nil {
+		return nil, err
+	}
+	return os.ReadFile(p)
+}
+
+// WriteVhostRaw Apache vhost içeriğini yazar, configtest ve istenirse graceful reload uygular.
+func WriteVhostRaw(cfg *config.Config, domain string, content []byte) error {
+	if !cfg.Hosting.ApacheManageVhosts {
+		return fmt.Errorf("apache vhost management is disabled")
+	}
+	if len(content) > maxRawApacheVhostBytes {
+		return fmt.Errorf("vhost content too large (max %d bytes)", maxRawApacheVhostBytes)
+	}
+	if bytes.IndexByte(content, 0) >= 0 {
+		return fmt.Errorf("invalid vhost content")
+	}
+	p, err := VhostFilePath(cfg, domain)
+	if err != nil {
+		return err
+	}
+	base := confBaseName(strings.ToLower(strings.TrimSpace(domain)))
+	availDir := sitesAvailable(cfg)
+	enDir := sitesEnabled(cfg)
+	if err := os.MkdirAll(availDir, 0o755); err != nil {
+		return fmt.Errorf("apache sites-available: %w", err)
+	}
+	if err := os.MkdirAll(enDir, 0o755); err != nil {
+		return fmt.Errorf("apache sites-enabled: %w", err)
+	}
+	enabled := filepath.Join(enDir, base)
+
+	oldAvail, readAvailErr := os.ReadFile(p)
+	hadAvail := readAvailErr == nil
+
+	var oldLinkTarget string
+	hadOldLink := false
+	if fi, err := os.Lstat(enabled); err == nil && fi.Mode()&os.ModeSymlink != 0 {
+		if tgt, err := os.Readlink(enabled); err == nil && tgt != "" {
+			oldLinkTarget = tgt
+			hadOldLink = true
+		}
+	}
+
+	rollback := func() {
+		_ = os.Remove(enabled)
+		if hadOldLink && oldLinkTarget != "" {
+			_ = os.Symlink(oldLinkTarget, enabled)
+		}
+		if hadAvail {
+			_ = os.WriteFile(p, oldAvail, 0o644)
+		} else {
+			_ = os.Remove(p)
+		}
+	}
+
+	if err := os.WriteFile(p, content, 0o644); err != nil {
+		return fmt.Errorf("write apache vhost: %w", err)
+	}
+	_ = os.Remove(enabled)
+	if err := os.Symlink(p, enabled); err != nil {
+		rollback()
+		return fmt.Errorf("apache symlink: %w", err)
+	}
+	if err := apacheTestConfig(); err != nil {
+		rollback()
+		return err
+	}
+	if cfg.Hosting.ApacheReloadAfterVhost {
+		if err := reloadApacheErr(); err != nil {
+			rollback()
+			return err
+		}
+	}
+	prev := apachePrevPath(p)
+	if hadAvail && len(oldAvail) > 0 {
+		_ = os.WriteFile(prev, oldAvail, 0o600)
+	} else {
+		_ = os.Remove(prev)
+	}
+	return nil
+}
+
+// RevertVhostRaw son başarılı kayıttan önceki içeriği geri yükler.
+func RevertVhostRaw(cfg *config.Config, domain string) error {
+	if !cfg.Hosting.ApacheManageVhosts {
+		return fmt.Errorf("apache vhost management is disabled")
+	}
+	p, err := VhostFilePath(cfg, domain)
+	if err != nil {
+		return err
+	}
+	prev := apachePrevPath(p)
+	prevBody, err := os.ReadFile(prev)
+	if err != nil || len(bytes.TrimSpace(prevBody)) == 0 {
+		return fmt.Errorf("no saved previous version to restore")
+	}
+	domain = strings.ToLower(strings.TrimSpace(domain))
+	base := confBaseName(domain)
+	enDir := sitesEnabled(cfg)
+	enabled := filepath.Join(enDir, base)
+
+	var curContent []byte
+	hadCur := false
+	if b, rerr := os.ReadFile(p); rerr == nil {
+		curContent = b
+		hadCur = true
+	}
+
+	var oldLinkTarget string
+	hadOldLink := false
+	if fi, err := os.Lstat(enabled); err == nil && fi.Mode()&os.ModeSymlink != 0 {
+		if tgt, err := os.Readlink(enabled); err == nil && tgt != "" {
+			oldLinkTarget = tgt
+			hadOldLink = true
+		}
+	}
+
+	revertRollback := func() {
+		_ = os.Remove(enabled)
+		if hadOldLink && oldLinkTarget != "" {
+			_ = os.Symlink(oldLinkTarget, enabled)
+		}
+		if hadCur {
+			_ = os.WriteFile(p, curContent, 0o644)
+		}
+	}
+
+	if err := os.WriteFile(p, prevBody, 0o644); err != nil {
+		return fmt.Errorf("write apache vhost: %w", err)
+	}
+	_ = os.Remove(enabled)
+	if err := os.Symlink(p, enabled); err != nil {
+		if hadCur {
+			_ = os.WriteFile(p, curContent, 0o644)
+		}
+		_ = os.Remove(enabled)
+		if hadOldLink && oldLinkTarget != "" {
+			_ = os.Symlink(oldLinkTarget, enabled)
+		}
+		return fmt.Errorf("apache symlink: %w", err)
+	}
+	if err := apacheTestConfig(); err != nil {
+		revertRollback()
+		return err
+	}
+	if cfg.Hosting.ApacheReloadAfterVhost {
+		if err := reloadApacheErr(); err != nil {
+			revertRollback()
+			return err
+		}
+	}
+	if hadCur && len(curContent) > 0 {
+		_ = os.WriteFile(prev, curContent, 0o600)
+	} else {
+		_ = os.Remove(prev)
 	}
 	return nil
 }

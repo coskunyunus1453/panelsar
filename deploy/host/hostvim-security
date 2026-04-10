@@ -1,6 +1,13 @@
 #!/bin/bash
 # Hostvim engine (www-data) tarafından sudo ile çağrılır.
 set -euo pipefail
+apt_noninteractive() {
+  export DEBIAN_FRONTEND=noninteractive
+  export NEEDRESTART_MODE=a
+  export NEEDRESTART_SUSPEND=1
+  apt-get -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" "$@" >/dev/null 2>&1
+}
+
 
 ACTION="${1:-}"
 ARG1="${2:-}"
@@ -41,6 +48,223 @@ sanitize_domain() {
   [[ "$d" =~ ^[A-Za-z0-9.-]+\.[A-Za-z]{2,}$ ]] || return 1
   [[ "$d" != .* && "$d" != *..* ]] || return 1
   echo "$d"
+}
+
+apache_configtest_cmd() {
+  if command -v apache2ctl >/dev/null 2>&1; then
+    echo "apache2ctl configtest"
+    return 0
+  fi
+  if command -v httpd >/dev/null 2>&1; then
+    echo "httpd -t"
+    return 0
+  fi
+  return 1
+}
+
+apache_configtest_run() {
+  local cmd
+  cmd="$(apache_configtest_cmd)" || return 0
+  bash -lc "$cmd" >/tmp/hostvim-apache-test.log 2>&1
+}
+
+# ModSecurity / site-kuralları gibi değişikliklerde test yoksa geri dönmeyi reddet.
+apache_configtest_run_strict() {
+  local cmd
+  cmd="$(apache_configtest_cmd)" || {
+    echo "apache/httpd configtest not available" >&2
+    return 1
+  }
+  bash -lc "$cmd" >/tmp/hostvim-apache-test.log 2>&1
+}
+
+apache_reload_safe() {
+  if systemctl is-active --quiet httpd 2>/dev/null; then
+    systemctl reload httpd >/dev/null 2>&1 || true
+  fi
+  if systemctl is-active --quiet apache2 2>/dev/null; then
+    systemctl reload apache2 >/dev/null 2>&1 || true
+  fi
+}
+
+# Site kuralları dosyasını ana ModSecurity zincirine bağla (wildcard olmayan kurulumlar için).
+ensure_modsec_site_rules_include() {
+  local marker='# hostvim-site-rules (managed)'
+  local line='IncludeOptional /etc/modsecurity/hostvim-site-rules.conf'
+  local f
+  for f in /etc/modsecurity/modsecurity.conf /etc/httpd/conf.d/mod_security.conf; do
+    [[ -f "$f" ]] || continue
+    if grep -qF 'hostvim-site-rules.conf' "$f" 2>/dev/null; then
+      return 0
+    fi
+    cp -a "$f" "${f}.bak.hostvim.$$" 2>/dev/null || true
+    printf '\n%s\n%s\n' "$marker" "$line" >> "$f"
+    return 0
+  done
+  return 0
+}
+
+sanitize_rel_path() {
+  local p="$1"
+  [[ -n "$p" ]] || return 1
+  [[ "$p" != *".."* ]] || return 1
+  [[ "$p" =~ ^[A-Za-z0-9/_\.\-\*\^\$\|\(\)\[\]\?\+]+$ ]] || return 1
+  echo "$p"
+}
+
+ensure_hostvim_security_dirs() {
+  install -d -m 750 /etc/hostvim/security
+  install -d -m 755 /etc/nginx/conf.d
+}
+
+nginx_rate_limit_file="/etc/nginx/conf.d/hostvim-rate-limit.conf"
+
+nginx_rate_limit_profile_write() {
+  local profile="$1"
+  case "$profile" in
+    wordpress)
+      cat > "$nginx_rate_limit_file" <<'EOF'
+# managed by hostvim-security (rate-limit: wordpress)
+limit_req_zone $binary_remote_addr zone=hostvim_wp_api:10m rate=20r/s;
+limit_req_zone $binary_remote_addr zone=hostvim_wp_login:10m rate=10r/m;
+
+map $request_uri $hostvim_rate_zone {
+  default "";
+  ~^/wp-login\.php$ hostvim_wp_login;
+  ~^/wp-json/ hostvim_wp_api;
+}
+
+map $request_uri $hostvim_rate_burst {
+  default 0;
+  ~^/wp-login\.php$ 6;
+  ~^/wp-json/ 30;
+}
+EOF
+      ;;
+    laravel)
+      cat > "$nginx_rate_limit_file" <<'EOF'
+# managed by hostvim-security (rate-limit: laravel)
+limit_req_zone $binary_remote_addr zone=hostvim_lr_auth:10m rate=30r/m;
+limit_req_zone $binary_remote_addr zone=hostvim_lr_api:10m rate=40r/s;
+
+map $request_uri $hostvim_rate_zone {
+  default "";
+  ~^/(login|register|password|sanctum/csrf-cookie) hostvim_lr_auth;
+  ~^/api/ hostvim_lr_api;
+}
+
+map $request_uri $hostvim_rate_burst {
+  default 0;
+  ~^/(login|register|password|sanctum/csrf-cookie) 8;
+  ~^/api/ 60;
+}
+EOF
+      ;;
+    api)
+      cat > "$nginx_rate_limit_file" <<'EOF'
+# managed by hostvim-security (rate-limit: api)
+limit_req_zone $binary_remote_addr zone=hostvim_api_global:20m rate=25r/s;
+
+map $request_uri $hostvim_rate_zone {
+  default hostvim_api_global;
+}
+
+map $request_uri $hostvim_rate_burst {
+  default 40;
+}
+EOF
+      ;;
+    *)
+      echo "invalid profile" >&2
+      return 1
+      ;;
+  esac
+}
+
+nginx_rate_limit_profile_read() {
+  if [[ ! -f "$nginx_rate_limit_file" ]]; then
+    echo "profile=none"
+    echo "limits="
+    return 0
+  fi
+  local profile
+  profile="$(awk 'match($0, /rate-limit: ([a-z0-9_-]+)/, m) { print m[1]; exit }' "$nginx_rate_limit_file")"
+  [[ -n "$profile" ]] || profile="custom"
+  local limits
+  limits="$(awk '/^limit_req_zone /{gsub(/;/, "", $0); print}' "$nginx_rate_limit_file" | paste -sd'|' -)"
+  echo "profile=$profile"
+  echo "limits=$limits"
+}
+
+modsec_site_rules_db="/etc/hostvim/security/modsec-site-rules.tsv"
+modsec_site_rules_file="/etc/modsecurity/hostvim-site-rules.conf"
+modsec_site_rules_old_file="/etc/modsecurity/panelsar-site-rules.conf"
+
+modsec_site_rules_rebuild() {
+  ensure_hostvim_security_dirs
+  install -d -m 755 /etc/modsecurity
+  : > "$modsec_site_rules_file"
+  echo "# managed by hostvim-security (modsec site rules)" > "$modsec_site_rules_file"
+  [[ -f "$modsec_site_rules_db" ]] || return 0
+  while IFS=$'\t' read -r rid domain mode target; do
+    [[ -n "$rid" && -n "$domain" && -n "$mode" ]] || continue
+    case "$mode" in
+      allow)
+        cat >> "$modsec_site_rules_file" <<EOF
+SecRule REQUEST_HEADERS:Host "@streq $domain" "id:$rid,phase:1,pass,nolog,ctl:ruleEngine=Off"
+EOF
+        ;;
+      deny)
+        cat >> "$modsec_site_rules_file" <<EOF
+SecRule REQUEST_HEADERS:Host "@streq $domain" "id:$rid,phase:1,chain,deny,status:403,log,msg:'hostvim deny rule'"
+SecRule REQUEST_URI "@rx $target"
+EOF
+        ;;
+      exception)
+        cat >> "$modsec_site_rules_file" <<EOF
+SecRule REQUEST_HEADERS:Host "@streq $domain" "id:$rid,phase:1,chain,pass,nolog,ctl:ruleRemoveByTag=OWASP_CRS"
+SecRule REQUEST_URI "@rx $target"
+EOF
+        ;;
+    esac
+  done < "$modsec_site_rules_db"
+  ensure_modsec_site_rules_include
+}
+
+# ClamAV / LMD: tarama ve karantina için ortak yol politikası (/var/www, /home, HOSTVIM_WEB_ROOT).
+clamav_canon_under_allowlist() {
+  local canon="$1"
+  [[ -n "$canon" ]] || return 1
+  local ok=0
+  for base in /var/www /home; do
+    case "$canon" in
+      "$base"|"$base"/*) ok=1; break ;;
+    esac
+  done
+  if [[ -n "${HOSTVIM_WEB_ROOT:-}" && "${HOSTVIM_WEB_ROOT:-}" == /* ]]; then
+    local wr
+    wr="$(readlink -f "${HOSTVIM_WEB_ROOT}" 2>/dev/null || true)"
+    if [[ -n "$wr" ]]; then
+      case "$canon" in
+        "$wr"|"$wr"/*) ok=1 ;;
+      esac
+    fi
+  fi
+  [[ "$ok" -eq 1 ]]
+}
+
+clamav_resolve_scan_target() {
+  local target="${1:-/var/www}"
+  [[ "$target" == /* ]] || { echo "target must be absolute path" >&2; return 1; }
+  [[ "$target" != *".."* ]] || { echo "invalid target" >&2; return 1; }
+  local canon
+  canon="$(readlink -f "$target" 2>/dev/null || true)"
+  [[ -n "$canon" && -d "$canon" ]] || { echo "scan target not found: $target" >&2; return 1; }
+  if ! clamav_canon_under_allowlist "$canon"; then
+    echo "scan path not allowed (allowed: /var/www, /home, or HOSTVIM_WEB_ROOT subtree)" >&2
+    return 1
+  fi
+  printf '%s\n' "$canon"
 }
 
 case "$ACTION" in
@@ -107,8 +331,8 @@ EOF
         exit 0
       fi
       export DEBIAN_FRONTEND=noninteractive
-      apt-get update -y >/dev/null
-      apt-get install -y fail2ban >/dev/null
+      apt_noninteractive update -y
+      apt_noninteractive install -y fail2ban
       systemctl enable --now fail2ban >/dev/null 2>&1 || true
       service_exists "fail2ban" || { echo "fail2ban install failed" >&2; exit 1; }
     fi
@@ -120,9 +344,8 @@ EOF
     service_active "fail2ban"
     ;;
   fail2ban-install)
-    export DEBIAN_FRONTEND=noninteractive
-    apt-get update -y >/dev/null
-    apt-get install -y fail2ban >/dev/null
+    apt_noninteractive update -y
+    apt_noninteractive install -y fail2ban
     systemctl enable --now fail2ban >/dev/null 2>&1 || true
     service_exists "fail2ban" || { echo "fail2ban install failed" >&2; exit 1; }
     echo "installed"
@@ -154,10 +377,49 @@ EOF
     fi
     ;;
   clamav-scan)
-    TARGET="${ARG1:-/var/www}"
-    [[ "$TARGET" == /* ]] || { echo "target must be absolute path" >&2; exit 1; }
-    [[ -d "$TARGET" ]] || { echo "scan target not found: $TARGET" >&2; exit 1; }
-    clamscan -ri --stdout "$TARGET"
+    canon="$(clamav_resolve_scan_target "${ARG1:-/var/www}")" || exit 1
+    # --remove yok: yalnızca rapor. Büyük dosya/arşiv taramasını sınırla (DoS riski azaltır).
+    clamscan -ri --stdout --max-filesize=100M --max-scansize=150M "$canon"
+    ;;
+  clamav-quarantine)
+    FILE="${ARG1:-}"
+    [[ -n "$FILE" ]] || { echo "file path required" >&2; exit 1; }
+    [[ "$FILE" == /* ]] || { echo "path must be absolute" >&2; exit 1; }
+    [[ "$FILE" != *".."* ]] || { echo "invalid path" >&2; exit 1; }
+    if [[ -L "$FILE" ]]; then
+      echo "symlinks not allowed" >&2
+      exit 1
+    fi
+    [[ -f "$FILE" ]] || { echo "not a regular file" >&2; exit 1; }
+    canon="$(readlink -f "$FILE" 2>/dev/null || true)"
+    [[ -n "$canon" ]] || { echo "could not canonicalize path" >&2; exit 1; }
+    if ! clamav_canon_under_allowlist "$canon"; then
+      echo "path not allowed" >&2
+      exit 1
+    fi
+    QUAR_ROOT="/var/lib/hostvim/quarantine"
+    install -d -m 0700 "$QUAR_ROOT" 2>/dev/null || { echo "cannot create quarantine dir" >&2; exit 1; }
+    ts="$(date +%Y%m%d-%H%M%S)"
+    base="$(basename "$canon")"
+    dest="$QUAR_ROOT/${ts}-${base}"
+    i=0
+    while [[ -e "$dest" ]]; do
+      i=$((i + 1))
+      dest="$QUAR_ROOT/${ts}-${i}-${base}"
+    done
+    if ! mv -- "$canon" "$dest" 2>/dev/null; then
+      echo "move failed" >&2
+      exit 1
+    fi
+    printf 'ok %s -> %s\n' "$canon" "$dest"
+    ;;
+  maldet-scan)
+    canon="$(clamav_resolve_scan_target "${ARG1:-/var/www}")" || exit 1
+    if ! command -v maldet >/dev/null 2>&1; then
+      echo "maldet not installed (Linux Malware Detect)" >&2
+      exit 1
+    fi
+    maldet -a "$canon"
     ;;
   modsec-status)
     CONF=""
@@ -181,9 +443,8 @@ EOF
         echo "disabled"
         exit 0
       fi
-      export DEBIAN_FRONTEND=noninteractive
-      apt-get update -y >/dev/null
-      apt-get install -y libapache2-mod-security2 modsecurity-crs >/dev/null
+      apt_noninteractive update -y
+      apt_noninteractive install -y libapache2-mod-security2 modsecurity-crs
       if command -v a2enmod >/dev/null 2>&1; then
         a2enmod security2 >/dev/null 2>&1 || true
       fi
@@ -193,12 +454,21 @@ EOF
       done
       [[ -n "$CONF" ]] || { echo "missing modsecurity config file after install" >&2; exit 1; }
     fi
+    TMP_CONF="$(mktemp)"
+    cp -a "$CONF" "$TMP_CONF"
     if [[ "$ARG1" == "on" ]]; then
       sed -i -E 's/^\s*SecRuleEngine\s+.*/SecRuleEngine On/' "$CONF"
     else
       sed -i -E 's/^\s*SecRuleEngine\s+.*/SecRuleEngine Off/' "$CONF"
     fi
-    systemctl reload apache2 || true
+    if ! apache_configtest_run; then
+      install -m 644 "$TMP_CONF" "$CONF"
+      rm -f "$TMP_CONF"
+      cat /tmp/hostvim-apache-test.log >&2
+      exit 1
+    fi
+    rm -f "$TMP_CONF"
+    systemctl reload apache2 >/dev/null 2>&1 || true
     if grep -Eq '^\s*SecRuleEngine\s+On\b' "$CONF"; then
       echo "enabled"
     else
@@ -206,9 +476,8 @@ EOF
     fi
     ;;
   modsec-install)
-    export DEBIAN_FRONTEND=noninteractive
-    apt-get update -y >/dev/null
-    apt-get install -y libapache2-mod-security2 modsecurity-crs >/dev/null
+    apt_noninteractive update -y
+    apt_noninteractive install -y libapache2-mod-security2 modsecurity-crs
     if command -v a2enmod >/dev/null 2>&1; then
       a2enmod security2 >/dev/null 2>&1 || true
     fi
@@ -236,12 +505,25 @@ EOF
     MOD="$(sanitize_mod_name "$ARG1")" || { echo "invalid module name" >&2; exit 1; }
     [[ "$ARG2" == "on" || "$ARG2" == "off" ]] || { echo "invalid state" >&2; exit 1; }
     [[ -f "/etc/apache2/mods-available/${MOD}.load" ]] || { echo "module not found: $MOD" >&2; exit 1; }
+    if a2query -m "$MOD" 2>/dev/null | grep -q "enabled"; then
+      PREV_STATE="enabled"
+    else
+      PREV_STATE="disabled"
+    fi
     if [[ "$ARG2" == "on" ]]; then
       a2enmod "$MOD" >/dev/null
     else
       a2dismod "$MOD" >/dev/null
     fi
-    apache2ctl configtest >/tmp/hostvim-apache-test.log 2>&1 || { cat /tmp/hostvim-apache-test.log; exit 1; }
+    if ! apache_configtest_run; then
+      if [[ "$PREV_STATE" == "enabled" ]]; then
+        a2enmod "$MOD" >/dev/null 2>&1 || true
+      else
+        a2dismod "$MOD" >/dev/null 2>&1 || true
+      fi
+      cat /tmp/hostvim-apache-test.log
+      exit 1
+    fi
     systemctl reload apache2 >/dev/null 2>&1 || true
     if a2query -m "$MOD" 2>/dev/null | grep -q "enabled"; then
       echo "enabled"
@@ -284,6 +566,136 @@ EOF
     fi
     echo "ok"
     ;;
+  nginx-rate-limit-set)
+    PROFILE="${ARG1:-}"
+    ensure_hostvim_security_dirs
+    [[ -n "$PROFILE" ]] || { echo "profile required" >&2; exit 1; }
+    TMP_BACKUP="$(mktemp)"
+    HAD_RATE_LIMIT=0
+    if [[ -f "$nginx_rate_limit_file" ]]; then
+      HAD_RATE_LIMIT=1
+      cp -a "$nginx_rate_limit_file" "$TMP_BACKUP"
+    fi
+    nginx_rate_limit_profile_write "$PROFILE"
+    if ! nginx -t >/tmp/hostvim-nginx-test.log 2>&1; then
+      if [[ "$HAD_RATE_LIMIT" -eq 1 ]]; then
+        install -m 644 "$TMP_BACKUP" "$nginx_rate_limit_file"
+      else
+        rm -f "$nginx_rate_limit_file"
+      fi
+      rm -f "$TMP_BACKUP"
+      cat /tmp/hostvim-nginx-test.log >&2
+      exit 1
+    fi
+    rm -f "$TMP_BACKUP"
+    systemctl reload nginx >/dev/null 2>&1 || true
+    echo "ok"
+    ;;
+  nginx-rate-limit-get)
+    nginx_rate_limit_profile_read
+    ;;
+  modsec-site-rule-add)
+    DOMAIN="$(sanitize_domain "$ARG1")" || { echo "invalid domain" >&2; exit 1; }
+    MODE="${ARG2:-}"
+    TARGET_RAW="${ARG3:-}"
+    [[ "$MODE" == "allow" || "$MODE" == "deny" || "$MODE" == "exception" ]] || { echo "invalid mode" >&2; exit 1; }
+    if [[ "$MODE" == "allow" ]]; then
+      TARGET="/"
+    else
+      TARGET="$(sanitize_rel_path "$TARGET_RAW")" || { echo "invalid target path/pattern" >&2; exit 1; }
+    fi
+    ensure_hostvim_security_dirs
+    [[ -f "$modsec_site_rules_db" ]] || : > "$modsec_site_rules_db"
+    RID=""
+    for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
+      RID=$((100000000 + RANDOM % 899999999))
+      if ! grep -qE "^${RID}"$'\t' "$modsec_site_rules_db" 2>/dev/null; then
+        break
+      fi
+      RID=""
+    done
+    [[ -n "$RID" ]] || { echo "could not allocate rule id" >&2; exit 1; }
+    printf "%s\t%s\t%s\t%s\n" "$RID" "$DOMAIN" "$MODE" "$TARGET" >> "$modsec_site_rules_db"
+    TMP_DB="$(mktemp)"
+    cp -a "$modsec_site_rules_db" "$TMP_DB"
+    TMP_RULES="$(mktemp)"
+    HAD_RULES=0
+    if [[ -f "$modsec_site_rules_file" ]]; then
+      HAD_RULES=1
+      cp -a "$modsec_site_rules_file" "$TMP_RULES"
+    fi
+    modsec_site_rules_rebuild
+    rm -f "$modsec_site_rules_old_file" 2>/dev/null || true
+    if ! apache_configtest_run_strict; then
+      install -m 640 "$TMP_DB" "$modsec_site_rules_db"
+      if [[ "$HAD_RULES" -eq 1 ]]; then
+        install -m 644 "$TMP_RULES" "$modsec_site_rules_file"
+      else
+        rm -f "$modsec_site_rules_file"
+      fi
+      rm -f "$TMP_DB" "$TMP_RULES"
+      cat /tmp/hostvim-apache-test.log >&2
+      exit 1
+    fi
+    rm -f "$TMP_DB" "$TMP_RULES"
+    apache_reload_safe
+    echo "id=$RID domain=$DOMAIN mode=$MODE target=$TARGET"
+    ;;
+  modsec-site-rule-list)
+    if [[ ! -f "$modsec_site_rules_db" ]]; then
+      exit 0
+    fi
+    cat "$modsec_site_rules_db"
+    ;;
+  modsec-site-rule-remove)
+    RID="${ARG1:-}"
+    [[ "$RID" =~ ^[0-9]{6,}$ ]] || { echo "invalid id" >&2; exit 1; }
+    [[ -f "$modsec_site_rules_db" ]] || { echo "rule db not found" >&2; exit 1; }
+    TMP_DB="$(mktemp)"
+    cp -a "$modsec_site_rules_db" "$TMP_DB"
+    TMP_RULES="$(mktemp)"
+    HAD_RULES=0
+    if [[ -f "$modsec_site_rules_file" ]]; then
+      HAD_RULES=1
+      cp -a "$modsec_site_rules_file" "$TMP_RULES"
+    fi
+    awk -F'\t' -v id="$RID" '$1!=id {print}' "$modsec_site_rules_db" > "${modsec_site_rules_db}.next"
+    mv "${modsec_site_rules_db}.next" "$modsec_site_rules_db"
+    modsec_site_rules_rebuild
+    rm -f "$modsec_site_rules_old_file" 2>/dev/null || true
+    if ! apache_configtest_run_strict; then
+      install -m 640 "$TMP_DB" "$modsec_site_rules_db"
+      if [[ "$HAD_RULES" -eq 1 ]]; then
+        install -m 644 "$TMP_RULES" "$modsec_site_rules_file"
+      else
+        rm -f "$modsec_site_rules_file"
+      fi
+      rm -f "$TMP_DB" "$TMP_RULES"
+      cat /tmp/hostvim-apache-test.log >&2
+      exit 1
+    fi
+    rm -f "$TMP_DB" "$TMP_RULES"
+    apache_reload_safe
+    echo "removed"
+    ;;
+  log-tail)
+    LOG_PATH="${ARG1:-}"
+    LINES="${ARG2:-200}"
+    [[ "$LOG_PATH" == /* ]] || { echo "path must be absolute" >&2; exit 1; }
+    [[ "$LINES" =~ ^[0-9]+$ ]] || { echo "invalid lines" >&2; exit 1; }
+    if (( LINES < 20 )); then LINES=20; fi
+    if (( LINES > 5000 )); then LINES=5000; fi
+    case "$LOG_PATH" in
+      /var/log/apache2/hostvim-*-access.log|/var/log/apache2/hostvim-*-error.log|/var/log/httpd/hostvim-*-access.log|/var/log/httpd/hostvim-*-error.log)
+        ;;
+      *)
+        echo "path not allowed" >&2
+        exit 1
+        ;;
+    esac
+    [[ -f "$LOG_PATH" ]] || { echo "not found" >&2; exit 2; }
+    tail -n "$LINES" "$LOG_PATH"
+    ;;
   mail-stack-setup)
     DOMAIN="$(sanitize_domain "$ARG1")" || { echo "invalid domain" >&2; exit 1; }
     export DEBIAN_FRONTEND=noninteractive
@@ -317,6 +729,13 @@ EOF
 </body></html>
 EOF
     NCONF="/etc/nginx/sites-available/hostvim-webmail-${DOMAIN}.conf"
+    NENABLED="/etc/nginx/sites-enabled/hostvim-webmail-${DOMAIN}.conf"
+    TMP_NCONF="$(mktemp)"
+    HAD_NCONF=0
+    if [[ -f "$NCONF" ]]; then
+      HAD_NCONF=1
+      cp -a "$NCONF" "$TMP_NCONF"
+    fi
     cat > "$NCONF" <<EOF
 server {
   listen 80;
@@ -326,15 +745,44 @@ server {
   location / { try_files \$uri \$uri/ /index.html; }
 }
 EOF
-    ln -sfn "$NCONF" "/etc/nginx/sites-enabled/hostvim-webmail-${DOMAIN}.conf"
+    ln -sfn "$NCONF" "$NENABLED"
     rm -f "/etc/nginx/sites-enabled/panelsar-webmail-${DOMAIN}.conf" 2>/dev/null || true
-    nginx -t >/tmp/hostvim-nginx-test.log 2>&1 || { cat /tmp/hostvim-nginx-test.log; exit 1; }
+    if ! nginx -t >/tmp/hostvim-nginx-test.log 2>&1; then
+      if [[ "$HAD_NCONF" -eq 1 ]]; then
+        install -m 644 "$TMP_NCONF" "$NCONF"
+        ln -sfn "$NCONF" "$NENABLED"
+      else
+        rm -f "$NCONF" "$NENABLED"
+      fi
+      rm -f "$TMP_NCONF"
+      cat /tmp/hostvim-nginx-test.log
+      exit 1
+    fi
+    rm -f "$TMP_NCONF"
     systemctl reload nginx >/dev/null 2>&1 || true
     echo "[6/6] done"
     echo "ok"
     ;;
+  self-test)
+    FAIL=0
+    if command -v nginx >/dev/null 2>&1; then
+      nginx -t >/tmp/hostvim-nginx-test.log 2>&1 || { echo "nginx-configtest-failed"; FAIL=1; }
+    fi
+    if ! apache_configtest_run; then
+      echo "apache-configtest-failed"
+      FAIL=1
+    fi
+    if [[ -f "/usr/local/sbin/panelsar-security" ]] && [[ ! -x "/usr/local/sbin/panelsar-security" ]]; then
+      echo "legacy-helper-not-executable"
+      FAIL=1
+    fi
+    if [[ "$FAIL" -ne 0 ]]; then
+      exit 1
+    fi
+    echo "ok"
+    ;;
   *)
-    echo "usage: hostvim-security reboot|fail2ban-status|fail2ban-set <on|off>|fail2ban-install|fail2ban-jail-get|fail2ban-jail-set <bantime> <findtime> <maxretry>|clamav-status|clamav-set <on|off>|clamav-scan <abs-dir>|modsec-status|modsec-set <on|off>|modsec-install|apache-modules-list|apache-module-set <module> <on|off>|nginx-config-get <main|panel>|nginx-config-set <main|panel> <tmpfile> <reload:0|1>|mail-stack-setup <domain>" >&2
+    echo "usage: hostvim-security reboot|fail2ban-status|fail2ban-set <on|off>|fail2ban-install|fail2ban-jail-get|fail2ban-jail-set <bantime> <findtime> <maxretry>|clamav-status|clamav-set <on|off>|clamav-scan <abs-dir>|clamav-quarantine <abs-file>|maldet-scan <abs-dir>|modsec-status|modsec-set <on|off>|modsec-install|apache-modules-list|apache-module-set <module> <on|off>|nginx-config-get <main|panel>|nginx-config-set <main|panel> <tmpfile> <reload:0|1>|nginx-rate-limit-set <wordpress|laravel|api>|nginx-rate-limit-get|modsec-site-rule-add <domain> <allow|deny|exception> [target]|modsec-site-rule-list|modsec-site-rule-remove <id>|mail-stack-setup <domain>|self-test" >&2
     exit 1
     ;;
 esac

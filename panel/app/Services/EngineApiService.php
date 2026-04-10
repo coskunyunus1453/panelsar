@@ -218,6 +218,206 @@ class EngineApiService
         ]);
     }
 
+    /**
+     * @return array{domain?: string, path?: string, content?: string, error?: string, hint?: string}
+     */
+    public function getSiteNginxVhost(string $domain): array
+    {
+        if (! $this->engineAuthConfigured()) {
+            return $this->missingEngineCredentialsPayload();
+        }
+
+        try {
+            $path = '/api/v1/sites/'.rawurlencode($domain).'/nginx-vhost';
+            $response = $this->client()->get($this->baseUrl.$path);
+            $json = $response->json() ?? [];
+            if (! $response->successful()) {
+                $payload = ['error' => $this->formatEngineHttpError($response, $json)];
+                if (isset($json['path'])) {
+                    $payload['path'] = $json['path'];
+                }
+                if (isset($json['hint'])) {
+                    $payload['hint'] = $json['hint'];
+                }
+                if (array_key_exists('can_revert', $json)) {
+                    $payload['can_revert'] = (bool) $json['can_revert'];
+                }
+
+                return $payload;
+            }
+
+            return $json;
+        } catch (\Throwable $e) {
+            Log::error('Engine API GET nginx-vhost failed: '.$e->getMessage());
+
+            return ['error' => $e->getMessage()];
+        }
+    }
+
+    /**
+     * @return array{domain?: string, path?: string, message?: string, ok?: bool, can_revert?: bool, error?: string}
+     */
+    public function revertSiteNginxVhost(string $domain): array
+    {
+        if (! $this->engineAuthConfigured()) {
+            return $this->missingEngineCredentialsPayload();
+        }
+
+        try {
+            $path = '/api/v1/sites/'.rawurlencode($domain).'/nginx-vhost/revert';
+            $response = $this->client()
+                ->withBody('{}', 'application/json')
+                ->post($this->baseUrl.$path);
+            $json = $response->json() ?? [];
+            if (! $response->successful()) {
+                $payload = ['error' => $this->formatEngineHttpError($response, $json)];
+                if (isset($json['path'])) {
+                    $payload['path'] = $json['path'];
+                }
+
+                return $payload;
+            }
+
+            return $json;
+        } catch (\Throwable $e) {
+            Log::error('Engine API POST nginx-vhost/revert failed: '.$e->getMessage());
+
+            return ['error' => $e->getMessage()];
+        }
+    }
+
+    /**
+     * @return array{domain?: string, path?: string, message?: string, ok?: bool, error?: string}
+     */
+    public function updateSiteNginxVhost(string $domain, string $content): array
+    {
+        if (! $this->engineAuthConfigured()) {
+            return $this->missingEngineCredentialsPayload();
+        }
+
+        try {
+            $path = '/api/v1/sites/'.rawurlencode($domain).'/nginx-vhost';
+            $response = $this->client()
+                ->withBody(json_encode(['content' => $content], JSON_THROW_ON_ERROR), 'application/json')
+                ->put($this->baseUrl.$path);
+            $json = $response->json() ?? [];
+            if (! $response->successful()) {
+                $payload = ['error' => $this->formatEngineHttpError($response, $json)];
+                if (isset($json['path'])) {
+                    $payload['path'] = $json['path'];
+                }
+
+                return $payload;
+            }
+
+            return $json;
+        } catch (\Throwable $e) {
+            Log::error('Engine API PUT nginx-vhost failed: '.$e->getMessage());
+
+            return ['error' => $e->getMessage()];
+        }
+    }
+
+    /**
+     * @return array{domain?: string, path?: string, content?: string, can_revert?: bool, error?: string, hint?: string}
+     */
+    public function getSiteApacheVhost(string $domain): array
+    {
+        if (! $this->engineAuthConfigured()) {
+            return $this->missingEngineCredentialsPayload();
+        }
+
+        try {
+            $path = '/api/v1/sites/'.rawurlencode($domain).'/apache-vhost';
+            $response = $this->client()->get($this->baseUrl.$path);
+            $json = $response->json() ?? [];
+            if (! $response->successful()) {
+                $payload = ['error' => $this->formatEngineHttpError($response, $json)];
+                if (isset($json['path'])) {
+                    $payload['path'] = $json['path'];
+                }
+                if (isset($json['hint'])) {
+                    $payload['hint'] = $json['hint'];
+                }
+                if (array_key_exists('can_revert', $json)) {
+                    $payload['can_revert'] = (bool) $json['can_revert'];
+                }
+
+                return $payload;
+            }
+
+            return $json;
+        } catch (\Throwable $e) {
+            Log::error('Engine API GET apache-vhost failed: '.$e->getMessage());
+
+            return ['error' => $e->getMessage()];
+        }
+    }
+
+    /**
+     * @return array{domain?: string, path?: string, message?: string, ok?: bool, can_revert?: bool, error?: string}
+     */
+    public function updateSiteApacheVhost(string $domain, string $content): array
+    {
+        if (! $this->engineAuthConfigured()) {
+            return $this->missingEngineCredentialsPayload();
+        }
+
+        try {
+            $path = '/api/v1/sites/'.rawurlencode($domain).'/apache-vhost';
+            $response = $this->client()
+                ->withBody(json_encode(['content' => $content], JSON_THROW_ON_ERROR), 'application/json')
+                ->put($this->baseUrl.$path);
+            $json = $response->json() ?? [];
+            if (! $response->successful()) {
+                $payload = ['error' => $this->formatEngineHttpError($response, $json)];
+                if (isset($json['path'])) {
+                    $payload['path'] = $json['path'];
+                }
+
+                return $payload;
+            }
+
+            return $json;
+        } catch (\Throwable $e) {
+            Log::error('Engine API PUT apache-vhost failed: '.$e->getMessage());
+
+            return ['error' => $e->getMessage()];
+        }
+    }
+
+    /**
+     * @return array{domain?: string, path?: string, message?: string, ok?: bool, can_revert?: bool, error?: string}
+     */
+    public function revertSiteApacheVhost(string $domain): array
+    {
+        if (! $this->engineAuthConfigured()) {
+            return $this->missingEngineCredentialsPayload();
+        }
+
+        try {
+            $path = '/api/v1/sites/'.rawurlencode($domain).'/apache-vhost/revert';
+            $response = $this->client()
+                ->withBody('{}', 'application/json')
+                ->post($this->baseUrl.$path);
+            $json = $response->json() ?? [];
+            if (! $response->successful()) {
+                $payload = ['error' => $this->formatEngineHttpError($response, $json)];
+                if (isset($json['path'])) {
+                    $payload['path'] = $json['path'];
+                }
+
+                return $payload;
+            }
+
+            return $json;
+        } catch (\Throwable $e) {
+            Log::error('Engine API POST apache-vhost/revert failed: '.$e->getMessage());
+
+            return ['error' => $e->getMessage()];
+        }
+    }
+
     public function setSiteDocumentRoot(string $domain, string $variant): array
     {
         $variant = in_array($variant, ['root', 'public'], true) ? $variant : 'root';
@@ -799,14 +999,45 @@ class EngineApiService
         return $this->post('/api/v1/security/clamav/toggle', ['enabled' => $enabled]);
     }
 
-    public function runClamavScan(?string $target = null): array
+    public function runClamavScan(?string $target = null, ?string $domain = null): array
     {
         $payload = [];
-        if (is_string($target) && trim($target) !== '') {
-            $payload['target'] = trim($target);
+        $domain = is_string($domain) ? trim($domain) : '';
+        if ($domain !== '') {
+            $payload['domain'] = $domain;
+        } else {
+            $target = is_string($target) ? trim($target) : '';
+            if ($target !== '') {
+                $payload['target'] = $target;
+            }
         }
 
         return $this->postLongChecked('/api/v1/security/clamav/scan', $payload, 1800);
+    }
+
+    /**
+     * @param  list<string>  $paths
+     * @return array<string, mixed>
+     */
+    public function quarantineClamavFiles(array $paths): array
+    {
+        return $this->postLongChecked('/api/v1/security/clamav/quarantine', ['paths' => array_values($paths)], 180);
+    }
+
+    public function runMaldetScan(?string $target = null, ?string $domain = null): array
+    {
+        $payload = [];
+        $domain = is_string($domain) ? trim($domain) : '';
+        if ($domain !== '') {
+            $payload['domain'] = $domain;
+        } else {
+            $target = is_string($target) ? trim($target) : '';
+            if ($target !== '') {
+                $payload['target'] = $target;
+            }
+        }
+
+        return $this->postLongChecked('/api/v1/security/clamav/maldet-scan', $payload, 1800);
     }
 
     public function reconcileMailState(bool $dryRun = true, ?string $confirm = null): array
@@ -817,6 +1048,93 @@ class EngineApiService
         }
 
         return $this->postLongChecked('/api/v1/security/mail/reconcile', $payload, 120);
+    }
+
+    public function getFimStatus(): array
+    {
+        return $this->get('/api/v1/security/fim/status');
+    }
+
+    public function createFimBaseline(): array
+    {
+        return $this->postChecked('/api/v1/security/fim/baseline');
+    }
+
+    public function runFimScan(): array
+    {
+        return $this->postLongChecked('/api/v1/security/fim/scan', [], 1800);
+    }
+
+    public function listSecurityAlerts(int $limit = 50): array
+    {
+        $limit = max(1, min(500, $limit));
+
+        return $this->get('/api/v1/security/alerts?limit='.$limit);
+    }
+
+    public function getSecurityIntelPolicy(): array
+    {
+        return $this->get('/api/v1/security/intel/policy');
+    }
+
+    public function updateSecurityIntelPolicy(array $payload): array
+    {
+        return $this->postLongChecked('/api/v1/security/intel/policy', $payload, 120);
+    }
+
+    public function getSecurityIntelStatus(): array
+    {
+        return $this->get('/api/v1/security/intel/status');
+    }
+
+    /**
+     * @return array{profile?: string, limits?: string, error?: string}
+     */
+    public function getNginxRateLimitProfile(): array
+    {
+        return $this->get('/api/v1/security/nginx/rate-limit/profile');
+    }
+
+    /**
+     * @return array{message?: string, profile?: string, limits?: string, error?: string}
+     */
+    public function setNginxRateLimitProfile(string $profile): array
+    {
+        return $this->postChecked('/api/v1/security/nginx/rate-limit/profile', [
+            'profile' => trim($profile),
+        ]);
+    }
+
+    /**
+     * @return array{rules?: list<array{id:string,domain:string,mode:string,target:string}>, error?: string}
+     */
+    public function getModSecuritySiteRules(): array
+    {
+        return $this->get('/api/v1/security/modsecurity/site-rules');
+    }
+
+    /**
+     * @return array{message?: string, rule?: array{id:string,domain:string,mode:string,target:string}, error?: string}
+     */
+    public function addModSecuritySiteRule(string $domain, string $mode, ?string $target = null): array
+    {
+        return $this->postChecked('/api/v1/security/modsecurity/site-rule', [
+            'operation' => 'add',
+            'domain' => trim($domain),
+            'mode' => trim($mode),
+            'target' => trim((string) $target),
+        ]);
+    }
+
+    /**
+     * @return array{message?: string, error?: string}
+     */
+    public function removeModSecuritySiteRule(string $id): array
+    {
+        return $this->postChecked('/api/v1/security/modsecurity/site-rule', [
+            'operation' => 'remove',
+            'id' => trim($id),
+        ]);
     }
 
     public function installerApps(): array
@@ -924,7 +1242,17 @@ class EngineApiService
                 if (! $response->successful()) {
                     $msg = $this->formatEngineHttpError($response, $json);
 
-                    return ['error' => $msg, 'output' => is_string($json['output'] ?? null) ? $json['output'] : null];
+                    $payload = ['error' => $msg];
+                    if (is_string($json['output'] ?? null)) {
+                        $payload['output'] = $json['output'];
+                    }
+                    foreach (['scan', 'infected_count', 'infected_files', 'infected_truncated', 'last_scan', 'scan_path', 'moved'] as $k) {
+                        if (array_key_exists($k, $json)) {
+                            $payload[$k] = $json[$k];
+                        }
+                    }
+
+                    return $payload;
                 }
 
                 return $json;

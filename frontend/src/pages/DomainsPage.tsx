@@ -13,6 +13,7 @@ import {
   Loader2,
   Plus,
   Search,
+  ServerCog,
   Settings,
   Shield,
   ShieldCheck,
@@ -720,33 +721,44 @@ export default function DomainsPage() {
                       </td>
 
                       <td className="px-6 py-4">
-                        <select
-                          className="input min-w-[150px] max-w-[200px]"
-                          value={domain.server_type}
-                          disabled={!!b.server}
-                          onChange={(e) => {
-                            const next = e.target.value
-                            if (next === domain.server_type) return
-                            const nextLabel =
-                              next === 'apache'
-                                ? 'Apache'
-                                : next === 'openlitespeed'
-                                  ? t('domains.server_openlitespeed')
-                                  : 'Nginx'
-                            if (
-                              !window.confirm(
-                                t('domains.confirm_server_change', { server: nextLabel }),
-                              )
-                            ) {
-                              return
-                            }
-                            serverM.mutate({ id: domain.id, server_type: next })
-                          }}
-                        >
-                          <option value="nginx">nginx</option>
-                          <option value="apache">Apache</option>
-                          <option value="openlitespeed">{t('domains.server_openlitespeed')}</option>
-                        </select>
+                        <div className="flex items-center gap-1">
+                          <select
+                            className="input min-w-[130px] max-w-[180px] flex-1"
+                            value={domain.server_type}
+                            disabled={!!b.server}
+                            onChange={(e) => {
+                              const next = e.target.value
+                              if (next === domain.server_type) return
+                              const nextLabel =
+                                next === 'apache'
+                                  ? 'Apache'
+                                  : next === 'openlitespeed'
+                                    ? t('domains.server_openlitespeed')
+                                    : 'Nginx'
+                              if (
+                                !window.confirm(
+                                  t('domains.confirm_server_change', { server: nextLabel }),
+                                )
+                              ) {
+                                return
+                              }
+                              serverM.mutate({ id: domain.id, server_type: next })
+                            }}
+                          >
+                            <option value="nginx">nginx</option>
+                            <option value="apache">Apache</option>
+                            <option value="openlitespeed">{t('domains.server_openlitespeed')}</option>
+                          </select>
+                          <button
+                            type="button"
+                            title={t('domains.webserver_configure')}
+                            className="shrink-0 rounded-lg p-1.5 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700"
+                            onClick={() => setQuickTarget(domain)}
+                          >
+                            <ServerCog className="h-4 w-4" aria-hidden />
+                            <span className="sr-only">{t('domains.webserver_configure')}</span>
+                          </button>
+                        </div>
                       </td>
 
                       <td className="px-6 py-4">

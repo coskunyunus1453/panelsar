@@ -18,11 +18,13 @@ import {
   ShieldCheck,
   ShieldX,
   Terminal,
+  Trash2,
   Zap,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useAuthStore } from '../store/authStore'
 import clsx from 'clsx'
+import { useDomainsList } from '../hooks/useDomains'
 import {
   Bar,
   BarChart,
@@ -42,6 +44,21 @@ function ProPill() {
   return (
     <span className="ml-2 inline-flex items-center rounded-md bg-violet-600/15 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-violet-700 dark:text-violet-300">
       Pro
+    </span>
+  )
+}
+
+function PlanPill({ plan }: { plan: 'free' | 'pro' }) {
+  if (plan === 'free') {
+    return (
+      <span className="inline-flex items-center rounded-md border border-emerald-300 bg-emerald-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-700 dark:border-emerald-700/60 dark:bg-emerald-900/20 dark:text-emerald-300">
+        FREE
+      </span>
+    )
+  }
+  return (
+    <span className="inline-flex items-center rounded-md border border-violet-300 bg-violet-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-violet-700 dark:border-violet-700/60 dark:bg-violet-900/20 dark:text-violet-300">
+      PRO
     </span>
   )
 }
@@ -77,7 +94,14 @@ export default function SecurityPage() {
   const isAdmin = useAuthStore((s) => s.user?.roles?.some((r) => r.name === 'admin'))
   const [tab, setTab] = useState<SecurityTabId>('firewall')
   const [scanTarget, setScanTarget] = useState('/var/www')
+  const [scanClamDomain, setScanClamDomain] = useState('')
   const [scanOutput, setScanOutput] = useState('')
+  const [scanResolvedPath, setScanResolvedPath] = useState<string | null>(null)
+  const [maldetOutput, setMaldetOutput] = useState('')
+  const [scanInfectedCount, setScanInfectedCount] = useState<number | null>(null)
+  const [scanInfectedFiles, setScanInfectedFiles] = useState<string[]>([])
+  const [scanInfectedTruncated, setScanInfectedTruncated] = useState(false)
+  const [quarantineSelected, setQuarantineSelected] = useState<string[]>([])
   const [mailConfirm, setMailConfirm] = useState('')
   const [mailReport, setMailReport] = useState<{
     dry_run?: boolean
@@ -86,9 +110,13 @@ export default function SecurityPage() {
     orphans?: string[]
     removed?: string[]
   } | null>(null)
+  const [intelCountryDeny, setIntelCountryDeny] = useState('')
+  const [intelAsnDeny, setIntelAsnDeny] = useState('')
+  const [intelMinRisk, setIntelMinRisk] = useState(70)
   const [jailBantime, setJailBantime] = useState(600)
   const [jailFindtime, setJailFindtime] = useState(600)
   const [jailMaxretry, setJailMaxretry] = useState(5)
+  const [fimDiffs, setFimDiffs] = useState<Array<{ path?: string; type?: string; severity?: string }>>([])
   const [installModal, setInstallModal] = useState<{
     open: boolean
     key: 'fail2ban' | 'modsecurity' | null
@@ -104,6 +132,35 @@ export default function SecurityPage() {
     startedAt: null,
     finishedAt: null,
   })
+  const [toggleProgress, setToggleProgress] = useState<{
+    key: 'fail2ban' | 'modsecurity' | null
+    running: boolean
+    pct: number
+    text: string
+    status: 'idle' | 'running' | 'success' | 'error'
+  }>({
+    key: null,
+    running: false,
+    pct: 0,
+    text: '',
+    status: 'idle',
+  })
+  const [rateLimitProfile, setRateLimitProfile] = useState<'wordpress' | 'laravel' | 'api'>('wordpress')
+  const [rateLimitProgress, setRateLimitProgress] = useState<{
+    running: boolean
+    pct: number
+    status: 'idle' | 'running' | 'success' | 'error'
+    text: string
+  }>({
+    running: false,
+    pct: 0,
+    status: 'idle',
+    text: '',
+  })
+  const [siteRuleDomain, setSiteRuleDomain] = useState('')
+  const [siteRuleMode, setSiteRuleMode] = useState<'allow' | 'deny' | 'exception'>('deny')
+  const [siteRuleTarget, setSiteRuleTarget] = useState('/wp-login\\.php$')
+  const domainsQ = useDomainsList()
 
   const tabs = useMemo(
     () =>
@@ -122,6 +179,26 @@ export default function SecurityPage() {
   const q = useQuery({
     queryKey: ['security-overview'],
     queryFn: async () => (await api.get('/security/overview')).data,
+    refetchInterval: 45_000,
+  })
+  const intelPolicyQ = useQuery({
+    queryKey: ['security-intel-policy'],
+    queryFn: async () => (await api.get('/security/intel/policy')).data,
+    refetchInterval: 60_000,
+  })
+  const intelStatusQ = useQuery({
+    queryKey: ['security-intel-status'],
+    queryFn: async () => (await api.get('/security/intel/status')).data,
+    refetchInterval: 60_000,
+  })
+  const rateLimitQ = useQuery({
+    queryKey: ['security-rate-limit-profile'],
+    queryFn: async () => (await api.get('/security/rate-limit/profile')).data,
+    refetchInterval: 45_000,
+  })
+  const siteRulesQ = useQuery({
+    queryKey: ['security-modsecurity-site-rules'],
+    queryFn: async () => (await api.get('/security/modsecurity/site-rules')).data,
     refetchInterval: 45_000,
   })
 
@@ -149,11 +226,45 @@ export default function SecurityPage() {
       if (payload.key === 'modsecurity') return api.post('/security/modsecurity/toggle', { enabled: payload.enabled })
       return api.post('/security/clamav/toggle', { enabled: payload.enabled })
     },
-    onSuccess: () => {
+    onMutate: (payload) => {
+      if (payload.key === 'clamav') return
+      setToggleProgress({
+        key: payload.key,
+        running: true,
+        pct: 12,
+        text: 'Islem baslatiliyor...',
+        status: 'running',
+      })
+    },
+    onSuccess: (_, vars) => {
+      if (vars.key !== 'clamav') {
+        setToggleProgress({
+          key: vars.key,
+          running: false,
+          pct: 100,
+          text: 'Tamamlandi',
+          status: 'success',
+        })
+        setTimeout(() => {
+          setToggleProgress((s) => ({ ...s, key: null, pct: 0, text: '', status: 'idle' }))
+        }, 1200)
+      }
       toast.success(t('security.toast.setting_updated'))
       qc.invalidateQueries({ queryKey: ['security-overview'] })
     },
-    onError: (err: unknown) => {
+    onError: (err: unknown, vars) => {
+      if (vars.key !== 'clamav') {
+        setToggleProgress({
+          key: vars.key,
+          running: false,
+          pct: 100,
+          text: 'Basarisiz',
+          status: 'error',
+        })
+        setTimeout(() => {
+          setToggleProgress((s) => ({ ...s, key: null, pct: 0, text: '', status: 'idle' }))
+        }, 1800)
+      }
       const ax = err as { response?: { data?: { message?: string; hint?: string }; status?: number } }
       if (ax.response?.status === 403) toast.error(t('security.toast.admin_only'))
       else toast.error([ax.response?.data?.message, ax.response?.data?.hint].filter(Boolean).join(' — ') || String(err))
@@ -208,18 +319,121 @@ export default function SecurityPage() {
     installM.mutate(key)
   }
 
+  useEffect(() => {
+    if (!toggleProgress.running) return
+    const id = window.setInterval(() => {
+      setToggleProgress((s) => {
+        if (!s.running) return s
+        return {
+          ...s,
+          pct: Math.min(88, s.pct + 6),
+          text: 'Uygulaniyor...',
+        }
+      })
+    }, 450)
+    return () => window.clearInterval(id)
+  }, [toggleProgress.running])
+
+  const applyClamavResult = (payload: {
+    output?: unknown
+    scan_path?: unknown
+    infected_count?: unknown
+    infected_files?: unknown
+    infected_truncated?: unknown
+    scan?: { infected_count?: unknown; infected_files?: unknown; infected_truncated?: unknown }
+  }) => {
+    const out = String(payload?.output ?? '')
+    setScanOutput(out)
+    const sp = payload?.scan_path
+    setScanResolvedPath(typeof sp === 'string' && sp.trim() !== '' ? sp : null)
+    const fromScan = payload?.scan
+    const n = Number(payload?.infected_count ?? fromScan?.infected_count ?? NaN)
+    setScanInfectedCount(Number.isFinite(n) ? n : null)
+    const files = (payload?.infected_files ?? fromScan?.infected_files) as unknown
+    setScanInfectedFiles(Array.isArray(files) ? (files as string[]) : [])
+    setScanInfectedTruncated(
+      Boolean(payload?.infected_truncated ?? fromScan?.infected_truncated),
+    )
+  }
+
+  const clamavScanPayload = () => {
+    const d = scanClamDomain.trim()
+    if (d) return { domain: d }
+    const t = scanTarget.trim()
+    return { target: t !== '' ? t : '/var/www' }
+  }
+
   const clamavScanM = useMutation({
-    mutationFn: async () => (await api.post('/security/clamav/scan', { target: scanTarget })).data,
+    mutationFn: async () => (await api.post('/security/clamav/scan', clamavScanPayload())).data,
     onSuccess: (res) => {
-      setScanOutput(String(res?.result?.output ?? ''))
-      toast.success(t('security.toast.scan_done'))
+      const r = res?.result as Record<string, unknown> | undefined
+      if (r) applyClamavResult(r)
+      setQuarantineSelected([])
+      const cnt = Number(r?.infected_count ?? NaN)
+      if (Number.isFinite(cnt) && cnt > 0) {
+        toast.success(t('security.clamav.toast_found', { count: cnt }))
+      } else {
+        toast.success(t('security.toast.scan_done'))
+      }
       qc.invalidateQueries({ queryKey: ['security-overview'] })
     },
     onError: (err: unknown) => {
-      const ax = err as { response?: { data?: { message?: string; hint?: string; result?: { output?: string } }; status?: number } }
-      setScanOutput(String(ax.response?.data?.result?.output ?? ''))
+      const ax = err as {
+        response?: {
+          data?: {
+            message?: string
+            hint?: string
+            result?: Record<string, unknown>
+          }
+          status?: number
+        }
+      }
+      const r = ax.response?.data?.result
+      if (r) applyClamavResult(r)
+      else setScanOutput('')
       if (ax.response?.status === 403) toast.error(t('security.toast.admin_only'))
       else toast.error([ax.response?.data?.message, ax.response?.data?.hint].filter(Boolean).join(' — ') || String(err))
+    },
+  })
+
+  const clamavQuarantineM = useMutation({
+    mutationFn: async (paths: string[]) => (await api.post('/security/clamav/quarantine', { paths })).data,
+    onSuccess: (res) => {
+      const r = res?.result as { moved?: Array<{ source?: string }> } | undefined
+      const moved = (r?.moved ?? []) as Array<{ source?: string }>
+      const gone = new Set(moved.map((m) => m.source).filter(Boolean) as string[])
+      setScanInfectedFiles((prev) => prev.filter((p) => !gone.has(p)))
+      setQuarantineSelected([])
+      setScanInfectedCount((c) => {
+        if (c === null) return c
+        const next = Math.max(0, c - gone.size)
+        return next
+      })
+      toast.success(t('security.clamav.toast_quarantine_done', { count: moved.length }))
+    },
+    onError: (err: unknown) => {
+      const ax = err as { response?: { data?: { message?: string; hint?: string } } }
+      toast.error([ax.response?.data?.message, ax.response?.data?.hint].filter(Boolean).join(' — ') || String(err))
+    },
+  })
+
+  const maldetScanM = useMutation({
+    mutationFn: async () => (await api.post('/security/clamav/maldet-scan', clamavScanPayload())).data,
+    onSuccess: (res) => {
+      const r = res?.result as Record<string, unknown> | undefined
+      const out = String(r?.output ?? '')
+      setMaldetOutput(out)
+      const sp = r?.scan_path
+      setScanResolvedPath(typeof sp === 'string' && sp.trim() !== '' ? sp : null)
+      toast.success(t('security.toast.scan_done'))
+    },
+    onError: (err: unknown) => {
+      const ax = err as {
+        response?: { data?: { message?: string; hint?: string; result?: Record<string, unknown> } }
+      }
+      const r = ax.response?.data?.result
+      if (r && typeof r.output === 'string') setMaldetOutput(r.output)
+      toast.error([ax.response?.data?.message, ax.response?.data?.hint].filter(Boolean).join(' — ') || String(err))
     },
   })
 
@@ -253,6 +467,94 @@ export default function SecurityPage() {
       toast.error(ax.response?.data?.result?.error ?? ax.response?.data?.message ?? String(err))
     },
   })
+  const fimStatusQ = useQuery({
+    queryKey: ['security-fim-status'],
+    queryFn: async () => (await api.get('/security/fim/status')).data,
+    refetchInterval: 45_000,
+  })
+  const fimBaselineM = useMutation({
+    mutationFn: async () => (await api.post('/security/fim/baseline')).data,
+    onSuccess: () => {
+      toast.success(t('security.toast.fim_baseline_done'))
+      void fimStatusQ.refetch()
+      void qc.invalidateQueries({ queryKey: ['security-overview'] })
+    },
+    onError: (err: unknown) => {
+      const ax = err as { response?: { data?: { message?: string; hint?: string } } }
+      toast.error([ax.response?.data?.message, ax.response?.data?.hint].filter(Boolean).join(' — ') || String(err))
+    },
+  })
+  const fimScanM = useMutation({
+    mutationFn: async () => (await api.post('/security/fim/scan')).data,
+    onSuccess: (res) => {
+      setFimDiffs(Array.isArray(res?.result?.diffs) ? res.result.diffs : [])
+      toast.success(t('security.toast.fim_scan_done'))
+      void fimStatusQ.refetch()
+      void qc.invalidateQueries({ queryKey: ['security-overview'] })
+    },
+    onError: (err: unknown) => {
+      const ax = err as { response?: { data?: { message?: string; hint?: string } } }
+      toast.error([ax.response?.data?.message, ax.response?.data?.hint].filter(Boolean).join(' — ') || String(err))
+    },
+  })
+  const intelPolicyM = useMutation({
+    mutationFn: async (payload: {
+      mode: 'observe' | 'enforce'
+      countries_deny: string[]
+      asn_deny: number[]
+      min_risk_score: number
+    }) => (await api.post('/security/intel/policy', payload)).data,
+    onSuccess: () => {
+      toast.success(t('security.toast.setting_updated'))
+      void intelPolicyQ.refetch()
+      void intelStatusQ.refetch()
+    },
+    onError: (err: unknown) => {
+      const ax = err as { response?: { data?: { message?: string; hint?: string } } }
+      toast.error([ax.response?.data?.message, ax.response?.data?.hint].filter(Boolean).join(' — ') || String(err))
+    },
+  })
+  const rateLimitM = useMutation({
+    mutationFn: async (profile: 'wordpress' | 'laravel' | 'api') => (await api.post('/security/rate-limit/profile', { profile })).data,
+    onMutate: () => {
+      setRateLimitProgress({ running: true, pct: 14, status: 'running', text: t('security.pro_live.rate.applying') })
+    },
+    onSuccess: () => {
+      setRateLimitProgress({ running: false, pct: 100, status: 'success', text: t('security.pro_live.rate.updated') })
+      toast.success(t('security.pro_live.rate.toast_updated'))
+      void qc.invalidateQueries({ queryKey: ['security-rate-limit-profile'] })
+      setTimeout(() => setRateLimitProgress({ running: false, pct: 0, status: 'idle', text: '' }), 1200)
+    },
+    onError: (err: unknown) => {
+      const ax = err as { response?: { data?: { message?: string; hint?: string } } }
+      setRateLimitProgress({ running: false, pct: 100, status: 'error', text: t('security.pro_live.rate.update_failed') })
+      toast.error([ax.response?.data?.message, ax.response?.data?.hint].filter(Boolean).join(' — ') || String(err))
+      setTimeout(() => setRateLimitProgress({ running: false, pct: 0, status: 'idle', text: '' }), 1800)
+    },
+  })
+  const addSiteRuleM = useMutation({
+    mutationFn: async (payload: { domain: string; mode: 'allow' | 'deny' | 'exception'; target?: string }) =>
+      (await api.post('/security/modsecurity/site-rule', payload)).data,
+    onSuccess: () => {
+      toast.success(t('security.pro_live.waf.toast_added'))
+      void qc.invalidateQueries({ queryKey: ['security-modsecurity-site-rules'] })
+    },
+    onError: (err: unknown) => {
+      const ax = err as { response?: { data?: { message?: string; hint?: string } } }
+      toast.error([ax.response?.data?.message, ax.response?.data?.hint].filter(Boolean).join(' — ') || String(err))
+    },
+  })
+  const removeSiteRuleM = useMutation({
+    mutationFn: async (id: string) => (await api.delete('/security/modsecurity/site-rule', { data: { id } })).data,
+    onSuccess: () => {
+      toast.success(t('security.pro_live.waf.toast_removed'))
+      void qc.invalidateQueries({ queryKey: ['security-modsecurity-site-rules'] })
+    },
+    onError: (err: unknown) => {
+      const ax = err as { response?: { data?: { message?: string; hint?: string } } }
+      toast.error([ax.response?.data?.message, ax.response?.data?.hint].filter(Boolean).join(' — ') || String(err))
+    },
+  })
 
   type Overview = {
     fail2ban?: {
@@ -276,6 +578,14 @@ export default function SecurityPage() {
     modsecurity?: { enabled?: boolean; installed?: boolean; error?: string }
     clamav?: { enabled?: boolean; installed?: boolean; last_scan?: unknown; error?: string }
   }
+  type FimStatus = {
+    baseline_exists?: boolean
+    last_baseline_at?: string
+    last_scan_at?: string
+    changed_count?: number
+    critical_count?: number
+    alerts?: Array<{ id?: string; severity?: string; message?: string; created_at?: string }>
+  }
 
   const overview = q.data?.overview as Overview | undefined
   const fail2banNeedsInstall =
@@ -287,6 +597,31 @@ export default function SecurityPage() {
     (overview?.modsecurity?.installed !== true &&
       String(overview?.modsecurity?.error ?? '').toLowerCase().includes('missing modsecurity'))
   const fwRules = overview?.firewall?.recent_rules ?? []
+  const fimStatus = (fimStatusQ.data?.result?.status ?? {}) as FimStatus
+  const fimReady = !!fimStatus.baseline_exists
+  const productFeatures = useMemo(() => {
+    const hasFirewall = typeof overview?.firewall?.default_policy === 'string' && (overview?.firewall?.default_policy ?? '').length > 0
+    const hasFail2ban = !!overview?.fail2ban?.enabled
+    const hasModsec = !!overview?.modsecurity?.enabled
+    const hasClamav = !!overview?.clamav?.enabled
+
+    const intelMode = String((intelPolicyQ.data?.policy?.mode ?? 'observe') || 'observe').toLowerCase()
+    const intelLive = String(intelStatusQ.data?.status?.db_version ?? '').trim().length > 0
+    return {
+      free: [
+        { key: 'firewall', active: hasFirewall },
+        { key: 'fail2ban', active: hasFail2ban },
+        { key: 'modsec', active: hasModsec },
+        { key: 'clamav', active: hasClamav },
+      ],
+      pro: [
+        { key: 'rate_limit', active: ['wordpress', 'laravel', 'api'].includes(String(rateLimitQ.data?.result?.profile ?? '')) },
+        { key: 'ip_reputation', active: intelLive && (intelMode === 'observe' || intelMode === 'enforce') },
+        { key: 'waf_per_site', active: ((siteRulesQ.data?.result?.rules as Array<unknown> | undefined) ?? []).length > 0 },
+        { key: 'fim', active: fimReady },
+      ],
+    }
+  }, [overview, intelPolicyQ.data?.policy?.mode, intelStatusQ.data?.status?.db_version, fimReady, rateLimitQ.data?.result?.profile, siteRulesQ.data?.result?.rules])
 
   const coverage = useMemo(() => {
     const fail2banOk = !!overview?.fail2ban?.enabled
@@ -346,6 +681,28 @@ export default function SecurityPage() {
     if (typeof s.findtime === 'number') setJailFindtime(s.findtime)
     if (typeof s.maxretry === 'number') setJailMaxretry(s.maxretry)
   }, [overview?.fail2ban?.settings])
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      setRateLimitProgress((s) => {
+        if (!s.running) return s
+        return { ...s, pct: Math.min(88, s.pct + 8), text: t('security.pro_live.rate.testing') }
+      })
+    }, 500)
+    return () => window.clearInterval(id)
+  }, [rateLimitProgress.running])
+  useEffect(() => {
+    const p = String(rateLimitQ.data?.result?.profile ?? '').trim()
+    if (p === 'wordpress' || p === 'laravel' || p === 'api') setRateLimitProfile(p)
+  }, [rateLimitQ.data?.result?.profile])
+  useEffect(() => {
+    const policy = intelPolicyQ.data?.policy
+    if (!policy) return
+    const denyCountries = Array.isArray(policy.countries_deny) ? policy.countries_deny : []
+    const denyAsn = Array.isArray(policy.asn_deny) ? policy.asn_deny : []
+    setIntelCountryDeny(denyCountries.join(','))
+    setIntelAsnDeny(denyAsn.map((x: unknown) => String(x)).join(','))
+    setIntelMinRisk(typeof policy.min_risk_score === 'number' ? policy.min_risk_score : 70)
+  }, [intelPolicyQ.data?.policy])
 
   const overviewBody =
     q.isLoading ? (
@@ -400,6 +757,56 @@ export default function SecurityPage() {
               <span className="whitespace-nowrap">{label}</span>
             </button>
           ))}
+        </div>
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <div className="rounded-2xl border border-emerald-200 bg-emerald-50/40 p-5 dark:border-emerald-900/50 dark:bg-emerald-950/15">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-gray-900 dark:text-white">{t('security.product.free_title')}</h2>
+            <PlanPill plan="free" />
+          </div>
+          <p className="mb-3 text-xs text-gray-600 dark:text-gray-300">{t('security.product.free_desc')}</p>
+          <div className="space-y-2">
+            {productFeatures.free.map((f) => (
+              <div
+                key={f.key}
+                className={clsx(
+                  'flex items-center justify-between rounded-lg border px-3 py-2 text-xs',
+                  f.active
+                    ? 'border-emerald-300 bg-emerald-100/70 text-emerald-900 dark:border-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-100'
+                    : 'border-amber-300 bg-amber-100/70 text-amber-900 dark:border-amber-800 dark:bg-amber-900/30 dark:text-amber-100',
+                )}
+              >
+                <span>{t(`security.product.features.${f.key}`)}</span>
+                <span className="font-semibold">{f.active ? t('security.product.available') : t('security.product.setup_needed')}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-violet-200 bg-violet-50/40 p-5 dark:border-violet-900/50 dark:bg-violet-950/15">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-gray-900 dark:text-white">{t('security.product.pro_title')}</h2>
+            <PlanPill plan="pro" />
+          </div>
+          <p className="mb-3 text-xs text-gray-600 dark:text-gray-300">{t('security.product.pro_desc')}</p>
+          <div className="space-y-2">
+            {productFeatures.pro.map((f) => (
+              <div
+                key={f.key}
+                className={clsx(
+                  'flex items-center justify-between rounded-lg border px-3 py-2 text-xs',
+                  f.active
+                    ? 'border-emerald-300 bg-emerald-100/70 text-emerald-900 dark:border-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-100'
+                    : 'border-violet-300 bg-violet-100/70 text-violet-900 dark:border-violet-800 dark:bg-violet-900/30 dark:text-violet-100',
+                )}
+              >
+                <span>{t(`security.product.features.${f.key}`)}</span>
+                <span className="font-semibold">{f.active ? t('security.product.available') : t('security.product.coming_soon')}</span>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -675,6 +1082,68 @@ export default function SecurityPage() {
 
               {isAdmin && (
                 <>
+                  <div className="rounded-xl border border-violet-200 bg-violet-50/40 p-5 dark:border-violet-900/40 dark:bg-violet-950/20">
+                    <h3 className="text-base font-semibold text-violet-900 dark:text-violet-200">{t('security.fim.title')}</h3>
+                    <p className="mt-1 text-xs text-violet-900/90 dark:text-violet-300/90">{t('security.fim.desc')}</p>
+                    <div className="mt-3 grid gap-3 sm:grid-cols-4">
+                      <div className="rounded-lg border border-gray-200 bg-white/70 p-3 dark:border-gray-700 dark:bg-gray-900/40">
+                        <p className="text-xs text-gray-500">{t('security.fim.baseline')}</p>
+                        <p className="mt-1 text-sm font-semibold text-gray-900 dark:text-white">{fimReady ? t('security.status.on') : t('security.status.off')}</p>
+                      </div>
+                      <div className="rounded-lg border border-gray-200 bg-white/70 p-3 dark:border-gray-700 dark:bg-gray-900/40">
+                        <p className="text-xs text-gray-500">{t('security.fim.changed')}</p>
+                        <p className="mt-1 text-sm font-semibold text-gray-900 dark:text-white">{fimStatus.changed_count ?? 0}</p>
+                      </div>
+                      <div className="rounded-lg border border-gray-200 bg-white/70 p-3 dark:border-gray-700 dark:bg-gray-900/40">
+                        <p className="text-xs text-gray-500">{t('security.fim.critical')}</p>
+                        <p className="mt-1 text-sm font-semibold text-red-700 dark:text-red-300">{fimStatus.critical_count ?? 0}</p>
+                      </div>
+                      <div className="rounded-lg border border-gray-200 bg-white/70 p-3 dark:border-gray-700 dark:bg-gray-900/40">
+                        <p className="text-xs text-gray-500">{t('security.fim.last_scan')}</p>
+                        <p className="mt-1 text-xs font-mono text-gray-900 dark:text-white">{String(fimStatus.last_scan_at ?? '—')}</p>
+                      </div>
+                    </div>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <button type="button" className="btn-secondary" onClick={() => fimBaselineM.mutate()} disabled={fimBaselineM.isPending}>
+                        {fimBaselineM.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : t('security.fim.create_baseline')}
+                      </button>
+                      <button
+                        type="button"
+                        className="btn-primary"
+                        onClick={() => fimScanM.mutate()}
+                        disabled={fimScanM.isPending || !fimReady}
+                        title={!fimReady ? t('security.fim.need_baseline') : ''}
+                      >
+                        {fimScanM.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : t('security.fim.run_scan')}
+                      </button>
+                    </div>
+                    {!fimReady && <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">{t('security.fim.need_baseline')}</p>}
+                    <div className="mt-3 grid gap-3 lg:grid-cols-2">
+                      <div className="rounded-lg border border-gray-200 bg-white/70 p-3 dark:border-gray-700 dark:bg-gray-900/40">
+                        <p className="text-xs font-semibold text-gray-700 dark:text-gray-200">{t('security.fim.last_diff')}</p>
+                        <pre className="mt-2 max-h-48 overflow-auto rounded bg-black p-2 text-xs text-green-200">
+                          {fimDiffs.length > 0
+                            ? fimDiffs
+                                .slice(0, 30)
+                                .map((d) => `[${String(d.severity ?? 'info')}] ${String(d.type ?? 'changed')} ${String(d.path ?? '')}`)
+                                .join('\n')
+                            : t('security.fim.no_diff')}
+                        </pre>
+                      </div>
+                      <div className="rounded-lg border border-gray-200 bg-white/70 p-3 dark:border-gray-700 dark:bg-gray-900/40">
+                        <p className="text-xs font-semibold text-gray-700 dark:text-gray-200">{t('security.fim.alerts')}</p>
+                        <pre className="mt-2 max-h-48 overflow-auto rounded bg-black p-2 text-xs text-green-200">
+                          {(fimStatus.alerts ?? []).length > 0
+                            ? (fimStatus.alerts ?? [])
+                                .slice(0, 30)
+                                .map((a) => `[${String(a.severity ?? 'info')}] ${String(a.created_at ?? '')} ${String(a.message ?? '')}`)
+                                .join('\n')
+                            : t('security.fim.no_alerts')}
+                        </pre>
+                      </div>
+                    </div>
+                  </div>
+
                   <div className="rounded-xl border border-red-200 bg-red-50/40 p-5 dark:border-red-900/40 dark:bg-red-950/20">
                     <h3 className="text-base font-semibold text-red-900 dark:text-red-200">{t('security.mail_cleanup.title')}</h3>
                     <p className="mt-1 text-xs text-red-800/90 dark:text-red-300/90">{t('security.mail_cleanup.warning')}</p>
@@ -719,23 +1188,157 @@ export default function SecurityPage() {
 
                   <div className="rounded-xl border border-gray-200 p-5 dark:border-gray-700 dark:bg-gray-900/40">
                     <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{t('security.clamav.scan_title')}</h3>
-                    <div className="mt-4 flex flex-wrap items-end gap-2">
+                    <div className="mt-4 flex flex-wrap items-end gap-3">
+                      <div className="min-w-[200px]">
+                        <label className="label">{t('security.clamav.domain_optional')}</label>
+                        <select
+                          className="input w-full"
+                          value={scanClamDomain}
+                          onChange={(e) => setScanClamDomain(e.target.value)}
+                        >
+                          <option value="">{t('security.clamav.domain_use_path')}</option>
+                          {(domainsQ.data ?? []).map((d) => (
+                            <option key={d.id} value={d.name}>
+                              {d.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
                       <div className="min-w-[260px] flex-1">
                         <label className="label">{t('security.clamav.target')}</label>
                         <input
-                          className="input w-full font-mono"
+                          className="input w-full font-mono disabled:opacity-50"
                           value={scanTarget}
                           onChange={(e) => setScanTarget(e.target.value)}
                           placeholder="/var/www"
+                          disabled={!!scanClamDomain.trim()}
                         />
                       </div>
-                      <button type="button" className="btn-primary" onClick={() => clamavScanM.mutate()} disabled={clamavScanM.isPending}>
+                      <button
+                        type="button"
+                        className="btn-primary"
+                        onClick={() => {
+                          setScanInfectedCount(null)
+                          setScanInfectedFiles([])
+                          setScanInfectedTruncated(false)
+                          setScanResolvedPath(null)
+                          setQuarantineSelected([])
+                          clamavScanM.mutate()
+                        }}
+                        disabled={clamavScanM.isPending}
+                      >
                         {clamavScanM.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : t('security.clamav.run')}
                       </button>
+                      <button
+                        type="button"
+                        className="rounded-lg border border-violet-300 bg-violet-50 px-4 py-2 text-sm font-medium text-violet-900 hover:bg-violet-100 disabled:opacity-50 dark:border-violet-700 dark:bg-violet-950/40 dark:text-violet-100 dark:hover:bg-violet-950/70"
+                        onClick={() => {
+                          setMaldetOutput('')
+                          setScanResolvedPath(null)
+                          maldetScanM.mutate()
+                        }}
+                        disabled={maldetScanM.isPending || clamavScanM.isPending}
+                        title={t('security.clamav.maldet_hint')}
+                      >
+                        {maldetScanM.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : t('security.clamav.maldet_run')}
+                      </button>
                     </div>
-                    <pre className="mt-3 max-h-64 overflow-auto whitespace-pre-wrap rounded-lg bg-black p-3 text-xs text-green-200">
+                    <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">{t('security.clamav.safe_hint')}</p>
+                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{t('security.clamav.maldet_hint')}</p>
+                    {scanResolvedPath && (
+                      <p className="mt-2 font-mono text-xs text-gray-600 dark:text-gray-400">
+                        {t('security.clamav.resolved_path')}: {scanResolvedPath}
+                      </p>
+                    )}
+                    {scanInfectedCount !== null && (
+                      <div
+                        className={`mt-3 rounded-lg border px-3 py-2 text-sm ${
+                          scanInfectedCount > 0
+                            ? 'border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200'
+                            : 'border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950/25 dark:text-emerald-200'
+                        }`}
+                      >
+                        <p className="font-semibold">
+                          {scanInfectedCount > 0
+                            ? t('security.clamav.summary_infected', { count: scanInfectedCount })
+                            : t('security.clamav.summary_clean')}
+                        </p>
+                        {scanInfectedFiles.length > 0 && (
+                          <div className="mt-2 space-y-1">
+                            <div className="flex flex-wrap items-center gap-2 text-xs">
+                              <button
+                                type="button"
+                                className="rounded border border-amber-400/50 px-2 py-0.5 hover:bg-amber-100/80 dark:hover:bg-amber-900/40"
+                                onClick={() => {
+                                  if (quarantineSelected.length === scanInfectedFiles.length) {
+                                    setQuarantineSelected([])
+                                  } else {
+                                    setQuarantineSelected([...scanInfectedFiles])
+                                  }
+                                }}
+                              >
+                                {quarantineSelected.length === scanInfectedFiles.length
+                                  ? t('security.clamav.deselect_all')
+                                  : t('security.clamav.select_all')}
+                              </button>
+                              <button
+                                type="button"
+                                className="rounded bg-red-600 px-2 py-0.5 font-medium text-white hover:bg-red-700 disabled:opacity-50"
+                                disabled={quarantineSelected.length === 0 || clamavQuarantineM.isPending}
+                                onClick={() => {
+                                  if (
+                                    !window.confirm(
+                                      t('security.clamav.quarantine_confirm', { count: quarantineSelected.length }),
+                                    )
+                                  ) {
+                                    return
+                                  }
+                                  clamavQuarantineM.mutate(quarantineSelected)
+                                }}
+                              >
+                                {clamavQuarantineM.isPending
+                                  ? t('security.clamav.quarantine_running')
+                                  : t('security.clamav.quarantine_selected', { count: quarantineSelected.length })}
+                              </button>
+                            </div>
+                            <ul className="max-h-40 overflow-auto font-mono text-xs">
+                              {scanInfectedFiles.map((p) => (
+                                <li key={p} className="flex gap-2 break-all py-0.5">
+                                  <input
+                                    type="checkbox"
+                                    className="mt-0.5 shrink-0"
+                                    checked={quarantineSelected.includes(p)}
+                                    onChange={() => {
+                                      setQuarantineSelected((prev) =>
+                                        prev.includes(p) ? prev.filter((x) => x !== p) : [...prev, p],
+                                      )
+                                    }}
+                                  />
+                                  <span>{p}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                        {scanInfectedTruncated && (
+                          <p className="mt-1 text-xs opacity-90">{t('security.clamav.list_truncated')}</p>
+                        )}
+                      </div>
+                    )}
+                    <p className="mt-3 text-xs font-medium text-gray-600 dark:text-gray-400">{t('security.clamav.output_clam')}</p>
+                    <pre className="mt-1 max-h-64 overflow-auto whitespace-pre-wrap rounded-lg bg-black p-3 text-xs text-green-200">
                       {scanOutput || t('security.clamav.no_output')}
                     </pre>
+                    {(maldetOutput || maldetScanM.isPending) && (
+                      <>
+                        <p className="mt-3 text-xs font-medium text-gray-600 dark:text-gray-400">
+                          {t('security.clamav.output_maldet')}
+                        </p>
+                        <pre className="mt-1 max-h-64 overflow-auto whitespace-pre-wrap rounded-lg bg-black p-3 text-xs text-green-200">
+                          {maldetScanM.isPending ? '…' : maldetOutput || t('security.clamav.no_output')}
+                        </pre>
+                      </>
+                    )}
                   </div>
                 </>
               )}
@@ -805,6 +1408,23 @@ export default function SecurityPage() {
                   )}
                 </div>
               )}
+              {toggleProgress.key === 'modsecurity' && toggleProgress.status !== 'idle' && (
+                <div className="mt-3 rounded-lg border border-gray-200 bg-white/70 p-3 dark:border-gray-700 dark:bg-gray-900/40">
+                  <div className="mb-1 flex items-center justify-between text-xs">
+                    <span className="text-gray-600 dark:text-gray-300">{toggleProgress.text}</span>
+                    <span className="font-mono">{toggleProgress.pct}%</span>
+                  </div>
+                  <div className="h-2 overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">
+                    <div
+                      className={clsx(
+                        'h-2 transition-all duration-300',
+                        toggleProgress.status === 'error' ? 'bg-red-500' : 'bg-primary-500',
+                      )}
+                      style={{ width: `${toggleProgress.pct}%` }}
+                    />
+                  </div>
+                </div>
+              )}
               {!!overview?.modsecurity?.error && (
                 <p className="mt-3 text-sm text-red-600">{String(overview.modsecurity.error)}</p>
               )}
@@ -812,7 +1432,60 @@ export default function SecurityPage() {
             </div>
           )}
           <div className="grid gap-3 md:grid-cols-2">
-            <PlaceholderCard pro title={t('security.website.per_site_title')} description={t('security.website.per_site_desc')} />
+            <div className="rounded-xl border border-violet-200 bg-violet-50/40 p-4 dark:border-violet-900/40 dark:bg-violet-950/20">
+              <p className="text-sm font-semibold text-gray-900 dark:text-white">{t('security.website.per_site_title')}</p>
+              <p className="mt-1 text-xs text-gray-600 dark:text-gray-400">{t('security.website.per_site_desc')}</p>
+              <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">{t('security.pro_live.waf.rollback_hint')}</p>
+              <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                <select className="input w-full" value={siteRuleDomain} onChange={(e) => setSiteRuleDomain(e.target.value)}>
+                  <option value="">{t('security.pro_live.waf.select_domain')}</option>
+                  {domainsQ.data?.map((d) => (
+                    <option key={d.id} value={d.name}>
+                      {d.name}
+                    </option>
+                  ))}
+                </select>
+                <select className="input w-full" value={siteRuleMode} onChange={(e) => setSiteRuleMode(e.target.value as 'allow' | 'deny' | 'exception')}>
+                  <option value="allow">allow</option>
+                  <option value="deny">deny</option>
+                  <option value="exception">exception</option>
+                </select>
+                <input className="input w-full font-mono text-xs" value={siteRuleTarget} onChange={(e) => setSiteRuleTarget(e.target.value)} placeholder="/wp-login\\.php$" />
+              </div>
+              <div className="mt-2">
+                <button
+                  type="button"
+                  className="btn-primary"
+                  disabled={addSiteRuleM.isPending || !siteRuleDomain.trim() || (siteRuleMode !== 'allow' && !siteRuleTarget.trim())}
+                  onClick={() =>
+                    addSiteRuleM.mutate({
+                      domain: siteRuleDomain.trim(),
+                      mode: siteRuleMode,
+                      target: siteRuleMode === 'allow' ? '/' : siteRuleTarget.trim(),
+                    })
+                  }
+                >
+                  {t('security.pro_live.waf.add_rule')}
+                </button>
+              </div>
+              <div className="mt-3 max-h-36 space-y-2 overflow-auto">
+                {((siteRulesQ.data?.result?.rules as Array<{ id?: string; domain?: string; mode?: string; target?: string }> | undefined) ?? []).map((r) => (
+                  <div key={String(r.id)} className="flex items-center justify-between rounded-lg border border-gray-200 bg-white/70 px-2 py-1 text-xs dark:border-gray-700 dark:bg-gray-900/40">
+                    <span className="font-mono">{String(r.domain)} • {String(r.mode)} • {String(r.target)}</span>
+                    {isAdmin && (
+                      <button
+                        type="button"
+                        className="rounded-md border border-red-300 p-1 text-red-600 dark:border-red-700"
+                        disabled={removeSiteRuleM.isPending || !r.id}
+                        onClick={() => r.id && removeSiteRuleM.mutate(String(r.id))}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
             <PlaceholderCard pro title={t('security.website.crs_title')} description={t('security.website.crs_desc')} />
           </div>
         </div>
@@ -869,6 +1542,23 @@ export default function SecurityPage() {
                     </>
                   )}
                 </div>
+                {toggleProgress.key === 'fail2ban' && toggleProgress.status !== 'idle' && (
+                  <div className="mt-3 rounded-lg border border-gray-200 bg-white/70 p-3 dark:border-gray-700 dark:bg-gray-900/40">
+                    <div className="mb-1 flex items-center justify-between text-xs">
+                      <span className="text-gray-600 dark:text-gray-300">{toggleProgress.text}</span>
+                      <span className="font-mono">{toggleProgress.pct}%</span>
+                    </div>
+                    <div className="h-2 overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">
+                      <div
+                        className={clsx(
+                          'h-2 transition-all duration-300',
+                          toggleProgress.status === 'error' ? 'bg-red-500' : 'bg-primary-500',
+                        )}
+                        style={{ width: `${toggleProgress.pct}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
                 {!!overview?.fail2ban?.error && (
                   <p className="mt-3 text-sm text-amber-800 dark:text-amber-200">{String(overview.fail2ban.error)}</p>
                 )}
@@ -957,10 +1647,112 @@ export default function SecurityPage() {
             </ul>
           </div>
           <div className="grid gap-3 md:grid-cols-2">
-            <PlaceholderCard pro title={t('security.attack.rate_title')} description={t('security.attack.rate_desc')} />
+            <div className="rounded-xl border border-violet-200 bg-violet-50/40 p-4 dark:border-violet-900/40 dark:bg-violet-950/20">
+              <p className="text-sm font-semibold text-gray-900 dark:text-white">{t('security.attack.rate_title')}</p>
+              <p className="mt-1 text-xs text-gray-600 dark:text-gray-400">{t('security.attack.rate_desc')}</p>
+              <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">{t('security.pro_live.rate.rollback_hint')}</p>
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <select
+                  className="input w-48"
+                  value={rateLimitProfile}
+                  onChange={(e) => setRateLimitProfile(e.target.value as 'wordpress' | 'laravel' | 'api')}
+                  disabled={!isAdmin || rateLimitM.isPending}
+                >
+                  <option value="wordpress">wordpress</option>
+                  <option value="laravel">laravel</option>
+                  <option value="api">api</option>
+                </select>
+                <button type="button" className="btn-primary" disabled={!isAdmin || rateLimitM.isPending} onClick={() => rateLimitM.mutate(rateLimitProfile)}>
+                  {t('security.pro_live.rate.apply')}
+                </button>
+              </div>
+              <p className="mt-2 text-xs text-gray-600 dark:text-gray-300">
+                {t('security.pro_live.rate.active_profile')}: <span className="font-mono font-semibold">{String(rateLimitQ.data?.result?.profile ?? 'none')}</span>
+              </p>
+              {!!rateLimitQ.data?.result?.limits && (
+                <pre className="mt-2 max-h-28 overflow-auto rounded bg-black p-2 text-[11px] text-green-200">{String(rateLimitQ.data?.result?.limits)}</pre>
+              )}
+              {rateLimitProgress.status !== 'idle' && (
+                <div className="mt-3 rounded-lg border border-gray-200 bg-white/70 p-3 dark:border-gray-700 dark:bg-gray-900/40">
+                  <div className="mb-1 flex items-center justify-between text-xs">
+                    <span className="text-gray-600 dark:text-gray-300">{rateLimitProgress.text}</span>
+                    <span className="font-mono">{rateLimitProgress.pct}%</span>
+                  </div>
+                  <div className="h-2 overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">
+                    <div
+                      className={clsx('h-2 transition-all duration-300', rateLimitProgress.status === 'error' ? 'bg-red-500' : 'bg-primary-500')}
+                      style={{ width: `${rateLimitProgress.pct}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
             <PlaceholderCard pro title={t('security.attack.ddos_title')} description={t('security.attack.ddos_desc')} />
             <PlaceholderCard pro title={t('security.attack.bot_title')} description={t('security.attack.bot_desc')} />
-            <PlaceholderCard pro title={t('security.attack.geo_title')} description={t('security.attack.geo_desc')} />
+            <div className="rounded-xl border border-violet-200 bg-violet-50/40 p-4 dark:border-violet-800/50 dark:bg-violet-950/20">
+              <p className="text-sm font-semibold text-gray-900 dark:text-white">{t('security.attack.geo_title')}</p>
+              <p className="mt-1 text-xs text-gray-600 dark:text-gray-300">{t('security.attack.geo_desc')}</p>
+              <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                DB: {String(intelStatusQ.data?.status?.db_version ?? 'local-demo-v1')} · last: {String(intelStatusQ.data?.status?.last_update ?? '—')}
+              </p>
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                mode: {String(intelPolicyQ.data?.policy?.mode ?? 'observe')} · private IP bypass: {String(intelStatusQ.data?.status?.private_ip_geo_bypass ?? true)}
+              </p>
+              {isAdmin && (
+                <form
+                  className="mt-3 space-y-2"
+                  onSubmit={(ev) => {
+                    ev.preventDefault()
+                    const countryList = intelCountryDeny
+                      .split(',')
+                      .map((x) => x.trim().toUpperCase())
+                      .filter(Boolean)
+                    const asnList = intelAsnDeny
+                      .split(',')
+                      .map((x) => Number(x.trim()))
+                      .filter((x) => Number.isFinite(x) && x > 0)
+                    const mode = String((ev.currentTarget.elements.namedItem('mode') as HTMLSelectElement).value) as 'observe' | 'enforce'
+                    intelPolicyM.mutate({
+                      mode,
+                      countries_deny: countryList,
+                      asn_deny: asnList,
+                      min_risk_score: Math.max(0, Math.min(100, intelMinRisk)),
+                    })
+                  }}
+                >
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <select name="mode" className="input w-full text-xs" defaultValue={String(intelPolicyQ.data?.policy?.mode ?? 'observe')}>
+                      <option value="observe">observe</option>
+                      <option value="enforce">enforce</option>
+                    </select>
+                    <input
+                      className="input w-full text-xs"
+                      value={String(intelMinRisk)}
+                      onChange={(e) => setIntelMinRisk(Number(e.target.value || 70))}
+                      type="number"
+                      min={0}
+                      max={100}
+                      placeholder="risk score 0-100"
+                    />
+                  </div>
+                  <input
+                    className="input w-full text-xs"
+                    value={intelCountryDeny}
+                    onChange={(e) => setIntelCountryDeny(e.target.value)}
+                    placeholder="deny countries: RU,CN,..."
+                  />
+                  <input
+                    className="input w-full text-xs"
+                    value={intelAsnDeny}
+                    onChange={(e) => setIntelAsnDeny(e.target.value)}
+                    placeholder="deny ASN: 12345,13335,..."
+                  />
+                  <button type="submit" className="btn-primary text-xs" disabled={intelPolicyM.isPending}>
+                    {intelPolicyM.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : 'IP Reputation politikasini uygula'}
+                  </button>
+                </form>
+              )}
+            </div>
           </div>
         </div>
       )}
@@ -990,6 +1782,22 @@ export default function SecurityPage() {
                   : installModal.status === 'error'
                     ? t('security.install.error')
                     : t('security.install.idle')}
+            </div>
+            <div className="h-2 overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">
+              <div
+                className={clsx(
+                  'h-2 transition-all duration-500',
+                  installModal.status === 'error' ? 'bg-red-500' : 'bg-primary-500',
+                )}
+                style={{
+                  width:
+                    installModal.status === 'running'
+                      ? '72%'
+                      : installModal.status === 'success' || installModal.status === 'error'
+                        ? '100%'
+                        : '0%',
+                }}
+              />
             </div>
             <pre className="max-h-64 overflow-auto whitespace-pre-wrap rounded-lg bg-black p-3 text-xs text-green-200">
               {installModal.logs.join('\n')}

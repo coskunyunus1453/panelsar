@@ -15,6 +15,7 @@ import {
   Loader2,
   CheckCircle2,
   Trash2,
+  Wand2,
 } from 'lucide-react'
 import DomainDeleteConfirmModal from './DomainDeleteConfirmModal'
 
@@ -48,6 +49,7 @@ export default function DomainQuickSettingsModal({ domain, open, onClose }: Prop
   const [sslDiagnostics, setSslDiagnostics] = useState<Array<{ key: string; ok: boolean; message: string }> | null>(
     null,
   )
+  const [autoDetectSummary, setAutoDetectSummary] = useState<string>('')
   const sslTimer = useRef<ReturnType<typeof setInterval> | null>(null)
 
   useEffect(() => {
@@ -141,6 +143,378 @@ export default function DomainQuickSettingsModal({ domain, open, onClose }: Prop
       setPerfMode(res.performance_mode)
       void qc.invalidateQueries({ queryKey: ['domain-performance', domain?.id ?? 0] })
       invalidate()
+    },
+    onError: (err: unknown) => {
+      const ax = err as { response?: { data?: { message?: string } } }
+      toast.error(ax.response?.data?.message ?? String(err))
+    },
+  })
+
+  const nginxForSite = (domain?.server_type ?? '').toLowerCase() === 'nginx'
+  const apacheForSite = (domain?.server_type ?? '').toLowerCase() === 'apache'
+  const vhostEditorActive = nginxForSite || apacheForSite
+
+  const vhostQ = useQuery({
+    queryKey: ['domain-vhost-editor', domain?.id ?? 0, domain?.server_type ?? ''],
+    enabled: open && !!domain?.id && vhostEditorActive,
+    queryFn: async () => {
+      if (!domain) {
+        throw new Error('no domain')
+      }
+      const k = (domain.server_type ?? '').toLowerCase()
+      const endpoint = k === 'apache' ? 'apache-vhost' : 'nginx-vhost'
+      try {
+        const { data } = await api.get<{
+          path?: string
+          content?: string
+          can_revert?: boolean
+        }>(`/domains/${domain.id}/${endpoint}`)
+        return { ...data, _missing: false as const, stack: k as 'nginx' | 'apache' }
+      } catch (err: unknown) {
+        const ax = err as {
+          response?: {
+            status?: number
+            data?: { path?: string; hint?: string; message?: string; can_revert?: boolean }
+          }
+        }
+        if (ax.response?.status === 404) {
+          return {
+            path: ax.response.data?.path,
+            content: '',
+            hint: ax.response.data?.hint,
+            can_revert: Boolean(ax.response.data?.can_revert),
+            _missing: true as const,
+            stack: k as 'nginx' | 'apache',
+          }
+        }
+        throw err
+      }
+    },
+  })
+
+  const [vhostEditorText, setVhostEditorText] = useState('')
+  const [vhostEditorReady, setVhostEditorReady] = useState(false)
+
+  useEffect(() => {
+    if (!open) {
+      setVhostEditorReady(false)
+      setVhostEditorText('')
+    }
+  }, [open])
+
+  useEffect(() => {
+    if (!open || !domain?.id) {
+      return
+    }
+    setVhostEditorReady(false)
+    setVhostEditorText('')
+  }, [domain?.id, domain?.server_type, open])
+
+  useEffect(() => {
+    if (!vhostEditorActive || !vhostQ.isSuccess || vhostEditorReady) {
+      return
+    }
+    const c = typeof vhostQ.data?.content === 'string' ? vhostQ.data.content : ''
+    setVhostEditorText(c)
+    setVhostEditorReady(true)
+  }, [vhostEditorActive, vhostQ.isSuccess, vhostQ.data, vhostEditorReady])
+
+  const vhostInvalidateKey = ['domain-vhost-editor', domain?.id ?? 0, domain?.server_type ?? ''] as const
+
+  const vhostSaveM = useMutation({
+    mutationFn: async () => {
+      if (!domain) {
+        throw new Error('no domain')
+      }
+      const k = (domain.server_type ?? '').toLowerCase()
+      const endpoint = k === 'apache' ? 'apache-vhost' : 'nginx-vhost'
+      return (await api.put(`/domains/${domain.id}/${endpoint}`, { content: vhostEditorText })).data as {
+        can_revert?: boolean
+      }
+    },
+    onSuccess: () => {
+      const k = (domain?.server_type ?? '').toLowerCase()
+      toast.success(k === 'apache' ? t('domains.apache_vhost_saved') : t('domains.nginx_vhost_saved'))
+      setVhostEditorReady(false)
+      void qc.invalidateQueries({ queryKey: vhostInvalidateKey })
+    },
+    onError: (err: unknown) => {
+      const ax = err as { response?: { data?: { message?: string } } }
+      toast.error(ax.response?.data?.message ?? String(err))
+    },
+  })
+
+  const vhostRevertM = useMutation({
+    mutationFn: async () => {
+      if (!domain) {
+        throw new Error('no domain')
+      }
+      const k = (domain.server_type ?? '').toLowerCase()
+      const endpoint = k === 'apache' ? 'apache-vhost/revert' : 'nginx-vhost/revert'
+      return (await api.post(`/domains/${domain.id}/${endpoint}`, {})).data as { can_revert?: boolean }
+    },
+    onSuccess: () => {
+      toast.success(t('domains.vhost_reverted_toast'))
+      setVhostEditorReady(false)
+      void qc.invalidateQueries({ queryKey: vhostInvalidateKey })
+    },
+    onError: (err: unknown) => {
+      const ax = err as { response?: { data?: { message?: string } } }
+      toast.error(ax.response?.data?.message ?? String(err))
+    },
+  })
+
+  const autoWebConfigM = useMutation({
+    mutationFn: async () => {
+      if (!domain) {
+        throw new Error('Domain not selected')
+      }
+
+      const detectEntries = async (p: string) => {
+        const u = new URLSearchParams()
+        u.set('limit', '300')
+        u.set('offset', '0')
+        u.set('sort', 'name')
+        u.set('order', 'asc')
+        if (p) u.set('path', p)
+        const { data } = await api.get<{ entries?: Array<{ name?: string; type?: string }> }>(
+          `/domains/${domain.id}/files?${u.toString()}`,
+        )
+        return data.entries ?? []
+      }
+
+      let rootEntries: Array<{ name?: string; type?: string }> = []
+      let publicEntries: Array<{ name?: string; type?: string }> = []
+      try {
+        rootEntries = await detectEntries('')
+      } catch {
+        // files yetkisi yoksa veya engine anlık yanıt vermezse güvenli varsayım ile devam.
+      }
+      try {
+        publicEntries = await detectEntries('public')
+      } catch {
+        // ignore
+      }
+
+      const hasName = (arr: Array<{ name?: string; type?: string }>, n: string) =>
+        arr.some((e) => String(e.name || '').toLowerCase() === n.toLowerCase())
+      const hasDir = (arr: Array<{ name?: string; type?: string }>, n: string) =>
+        arr.some((e) => String(e.type || '').toLowerCase() === 'directory' && String(e.name || '').toLowerCase() === n.toLowerCase())
+      const hasPublicIndex = hasName(publicEntries, 'index.php')
+      const hasPackageJson = hasName(rootEntries, 'package.json')
+
+      const hasLaravel =
+        (hasName(rootEntries, 'artisan') && hasPublicIndex) ||
+        (hasName(rootEntries, '.env') && hasPublicIndex)
+      const hasWp =
+        hasName(rootEntries, 'wp-config.php') || hasDir(rootEntries, 'wp-content')
+      const hasSymfony =
+        hasDir(rootEntries, 'bin') && hasName(rootEntries, 'composer.json') && hasDir(rootEntries, 'config') && hasDir(rootEntries, 'src')
+      const hasDrupal = hasDir(rootEntries, 'core') && hasDir(rootEntries, 'sites')
+      const hasJoomla = hasName(rootEntries, 'configuration.php') && hasDir(rootEntries, 'administrator')
+      const hasOpenCart = hasName(rootEntries, 'config.php') && hasDir(rootEntries, 'catalog') && hasDir(rootEntries, 'admin')
+      const hasMagento =
+        hasDir(rootEntries, 'app') && hasDir(rootEntries, 'vendor') && hasName(rootEntries, 'composer.json')
+      const hasNext =
+        hasPackageJson &&
+        (
+          hasDir(rootEntries, '.next') ||
+          hasName(rootEntries, 'next.config.js') ||
+          hasName(rootEntries, 'next.config.mjs') ||
+          hasName(rootEntries, 'next.config.ts')
+        )
+      const hasNuxt = hasPackageJson && (hasName(rootEntries, 'nuxt.config.ts') || hasName(rootEntries, 'nuxt.config.js'))
+      const hasStrapi = hasPackageJson && hasDir(rootEntries, 'src') && hasDir(rootEntries, 'config') && (hasName(rootEntries, 'strapi.config.ts') || hasName(rootEntries, 'strapi.config.js'))
+      const hasN8n = hasPackageJson && (hasName(rootEntries, 'n8n.config.js') || hasName(rootEntries, 'n8n.json'))
+      const hasNodeApp = hasPackageJson
+      const hasHtaccess = hasName(rootEntries, '.htaccess')
+      const hasNginxHint = hasName(rootEntries, 'nginx.conf') || hasName(rootEntries, '.nginx.conf')
+
+      // Güvenlik varsayımı: otomatik mod Apache/OLS seçmez; yalnız Nginx güvenli preset uygular.
+      let targetServer: 'nginx' | 'apache' | 'openlitespeed' = 'nginx'
+      let targetVariant: 'root' | 'public' = 'root'
+      let targetPerf: 'off' | 'standard' = 'standard'
+      let profile:
+        | 'laravel'
+        | 'wordpress'
+        | 'symfony'
+        | 'drupal'
+        | 'joomla'
+        | 'opencart'
+        | 'magento'
+        | 'nextjs'
+        | 'nuxt'
+        | 'strapi'
+        | 'n8n'
+        | 'node'
+        | 'htaccess'
+        | 'standard' = 'standard'
+      const detectSignals: string[] = []
+
+      if (hasName(rootEntries, 'artisan')) detectSignals.push('artisan')
+      if (hasName(rootEntries, '.env')) detectSignals.push('.env')
+      if (hasPublicIndex) detectSignals.push('public/index.php')
+      if (hasName(rootEntries, 'wp-config.php')) detectSignals.push('wp-config.php')
+      if (hasDir(rootEntries, 'wp-content')) detectSignals.push('wp-content/')
+      if (hasName(rootEntries, 'composer.json')) detectSignals.push('composer.json')
+      if (hasPackageJson) detectSignals.push('package.json')
+      if (hasName(rootEntries, 'next.config.js') || hasName(rootEntries, 'next.config.mjs') || hasName(rootEntries, 'next.config.ts')) {
+        detectSignals.push('next.config.*')
+      }
+      if (hasName(rootEntries, 'nuxt.config.js') || hasName(rootEntries, 'nuxt.config.ts')) {
+        detectSignals.push('nuxt.config.*')
+      }
+      if (hasName(rootEntries, 'strapi.config.js') || hasName(rootEntries, 'strapi.config.ts')) {
+        detectSignals.push('strapi.config.*')
+      }
+      if (hasName(rootEntries, 'n8n.config.js') || hasName(rootEntries, 'n8n.json')) {
+        detectSignals.push('n8n.config')
+      }
+      if (hasName(rootEntries, '.htaccess')) detectSignals.push('.htaccess')
+
+      if (hasLaravel) {
+        profile = 'laravel'
+        targetServer = 'nginx'
+        targetVariant = 'public'
+        targetPerf = 'standard'
+      } else if (hasSymfony) {
+        profile = 'symfony'
+        targetServer = 'nginx'
+        targetVariant = 'public'
+        targetPerf = 'standard'
+      } else if (hasWp) {
+        profile = 'wordpress'
+        targetServer = 'nginx'
+        targetVariant = 'root'
+        targetPerf = 'standard'
+      } else if (hasDrupal) {
+        profile = 'drupal'
+        targetServer = 'nginx'
+        targetVariant = 'root'
+        targetPerf = 'standard'
+      } else if (hasJoomla) {
+        profile = 'joomla'
+        targetServer = 'nginx'
+        targetVariant = 'root'
+        targetPerf = 'standard'
+      } else if (hasOpenCart) {
+        profile = 'opencart'
+        targetServer = 'nginx'
+        targetVariant = 'root'
+        targetPerf = 'standard'
+      } else if (hasMagento) {
+        profile = 'magento'
+        targetServer = 'nginx'
+        targetVariant = 'root'
+        targetPerf = 'standard'
+      } else if (hasNext) {
+        profile = 'nextjs'
+        targetServer = 'nginx'
+        targetVariant = 'root'
+        targetPerf = 'standard'
+      } else if (hasNuxt) {
+        profile = 'nuxt'
+        targetServer = 'nginx'
+        targetVariant = 'root'
+        targetPerf = 'standard'
+      } else if (hasStrapi) {
+        profile = 'strapi'
+        targetServer = 'nginx'
+        targetVariant = 'root'
+        targetPerf = 'standard'
+      } else if (hasN8n) {
+        profile = 'n8n'
+        targetServer = 'nginx'
+        targetVariant = 'root'
+        targetPerf = 'standard'
+      } else if (hasNodeApp) {
+        profile = 'node'
+        targetServer = 'nginx'
+        targetVariant = 'root'
+        targetPerf = 'standard'
+      } else if (hasHtaccess && !hasNginxHint) {
+        profile = 'htaccess'
+        targetServer = 'nginx'
+        targetVariant = 'root'
+        targetPerf = 'standard'
+      }
+
+      const changed: string[] = []
+      if (targetServer !== domain.server_type) {
+        await api.post(`/domains/${domain.id}/server`, { server_type: targetServer })
+        changed.push(`server=${targetServer}`)
+      }
+
+      await api.post(`/domains/${domain.id}/document-root`, { variant: targetVariant })
+      changed.push(`docroot=${targetVariant}`)
+
+      // Güvenli preset: yalnız Nginx'te standard performans; diğer durumlar otomatikte seçilmiyor.
+      await api.post(`/domains/${domain.id}/performance`, { mode: targetPerf })
+      changed.push(`perf=${targetPerf}`)
+
+      const confidence: 'high' | 'medium' | 'low' =
+        profile === 'laravel' || profile === 'symfony' || profile === 'wordpress'
+          ? 'high'
+          : profile === 'standard' || profile === 'htaccess' || detectSignals.length <= 1
+            ? 'low'
+            : 'medium'
+
+      return {
+        profile,
+        targetServer,
+        targetVariant,
+        targetPerf,
+        changed,
+        detectedBy: detectSignals.slice(0, 8),
+        confidence,
+      }
+    },
+    onSuccess: (res) => {
+      if (!res) return
+      invalidate()
+      void qc.invalidateQueries({ queryKey: ['domain-performance', domain?.id ?? 0] })
+      const profileText =
+        res.profile === 'laravel'
+          ? t('domains.auto_profile_laravel')
+          : res.profile === 'symfony'
+            ? t('domains.auto_profile_symfony')
+          : res.profile === 'wordpress'
+            ? t('domains.auto_profile_wordpress')
+            : res.profile === 'drupal'
+              ? t('domains.auto_profile_drupal')
+              : res.profile === 'joomla'
+                ? t('domains.auto_profile_joomla')
+                : res.profile === 'opencart'
+                  ? t('domains.auto_profile_opencart')
+                  : res.profile === 'magento'
+                    ? t('domains.auto_profile_magento')
+                    : res.profile === 'nextjs'
+                      ? t('domains.auto_profile_nextjs')
+                      : res.profile === 'nuxt'
+                        ? t('domains.auto_profile_nuxt')
+                        : res.profile === 'strapi'
+                          ? t('domains.auto_profile_strapi')
+                          : res.profile === 'n8n'
+                            ? t('domains.auto_profile_n8n')
+                            : res.profile === 'node'
+                              ? t('domains.auto_profile_node')
+            : res.profile === 'htaccess'
+              ? t('domains.auto_profile_htaccess')
+              : t('domains.auto_profile_standard')
+      toast.success(t('domains.auto_web_applied', { profile: profileText }))
+      const sig = Array.isArray((res as any).detectedBy) ? (res as any).detectedBy as string[] : []
+      const confRaw = String((res as any).confidence ?? 'low')
+      const confText =
+        confRaw === 'high'
+          ? t('domains.auto_confidence_high')
+          : confRaw === 'medium'
+            ? t('domains.auto_confidence_medium')
+            : t('domains.auto_confidence_low')
+      setAutoDetectSummary(
+        sig.length > 0
+          ? `${t('domains.auto_web_detected_by', { list: sig.join(', ') })} - ${t('domains.auto_web_confidence', { level: confText })}`
+          : `${t('domains.auto_web_detected_by', { list: t('domains.auto_profile_standard') })} - ${t('domains.auto_web_confidence', { level: confText })}`,
+      )
     },
     onError: (err: unknown) => {
       const ax = err as { response?: { data?: { message?: string } } }
@@ -438,6 +812,23 @@ export default function DomainQuickSettingsModal({ domain, open, onClose }: Prop
         </div>
 
         <div className="mb-5 rounded-xl border border-gray-200 p-4 dark:border-gray-700">
+          <div className="mb-4 rounded-lg border border-primary-200 bg-primary-50/70 p-3 dark:border-primary-900/40 dark:bg-primary-950/20">
+            <p className="text-sm font-semibold text-primary-900 dark:text-primary-200">{t('domains.auto_web_title')}</p>
+            <p className="mt-1 text-xs text-primary-800/90 dark:text-primary-200/90">{t('domains.auto_web_hint')}</p>
+            <button
+              type="button"
+              className="btn-primary mt-3 inline-flex items-center gap-2"
+              onClick={() => autoWebConfigM.mutate()}
+              disabled={autoWebConfigM.isPending}
+            >
+              {autoWebConfigM.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wand2 className="h-4 w-4" />}
+              {t('domains.auto_web_apply')}
+            </button>
+            {autoDetectSummary && (
+              <p className="mt-2 text-xs text-primary-900/90 dark:text-primary-200/90">{autoDetectSummary}</p>
+            )}
+          </div>
+
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="text-sm font-semibold text-gray-900 dark:text-white">{t('domains.perf_title')}</p>
@@ -474,6 +865,88 @@ export default function DomainQuickSettingsModal({ domain, open, onClose }: Prop
             )}
           </div>
         </div>
+
+        {vhostEditorActive && (
+          <div className="mb-5 rounded-xl border border-amber-200/80 bg-amber-50/40 p-4 dark:border-amber-900/50 dark:bg-amber-950/20">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                  {apacheForSite ? t('domains.apache_vhost_title') : t('domains.nginx_vhost_title')}
+                </p>
+                <p className="mt-0.5 text-xs text-gray-600 dark:text-gray-400">
+                  {apacheForSite ? t('domains.apache_vhost_hint') : t('domains.nginx_vhost_hint')}
+                </p>
+                <p className="mt-2 text-xs text-amber-900/90 dark:text-amber-200/90">{t('domains.vhost_safety_notice')}</p>
+              </div>
+            </div>
+            {vhostQ.data?.path ? (
+              <p className="mt-2 text-[11px] text-gray-500 dark:text-gray-400">
+                <span className="font-medium">{t('domains.nginx_vhost_path')}: </span>
+                <span className="break-all font-mono">{vhostQ.data.path}</span>
+              </p>
+            ) : null}
+            {vhostQ.isError && (
+              <p className="mt-2 text-xs text-red-600 dark:text-red-400">{t('domains.nginx_vhost_load_error')}</p>
+            )}
+            {vhostQ.data?._missing ? (
+              <p className="mt-2 text-xs text-amber-800 dark:text-amber-200">{t('domains.nginx_vhost_empty_hint')}</p>
+            ) : null}
+            <textarea
+              className="input mt-3 min-h-[280px] w-full resize-y font-mono text-xs leading-relaxed"
+              spellCheck={false}
+              value={vhostEditorText}
+              onChange={(e) => setVhostEditorText(e.target.value)}
+              disabled={vhostQ.isLoading || vhostSaveM.isPending || vhostRevertM.isPending}
+            />
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                className="btn-primary inline-flex items-center gap-2 text-xs"
+                disabled={vhostSaveM.isPending || vhostRevertM.isPending || vhostQ.isLoading}
+                onClick={() => {
+                  if (!window.confirm(t('domains.vhost_confirm_save'))) {
+                    return
+                  }
+                  vhostSaveM.mutate()
+                }}
+              >
+                {vhostSaveM.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                {apacheForSite ? t('domains.apache_vhost_reload') : t('domains.nginx_vhost_reload')}
+              </button>
+              <button
+                type="button"
+                className="btn-secondary inline-flex items-center gap-2 text-xs disabled:opacity-50"
+                disabled={
+                  vhostRevertM.isPending ||
+                  vhostSaveM.isPending ||
+                  vhostQ.isLoading ||
+                  !vhostQ.data?.can_revert
+                }
+                title={t('domains.vhost_revert_hint')}
+                onClick={() => {
+                  if (!window.confirm(t('domains.vhost_revert_confirm'))) {
+                    return
+                  }
+                  vhostRevertM.mutate()
+                }}
+              >
+                {vhostRevertM.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                {t('domains.vhost_revert_last')}
+              </button>
+              <button
+                type="button"
+                className="btn-secondary text-xs"
+                disabled={vhostQ.isFetching}
+                onClick={() => {
+                  setVhostEditorReady(false)
+                  void vhostQ.refetch()
+                }}
+              >
+                {t('domains.refresh')}
+              </button>
+            </div>
+          </div>
+        )}
 
         {sslPhase !== 'idle' && (
           <div className="mb-4 rounded-xl border border-primary-200 bg-primary-50/80 p-4 dark:border-primary-900/40 dark:bg-primary-950/30">

@@ -448,31 +448,43 @@ fi
 # Engine www-data iken nginx sites-enabled'a yazamaz; sudo ile izinli betikler
 if [[ -f "$REPO_ROOT/deploy/host/hostvim-nginx-vhost" ]]; then
   install -m 755 "$REPO_ROOT/deploy/host/hostvim-nginx-vhost" /usr/local/sbin/hostvim-nginx-vhost
+  ln -sfn /usr/local/sbin/hostvim-nginx-vhost /usr/local/sbin/panelsar-nginx-vhost
 fi
 if [[ -f "$REPO_ROOT/deploy/host/hostvim-stack-install" ]]; then
   install -m 755 "$REPO_ROOT/deploy/host/hostvim-stack-install" /usr/local/sbin/hostvim-stack-install
+  ln -sfn /usr/local/sbin/hostvim-stack-install /usr/local/sbin/panelsar-stack-install
 fi
 if [[ -f "$REPO_ROOT/deploy/host/hostvim-mail-stack-setup.sh" ]]; then
   install -m 755 "$REPO_ROOT/deploy/host/hostvim-mail-stack-setup.sh" /usr/local/sbin/hostvim-mail-stack-setup.sh
+  ln -sfn /usr/local/sbin/hostvim-mail-stack-setup.sh /usr/local/sbin/panelsar-mail-stack-setup.sh
 fi
 if [[ -f "$REPO_ROOT/deploy/host/hostvim-terminal-root" ]]; then
   install -m 755 "$REPO_ROOT/deploy/host/hostvim-terminal-root" /usr/local/sbin/hostvim-terminal-root
+  ln -sfn /usr/local/sbin/hostvim-terminal-root /usr/local/sbin/panelsar-terminal-root
 fi
 if [[ -f "$REPO_ROOT/deploy/host/hostvim-php-ini" ]]; then
   install -m 755 "$REPO_ROOT/deploy/host/hostvim-php-ini" /usr/local/sbin/hostvim-php-ini
+  ln -sfn /usr/local/sbin/hostvim-php-ini /usr/local/sbin/panelsar-php-ini
 fi
 if [[ -f "$REPO_ROOT/deploy/host/hostvim-security" ]]; then
   install -m 755 "$REPO_ROOT/deploy/host/hostvim-security" /usr/local/sbin/hostvim-security
+  ln -sfn /usr/local/sbin/hostvim-security /usr/local/sbin/panelsar-security
 fi
 if [[ -f "$REPO_ROOT/deploy/host/hostvim-cleaner" ]]; then
   install -m 755 "$REPO_ROOT/deploy/host/hostvim-cleaner" /usr/local/sbin/hostvim-cleaner
+  ln -sfn /usr/local/sbin/hostvim-cleaner /usr/local/sbin/panelsar-cleaner
 fi
 cat > /etc/sudoers.d/hostvim-engine <<'SUDOERS'
 www-data ALL=(root) NOPASSWD: /usr/local/sbin/hostvim-nginx-vhost
+www-data ALL=(root) NOPASSWD: /usr/local/sbin/panelsar-nginx-vhost
 www-data ALL=(root) NOPASSWD: /usr/local/sbin/hostvim-stack-install
+www-data ALL=(root) NOPASSWD: /usr/local/sbin/panelsar-stack-install
 www-data ALL=(root) NOPASSWD: /usr/local/sbin/hostvim-terminal-root
+www-data ALL=(root) NOPASSWD: /usr/local/sbin/panelsar-terminal-root
 www-data ALL=(root) NOPASSWD: /usr/local/sbin/hostvim-php-ini
+www-data ALL=(root) NOPASSWD: /usr/local/sbin/panelsar-php-ini
 www-data ALL=(root) NOPASSWD: /usr/local/sbin/hostvim-security
+www-data ALL=(root) NOPASSWD: /usr/local/sbin/panelsar-security
 SUDOERS
 chmod 440 /etc/sudoers.d/hostvim-engine
 visudo -cf /etc/sudoers.d/hostvim-engine
@@ -932,6 +944,14 @@ run_certbot_if_configured() {
 
 refresh_phpmysql_url_in_env
 run_certbot_if_configured
+
+if [[ -x /usr/local/sbin/hostvim-security ]]; then
+  echo "==> Security helper self-test"
+  if ! /usr/local/sbin/hostvim-security self-test; then
+    echo "Hata: hostvim-security self-test basarisiz. Geri alma icin son iyi yapiyi tekrar calistirin." >&2
+    exit 1
+  fi
+fi
 
 echo "==> Laravel onbellek + kurulum kontrolu (musterinin manuel komut calistirmasi gerekmez)"
 sudo -u www-data php "$PANEL_ROOT/artisan" config:cache

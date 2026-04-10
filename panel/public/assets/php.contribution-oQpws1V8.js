@@ -1,1 +1,0 @@
-import{_ as p}from"./index-DS9cDqpL.js";import{r as e}from"./_.contribution-B157lprA.js";e({id:"php",extensions:[".php",".php4",".php5",".phtml",".ctp"],aliases:["PHP","php"],mimetypes:["application/x-php"],loader:()=>p(()=>import("./php-BVQguGre.js"),[])});

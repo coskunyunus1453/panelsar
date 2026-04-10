@@ -244,7 +244,21 @@
           </div>
           <div class="ps-boot-status">
             <span class="ps-boot-dot" aria-hidden="true"></span>
-            <span>Uygulama yükleniyor…</span>
+            <span id="ps-boot-status-text">Uygulama yükleniyor…</span>
+          </div>
+          <div id="ps-boot-code" style="margin-top:6px;font-size:11px;color:#64748b;">
+            Kod: BOOT_LOADING
+          </div>
+          <div id="ps-boot-help" style="margin-top:10px;font-size:12px;color:#64748b;">
+            İlk yükleme birkaç saniye sürebilir.
+          </div>
+          <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">
+            <button id="ps-boot-retry" type="button" style="border:1px solid #cbd5e1;background:#fff;color:#0f172a;border-radius:8px;padding:6px 10px;font-size:12px;cursor:pointer;">
+              Yeniden dene
+            </button>
+            <button id="ps-boot-hard" type="button" style="border:1px solid #0ea5e9;background:#0ea5e9;color:#fff;border-radius:8px;padding:6px 10px;font-size:12px;cursor:pointer;">
+              Sert yenile (Ctrl+Shift+R)
+            </button>
           </div>
         </div>
         <p class="ps-boot-foot">
@@ -256,6 +270,69 @@
     <script>
       (function () {
         try {
+          var startedAt = Date.now()
+          var statusEl = document.getElementById('ps-boot-status-text')
+          var codeEl = document.getElementById('ps-boot-code')
+          var helpEl = document.getElementById('ps-boot-help')
+          var retryBtn = document.getElementById('ps-boot-retry')
+          var hardBtn = document.getElementById('ps-boot-hard')
+
+          function setBootMessage(status, help, code) {
+            if (statusEl) statusEl.textContent = status
+            if (helpEl) helpEl.textContent = help
+            if (codeEl) codeEl.textContent = 'Kod: ' + code
+          }
+
+          function networkHint() {
+            var online = typeof navigator !== 'undefined' ? navigator.onLine : true
+            if (!online) {
+              return 'İnternet bağlantısı görünmüyor. Bağlantıyı kontrol edip tekrar deneyin.'
+            }
+            return 'Ağ, önbellek veya asset yolu kaynaklı gecikme olabilir. Devam ederse Yeniden dene ile tekrar başlatın.'
+          }
+
+          if (retryBtn) {
+            retryBtn.addEventListener('click', function () {
+              window.location.reload()
+            })
+          }
+          if (hardBtn) {
+            hardBtn.addEventListener('click', function () {
+              var url = window.location.href
+              var sep = url.indexOf('?') >= 0 ? '&' : '?'
+              window.location.href = url + sep + 'hard_reload=' + Date.now()
+            })
+          }
+
+          setTimeout(function () {
+            setBootMessage('Panel biraz yavas aciliyor…', networkHint(), 'BOOT_SLOW_6S')
+          }, 6000)
+
+          setTimeout(function () {
+            setBootMessage(
+              'Yukleme beklenenden uzun surdu.',
+              'JS/CSS dosyalari yuklenemiyor olabilir. Sert yenile yapin; sorun devam ederse yoneticiye “asset 404 / base path” kontrolu iletin.',
+              'BOOT_TIMEOUT_15S'
+            )
+          }, 15000)
+
+          window.addEventListener('error', function (ev) {
+            try {
+              var target = ev && ev.target
+              var src = target && target.src ? String(target.src) : ''
+              var href = target && target.href ? String(target.href) : ''
+              if (src || href) {
+                setBootMessage(
+                  'Arayuz dosyalari yuklenemedi.',
+                  'Bir dosya acilamadi: ' + (src || href) + '. Muhtemel neden: cache veya yanlis base path.',
+                  'BOOT_ASSET_LOAD_ERROR'
+                )
+              } else {
+                setBootMessage('Uygulama baslatma hatasi.', 'Beklenmeyen bir JS hatasi olustu. Yeniden denemeyi deneyin.', 'BOOT_JS_RUNTIME_ERROR')
+              }
+            } catch (_) {}
+          }, true)
+
           var el = document.querySelector('script[type="module"][src*="assets/index"]')
           if (!el || !el.src) return
           var pathname = new URL(el.src, window.location.href).pathname
@@ -270,6 +347,10 @@
           })
           var bootImg = document.querySelector('#hostvim-boot img')
           if (bootImg) bootImg.setAttribute('src', iconPath)
+          var elapsed = Date.now() - startedAt
+          if (elapsed < 2000) {
+            setBootMessage('Uygulama yukleniyor…', 'Panel aciliyor, lutfen bekleyin.', 'BOOT_LOADING')
+          }
         } catch (e) {}
       })()
     </script>

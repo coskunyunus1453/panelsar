@@ -17,6 +17,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
+	"hostvim/engine/internal/apache"
 	"hostvim/engine/internal/backup"
 	"hostvim/engine/internal/config"
 	"hostvim/engine/internal/daemon"
@@ -466,18 +467,66 @@ func registerModuleRoutes(cfg *config.Config, d *daemon.Daemon, api *gin.RouterG
 	api.POST("/security/clamav/scan", func(c *gin.Context) {
 		var req struct {
 			Target string `json:"target"`
+			Domain string `json:"domain"`
 		}
 		_ = c.ShouldBindJSON(&req)
-		out, err := security.RunClamAVScan(req.Target)
+		scanPath, rerr := security.ResolveClamScanTarget(cfg, req.Target, req.Domain)
+		if rerr != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": rerr.Error()})
+			return
+		}
+		out, err := security.RunClamAVScan(cfg, scanPath)
+		summary := security.SummarizeClamScanOutput(out)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "output": out})
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "output": out, "scan": summary, "scan_path": scanPath})
 			return
 		}
 		ts := time.Now().UTC().Format(time.RFC3339)
 		_ = panelmirror.SecuritySetValue(cfg, "clamav_last_scan", ts)
 		c.JSON(http.StatusOK, gin.H{
-			"message":   "clamav scan completed",
-			"last_scan": ts,
+			"message":            "clamav scan completed",
+			"last_scan":          ts,
+			"scan_path":          scanPath,
+			"output":             out,
+			"infected_count":     summary.InfectedCount,
+			"infected_files":     summary.InfectedFiles,
+			"infected_truncated": summary.Truncated,
+		})
+	})
+	api.POST("/security/clamav/quarantine", func(c *gin.Context) {
+		var req struct {
+			Paths []string `json:"paths"`
+		}
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		res, err := security.QuarantineClamFiles(cfg, req.Paths)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"message": "quarantine completed", "moved": res})
+	})
+	api.POST("/security/clamav/maldet-scan", func(c *gin.Context) {
+		var req struct {
+			Target string `json:"target"`
+			Domain string `json:"domain"`
+		}
+		_ = c.ShouldBindJSON(&req)
+		scanPath, rerr := security.ResolveClamScanTarget(cfg, req.Target, req.Domain)
+		if rerr != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": rerr.Error()})
+			return
+		}
+		out, err := security.RunMaldetScan(cfg, scanPath)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "output": out, "scan_path": scanPath})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{
+			"message":   "maldet scan completed",
+			"scan_path": scanPath,
 			"output":    out,
 		})
 	})
@@ -508,6 +557,89 @@ func registerModuleRoutes(cfg *config.Config, d *daemon.Daemon, api *gin.RouterG
 			"report":  report,
 		})
 	})
+	api.GET("/security/intel/policy", func(c *gin.Context) {
+		policy, err := loadSecurityIntelPolicy(cfg)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"policy": policy})
+	})
+	api.POST("/security/intel/policy", func(c *gin.Context) {
+		var req securityIntelPolicy
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		if err := saveSecurityIntelPolicy(cfg, req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		policy, err := loadSecurityIntelPolicy(cfg)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		status, _ := loadSecurityIntelStatus(cfg)
+		status.ObserveOnly = strings.EqualFold(policy.Mode, "observe")
+		status.PrivateIPGeoBypass = true
+		status.EnforcementReady = true
+		status.LastUpdate = policy.UpdatedAt
+		_ = saveSecurityIntelStatus(cfg, status)
+		c.JSON(http.StatusOK, gin.H{"message": "intel policy updated", "policy": policy})
+	})
+	api.GET("/security/intel/status", func(c *gin.Context) {
+		status, err := loadSecurityIntelStatus(cfg)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"status": status})
+	})
+	api.GET("/security/fim/status", func(c *gin.Context) {
+		status, err := security.FimGetStatus(cfg)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		alerts, err := security.FimListAlerts(cfg, 30)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		status.Alerts = alerts
+		c.JSON(http.StatusOK, gin.H{"status": status})
+	})
+	api.POST("/security/fim/baseline", func(c *gin.Context) {
+		total, err := security.FimCreateBaseline(cfg)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"message": "fim baseline created", "total_tracked": total})
+	})
+	api.POST("/security/fim/scan", func(c *gin.Context) {
+		diffs, err := security.FimScan(cfg)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"message": "fim scan completed", "changed_count": len(diffs), "diffs": diffs})
+	})
+	api.GET("/security/alerts", func(c *gin.Context) {
+		limit := 50
+		if q := strings.TrimSpace(c.Query("limit")); q != "" {
+			if n, err := strconv.Atoi(q); err == nil && n > 0 && n <= 500 {
+				limit = n
+			}
+		}
+		alerts, err := security.FimListAlerts(cfg, limit)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"alerts": alerts})
+	})
 	api.POST("/security/firewall/rule", func(c *gin.Context) {
 		var body gin.H
 		if err := c.ShouldBindJSON(&body); err != nil {
@@ -519,6 +651,99 @@ func registerModuleRoutes(cfg *config.Config, d *daemon.Daemon, api *gin.RouterG
 			return
 		}
 		c.JSON(http.StatusAccepted, gin.H{"message": "firewall rule recorded"})
+	})
+	api.GET("/security/nginx/rate-limit/profile", func(c *gin.Context) {
+		prof, err := security.NginxRateLimitProfileGet()
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{
+			"profile": prof.Profile,
+			"limits":  prof.Limits,
+		})
+	})
+	api.POST("/security/nginx/rate-limit/profile", func(c *gin.Context) {
+		var req struct {
+			Profile string `json:"profile" binding:"required"`
+		}
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		prof := strings.ToLower(strings.TrimSpace(req.Profile))
+		if prof != "wordpress" && prof != "laravel" && prof != "api" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid profile"})
+			return
+		}
+		out, err := security.NginxRateLimitProfileSet(prof)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{
+			"message": "rate-limit profile updated",
+			"profile": out.Profile,
+			"limits":  out.Limits,
+		})
+	})
+	api.GET("/security/modsecurity/site-rules", func(c *gin.Context) {
+		rows, err := security.ModSecSiteRuleList()
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"rules": rows})
+	})
+	api.POST("/security/modsecurity/site-rule", func(c *gin.Context) {
+		var req struct {
+			Operation string `json:"operation"`
+			ID        string `json:"id"`
+			Domain    string `json:"domain"`
+			Mode      string `json:"mode"`
+			Target    string `json:"target"`
+		}
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		op := strings.ToLower(strings.TrimSpace(req.Operation))
+		if op == "" {
+			op = "add"
+		}
+		switch op {
+		case "add":
+			mode := strings.ToLower(strings.TrimSpace(req.Mode))
+			if mode != "allow" && mode != "deny" && mode != "exception" {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "invalid mode"})
+				return
+			}
+			if strings.TrimSpace(req.Domain) == "" {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "domain required"})
+				return
+			}
+			rule, err := security.ModSecSiteRuleAdd(req.Domain, mode, req.Target)
+			if err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+				return
+			}
+			c.JSON(http.StatusCreated, gin.H{
+				"message": "site rule added",
+				"rule":    rule,
+			})
+		case "remove":
+			if strings.TrimSpace(req.ID) == "" {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "id required"})
+				return
+			}
+			if err := security.ModSecSiteRuleRemove(req.ID); err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+				return
+			}
+			c.JSON(http.StatusOK, gin.H{"message": "site rule removed"})
+		default:
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid operation"})
+		}
 	})
 
 	api.GET("/cron", func(c *gin.Context) {
@@ -683,6 +908,313 @@ func registerModuleRoutes(cfg *config.Config, d *daemon.Daemon, api *gin.RouterG
 			outMode = "off"
 		}
 		c.JSON(http.StatusOK, gin.H{"domain": d, "performance_mode": outMode, "ok": true})
+	})
+
+	// Site bazlı nginx vhost (paths.vhosts_dir/hostvim-<domain>.conf + .hostvim-prev geri alma)
+	api.POST("/sites/:domain/nginx-vhost/revert", func(c *gin.Context) {
+		d := strings.ToLower(strings.TrimSpace(c.Param("domain")))
+		if d == "" || strings.Contains(d, "..") || !nginx.DomainSafe(d) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid domain"})
+			return
+		}
+		if !cfg.Hosting.NginxManageVhosts {
+			c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "nginx vhost management is disabled on this server"})
+			return
+		}
+		meta, err := sites.ReadSiteMeta(cfg.Paths.WebRoot, d)
+		if err != nil || meta == nil {
+			if err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			} else {
+				c.JSON(http.StatusNotFound, gin.H{"error": "site meta not found"})
+			}
+			return
+		}
+		if sites.NormalizeServerType(meta.ServerType) != "nginx" {
+			c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "site is not using nginx"})
+			return
+		}
+		path, perr := nginx.VhostFilePath(cfg, d)
+		if perr != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": perr.Error()})
+			return
+		}
+		if err := nginx.RevertVhostRaw(cfg, d); err != nil {
+			c.JSON(http.StatusUnprocessableEntity, gin.H{"error": err.Error(), "path": path})
+			return
+		}
+		canRev, _ := nginx.VhostCanRevert(cfg, d)
+		c.JSON(http.StatusOK, gin.H{
+			"domain":     d,
+			"path":         path,
+			"message":      "nginx vhost reverted to previous version",
+			"ok":           true,
+			"can_revert":   canRev,
+		})
+	})
+
+	api.GET("/sites/:domain/nginx-vhost", func(c *gin.Context) {
+		d := strings.ToLower(strings.TrimSpace(c.Param("domain")))
+		if d == "" || strings.Contains(d, "..") || !nginx.DomainSafe(d) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid domain"})
+			return
+		}
+		if !cfg.Hosting.NginxManageVhosts {
+			c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "nginx vhost management is disabled on this server"})
+			return
+		}
+		meta, err := sites.ReadSiteMeta(cfg.Paths.WebRoot, d)
+		if err != nil || meta == nil {
+			if err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			} else {
+				c.JSON(http.StatusNotFound, gin.H{"error": "site meta not found"})
+			}
+			return
+		}
+		if sites.NormalizeServerType(meta.ServerType) != "nginx" {
+			c.JSON(http.StatusUnprocessableEntity, gin.H{
+				"error":       "site is not using nginx",
+				"server_type": strings.TrimSpace(meta.ServerType),
+			})
+			return
+		}
+		path, perr := nginx.VhostFilePath(cfg, d)
+		if perr != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": perr.Error()})
+			return
+		}
+		canRev, _ := nginx.VhostCanRevert(cfg, d)
+		b, rerr := nginx.ReadVhostFile(cfg, d)
+		if rerr != nil {
+			if errors.Is(rerr, os.ErrNotExist) {
+				c.JSON(http.StatusNotFound, gin.H{
+					"error":       "nginx vhost file not found",
+					"path":        path,
+					"hint":        "activate the site or switch server type to nginx to generate the vhost",
+					"domain":      d,
+					"can_revert":  canRev,
+					"content":     "",
+				})
+				return
+			}
+			c.JSON(http.StatusInternalServerError, gin.H{"error": rerr.Error(), "path": path})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{
+			"domain":      d,
+			"path":        path,
+			"content":     string(b),
+			"can_revert":  canRev,
+		})
+	})
+
+	api.PUT("/sites/:domain/nginx-vhost", func(c *gin.Context) {
+		d := strings.ToLower(strings.TrimSpace(c.Param("domain")))
+		if d == "" || strings.Contains(d, "..") || !nginx.DomainSafe(d) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid domain"})
+			return
+		}
+		if !cfg.Hosting.NginxManageVhosts {
+			c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "nginx vhost management is disabled on this server"})
+			return
+		}
+		var req struct {
+			Content string `json:"content" binding:"required"`
+		}
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		meta, err := sites.ReadSiteMeta(cfg.Paths.WebRoot, d)
+		if err != nil || meta == nil {
+			if err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			} else {
+				c.JSON(http.StatusNotFound, gin.H{"error": "site meta not found"})
+			}
+			return
+		}
+		if sites.NormalizeServerType(meta.ServerType) != "nginx" {
+			c.JSON(http.StatusUnprocessableEntity, gin.H{
+				"error":       "site is not using nginx",
+				"server_type": strings.TrimSpace(meta.ServerType),
+			})
+			return
+		}
+		path, perr := nginx.VhostFilePath(cfg, d)
+		if perr != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": perr.Error()})
+			return
+		}
+		if err := nginx.WriteVhostRaw(cfg, d, []byte(req.Content)); err != nil {
+			c.JSON(http.StatusUnprocessableEntity, gin.H{
+				"error": err.Error(),
+				"path":  path,
+			})
+			return
+		}
+		canRev, _ := nginx.VhostCanRevert(cfg, d)
+		c.JSON(http.StatusOK, gin.H{
+			"domain":      d,
+			"path":        path,
+			"message":     "nginx vhost updated and reloaded",
+			"ok":          true,
+			"can_revert":  canRev,
+		})
+	})
+
+	api.POST("/sites/:domain/apache-vhost/revert", func(c *gin.Context) {
+		d := strings.ToLower(strings.TrimSpace(c.Param("domain")))
+		if d == "" || strings.Contains(d, "..") || !nginx.DomainSafe(d) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid domain"})
+			return
+		}
+		if !cfg.Hosting.ApacheManageVhosts {
+			c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "apache vhost management is disabled on this server"})
+			return
+		}
+		meta, err := sites.ReadSiteMeta(cfg.Paths.WebRoot, d)
+		if err != nil || meta == nil {
+			if err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			} else {
+				c.JSON(http.StatusNotFound, gin.H{"error": "site meta not found"})
+			}
+			return
+		}
+		if sites.NormalizeServerType(meta.ServerType) != "apache" {
+			c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "site is not using apache"})
+			return
+		}
+		path, perr := apache.VhostFilePath(cfg, d)
+		if perr != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": perr.Error()})
+			return
+		}
+		if err := apache.RevertVhostRaw(cfg, d); err != nil {
+			c.JSON(http.StatusUnprocessableEntity, gin.H{"error": err.Error(), "path": path})
+			return
+		}
+		canRev, _ := apache.VhostCanRevert(cfg, d)
+		c.JSON(http.StatusOK, gin.H{
+			"domain":     d,
+			"path":       path,
+			"message":    "apache vhost reverted to previous version",
+			"ok":         true,
+			"can_revert": canRev,
+		})
+	})
+
+	api.GET("/sites/:domain/apache-vhost", func(c *gin.Context) {
+		d := strings.ToLower(strings.TrimSpace(c.Param("domain")))
+		if d == "" || strings.Contains(d, "..") || !nginx.DomainSafe(d) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid domain"})
+			return
+		}
+		if !cfg.Hosting.ApacheManageVhosts {
+			c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "apache vhost management is disabled on this server"})
+			return
+		}
+		meta, err := sites.ReadSiteMeta(cfg.Paths.WebRoot, d)
+		if err != nil || meta == nil {
+			if err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			} else {
+				c.JSON(http.StatusNotFound, gin.H{"error": "site meta not found"})
+			}
+			return
+		}
+		if sites.NormalizeServerType(meta.ServerType) != "apache" {
+			c.JSON(http.StatusUnprocessableEntity, gin.H{
+				"error":       "site is not using apache",
+				"server_type": strings.TrimSpace(meta.ServerType),
+			})
+			return
+		}
+		path, perr := apache.VhostFilePath(cfg, d)
+		if perr != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": perr.Error()})
+			return
+		}
+		canRev, _ := apache.VhostCanRevert(cfg, d)
+		b, rerr := apache.ReadVhostFile(cfg, d)
+		if rerr != nil {
+			if errors.Is(rerr, os.ErrNotExist) {
+				c.JSON(http.StatusNotFound, gin.H{
+					"error":       "apache vhost file not found",
+					"path":        path,
+					"hint":        "activate the site or switch server type to apache to generate the vhost",
+					"domain":      d,
+					"can_revert":  canRev,
+					"content":     "",
+				})
+				return
+			}
+			c.JSON(http.StatusInternalServerError, gin.H{"error": rerr.Error(), "path": path})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{
+			"domain":      d,
+			"path":        path,
+			"content":     string(b),
+			"can_revert":  canRev,
+		})
+	})
+
+	api.PUT("/sites/:domain/apache-vhost", func(c *gin.Context) {
+		d := strings.ToLower(strings.TrimSpace(c.Param("domain")))
+		if d == "" || strings.Contains(d, "..") || !nginx.DomainSafe(d) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid domain"})
+			return
+		}
+		if !cfg.Hosting.ApacheManageVhosts {
+			c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "apache vhost management is disabled on this server"})
+			return
+		}
+		var req struct {
+			Content string `json:"content" binding:"required"`
+		}
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		meta, err := sites.ReadSiteMeta(cfg.Paths.WebRoot, d)
+		if err != nil || meta == nil {
+			if err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			} else {
+				c.JSON(http.StatusNotFound, gin.H{"error": "site meta not found"})
+			}
+			return
+		}
+		if sites.NormalizeServerType(meta.ServerType) != "apache" {
+			c.JSON(http.StatusUnprocessableEntity, gin.H{
+				"error":       "site is not using apache",
+				"server_type": strings.TrimSpace(meta.ServerType),
+			})
+			return
+		}
+		path, perr := apache.VhostFilePath(cfg, d)
+		if perr != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": perr.Error()})
+			return
+		}
+		if err := apache.WriteVhostRaw(cfg, d, []byte(req.Content)); err != nil {
+			c.JSON(http.StatusUnprocessableEntity, gin.H{
+				"error": err.Error(),
+				"path":  path,
+			})
+			return
+		}
+		canRev, _ := apache.VhostCanRevert(cfg, d)
+		c.JSON(http.StatusOK, gin.H{
+			"domain":      d,
+			"path":        path,
+			"message":     "apache vhost updated and reloaded",
+			"ok":          true,
+			"can_revert":  canRev,
+		})
 	})
 
 	api.POST("/license/validate", func(c *gin.Context) {
@@ -1528,15 +2060,15 @@ func listProcesses() ([]gin.H, error) {
 func handleInstallerInstall(cfg *config.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var req struct {
-			App                  string `json:"app" binding:"required"`
-			Domain               string `json:"domain" binding:"required"`
-			DbHost               string `json:"db_host"`
-			DbPort               int    `json:"db_port"`
-			DbName               string `json:"db_name"`
-			DbUser               string `json:"db_user"`
-			DbPassword           string `json:"db_password"`
-			TablePrefix          string `json:"table_prefix"`
-			InstallWooCommerce   bool   `json:"install_woocommerce"`
+			App                string `json:"app" binding:"required"`
+			Domain             string `json:"domain" binding:"required"`
+			DbHost             string `json:"db_host"`
+			DbPort             int    `json:"db_port"`
+			DbName             string `json:"db_name"`
+			DbUser             string `json:"db_user"`
+			DbPassword         string `json:"db_password"`
+			TablePrefix        string `json:"table_prefix"`
+			InstallWooCommerce bool   `json:"install_woocommerce"`
 		}
 		if err := c.ShouldBindJSON(&req); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})

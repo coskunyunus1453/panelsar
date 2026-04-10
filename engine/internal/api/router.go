@@ -1,25 +1,29 @@
 package api
 
 import (
+	"errors"
+	"fmt"
 	"io"
-	"os"
 	"net/http"
+	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"syscall"
 
 	"github.com/gin-gonic/gin"
+	"github.com/sirupsen/logrus"
 	"hostvim/engine/internal/config"
 	"hostvim/engine/internal/daemon"
 	"hostvim/engine/internal/hosting"
+	"hostvim/engine/internal/metrics"
 	"hostvim/engine/internal/middleware"
 	"hostvim/engine/internal/nginx"
 	"hostvim/engine/internal/phpfpm"
 	"hostvim/engine/internal/sites"
-	"hostvim/engine/internal/metrics"
 	"hostvim/engine/internal/ssl"
 	"hostvim/engine/internal/terminal"
-	"github.com/sirupsen/logrus"
 )
 
 func NewRouter(cfg *config.Config, d *daemon.Daemon, log *logrus.Logger) *gin.Engine {
@@ -247,10 +251,10 @@ func handleCreateSite(cfg *config.Config, d *daemon.Daemon) gin.HandlerFunc {
 
 func phpfpmSettings(cfg *config.Config) phpfpm.HostingPoolSettings {
 	return phpfpm.HostingPoolSettings{
-		PoolDirTemplate:  cfg.Hosting.PHPFPMpoolDirTemplate,
-		SocketListenDir:  cfg.Hosting.PHPFPMlistenDir,
-		FPMUser:          cfg.Hosting.PHPFPMpoolUser,
-		FPMGroup:         cfg.Hosting.PHPFPMpoolGroup,
+		PoolDirTemplate: cfg.Hosting.PHPFPMpoolDirTemplate,
+		SocketListenDir: cfg.Hosting.PHPFPMlistenDir,
+		FPMUser:         cfg.Hosting.PHPFPMpoolUser,
+		FPMGroup:        cfg.Hosting.PHPFPMpoolGroup,
 	}
 }
 
@@ -505,6 +509,16 @@ func tailFile(path string, lines int, maxBytes int64) (string, bool, string) {
 		if os.IsNotExist(err) {
 			return "", false, ""
 		}
+		if isPermissionDenied(err) {
+			content, eerr := tailFileElevated(path, lines)
+			if eerr == nil {
+				return content, true, ""
+			}
+			if errors.Is(eerr, os.ErrNotExist) {
+				return "", false, ""
+			}
+			return "", false, eerr.Error()
+		}
 		return "", false, err.Error()
 	}
 	if st.IsDir() {
@@ -512,6 +526,16 @@ func tailFile(path string, lines int, maxBytes int64) (string, bool, string) {
 	}
 	f, err := os.Open(path)
 	if err != nil {
+		if isPermissionDenied(err) {
+			content, eerr := tailFileElevated(path, lines)
+			if eerr == nil {
+				return content, true, ""
+			}
+			if errors.Is(eerr, os.ErrNotExist) {
+				return "", false, ""
+			}
+			return "", true, eerr.Error()
+		}
 		return "", true, err.Error()
 	}
 	defer f.Close()
@@ -542,6 +566,42 @@ func tailFile(path string, lines int, maxBytes int64) (string, bool, string) {
 		all = all[len(all)-lines:]
 	}
 	return strings.Join(all, "\n"), true, ""
+}
+
+func isPermissionDenied(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, os.ErrPermission) {
+		return true
+	}
+	var pe *os.PathError
+	if errors.As(err, &pe) {
+		return errors.Is(pe.Err, syscall.EACCES) || errors.Is(pe.Err, syscall.EPERM)
+	}
+	return strings.Contains(strings.ToLower(err.Error()), "permission denied")
+}
+
+func tailFileElevated(path string, lines int) (string, error) {
+	if lines < 20 {
+		lines = 20
+	}
+	if lines > 5000 {
+		lines = 5000
+	}
+	cmd := exec.Command("sudo", "-n", "/usr/local/sbin/hostvim-security", "log-tail", path, strconv.Itoa(lines))
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		msg := strings.TrimSpace(string(out))
+		if strings.Contains(strings.ToLower(msg), "not found") {
+			return "", os.ErrNotExist
+		}
+		if msg == "" {
+			msg = err.Error()
+		}
+		return "", fmt.Errorf("elevated log read failed: %s", msg)
+	}
+	return string(out), nil
 }
 
 func handleIssueSSL(cfg *config.Config) gin.HandlerFunc {
@@ -725,10 +785,10 @@ func handleAddSubdomain(cfg *config.Config, d *daemon.Daemon) gin.HandlerFunc {
 			return
 		}
 		c.JSON(http.StatusCreated, gin.H{
-			"message":        "subdomain created",
-			"document_root":  docRoot,
-			"hostname":       req.Hostname,
-			"path_segment":   req.PathSegment,
+			"message":       "subdomain created",
+			"document_root": docRoot,
+			"hostname":      req.Hostname,
+			"path_segment":  req.PathSegment,
 		})
 	}
 }

@@ -19,6 +19,8 @@ use App\Http\Controllers\Api\DeploymentController;
 use App\Http\Controllers\Api\DnsRecordController;
 use App\Http\Controllers\Api\DocumentRootController;
 use App\Http\Controllers\Api\DomainController;
+use App\Http\Controllers\Api\DomainApacheVhostController;
+use App\Http\Controllers\Api\DomainNginxVhostController;
 use App\Http\Controllers\Api\EmailAccountController;
 use App\Http\Controllers\Api\FileManagerController;
 use App\Http\Controllers\Api\FtpController;
@@ -112,6 +114,12 @@ Route::middleware(['auth:sanctum', 'abilities:access:customer-panel', 'require_p
         Route::post('domains/{domain}/document-root', [DocumentRootController::class, 'update']);
         Route::get('domains/{domain}/performance', [PerformanceController::class, 'show']);
         Route::post('domains/{domain}/performance', [PerformanceController::class, 'update']);
+        Route::get('domains/{domain}/nginx-vhost', [DomainNginxVhostController::class, 'show']);
+        Route::put('domains/{domain}/nginx-vhost', [DomainNginxVhostController::class, 'update']);
+        Route::post('domains/{domain}/nginx-vhost/revert', [DomainNginxVhostController::class, 'revert']);
+        Route::get('domains/{domain}/apache-vhost', [DomainApacheVhostController::class, 'show']);
+        Route::put('domains/{domain}/apache-vhost', [DomainApacheVhostController::class, 'update']);
+        Route::post('domains/{domain}/apache-vhost/revert', [DomainApacheVhostController::class, 'revert']);
     });
 
     Route::middleware('ability:databases:read')->group(function () {
@@ -232,6 +240,12 @@ Route::middleware(['auth:sanctum', 'abilities:access:customer-panel', 'require_p
     Route::middleware('ability:dashboard:read')->get('domains/{domain}/ai/slow-site', [AiAdvisorController::class, 'slowSite']);
 
     Route::middleware('ability:security:read')->get('security/overview', [SecurityController::class, 'overview']);
+    Route::middleware('ability:security:read')->get('security/rate-limit/profile', [SecurityController::class, 'getRateLimitProfile']);
+    Route::middleware('ability:security:read')->get('security/modsecurity/site-rules', [SecurityController::class, 'getModSecuritySiteRules']);
+    Route::middleware('ability:security:read')->get('security/intel/policy', [SecurityController::class, 'intelPolicy']);
+    Route::middleware('ability:security:read')->get('security/intel/status', [SecurityController::class, 'intelStatus']);
+    Route::middleware('ability:security:read')->get('security/fim/status', [SecurityController::class, 'fimStatus']);
+    Route::middleware('ability:security:read')->get('security/alerts', [SecurityController::class, 'alerts']);
     Route::middleware(['role:admin', 'ability:security:write'])->group(function () {
         Route::post('security/firewall', [SecurityController::class, 'firewall']);
         Route::post('security/fail2ban/toggle', [SecurityController::class, 'toggleFail2ban']);
@@ -241,7 +255,15 @@ Route::middleware(['auth:sanctum', 'abilities:access:customer-panel', 'require_p
         Route::post('security/modsecurity/install', [SecurityController::class, 'installModSecurity']);
         Route::post('security/clamav/toggle', [SecurityController::class, 'toggleClamav']);
         Route::post('security/clamav/scan', [SecurityController::class, 'scanClamav']);
+        Route::post('security/clamav/quarantine', [SecurityController::class, 'quarantineClamav']);
+        Route::post('security/clamav/maldet-scan', [SecurityController::class, 'scanMaldet']);
         Route::post('security/mail/reconcile', [SecurityController::class, 'reconcileMailState']);
+        Route::post('security/rate-limit/profile', [SecurityController::class, 'setRateLimitProfile']);
+        Route::post('security/modsecurity/site-rule', [SecurityController::class, 'addModSecuritySiteRule']);
+        Route::delete('security/modsecurity/site-rule', [SecurityController::class, 'removeModSecuritySiteRule']);
+        Route::post('security/intel/policy', [SecurityController::class, 'updateIntelPolicy']);
+        Route::post('security/fim/baseline', [SecurityController::class, 'createFimBaseline']);
+        Route::post('security/fim/scan', [SecurityController::class, 'runFimScan']);
     });
 
     Route::middleware('ability:installer:read')->get('installer/apps', [InstallerController::class, 'apps']);

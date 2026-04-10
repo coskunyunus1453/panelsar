@@ -9,10 +9,14 @@ case "$ACTION" in
   enable)
     CONF="$ARG"
     [[ -f "$CONF" ]] || { echo "hostvim-nginx-vhost: conf yok: $CONF" >&2; exit 1; }
-    [[ "$CONF" =~ ^/var/www/[^/]+/data/vhosts/(hostvim|panelsar)-[a-zA-Z0-9.-]+\.conf$ ]] || {
+    # Prod: /var/www/.../data/vhosts/ — geliştirme: /etc/nginx/sites-available/
+    if [[ "$CONF" =~ ^/var/www/[^/]+/data/vhosts/(hostvim|panelsar)-[a-zA-Z0-9.-]+\.conf$ ]] ||
+      [[ "$CONF" =~ ^/etc/nginx/sites-available/(hostvim|panelsar)-[a-zA-Z0-9.-]+\.conf$ ]]; then
+      :
+    else
       echo "hostvim-nginx-vhost: izin verilmeyen conf yolu" >&2
       exit 1
-    }
+    fi
     BASE="$(basename "$CONF")"
     TARGET="/etc/nginx/sites-enabled/${BASE}"
     OLD_ABS=""

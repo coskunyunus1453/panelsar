@@ -1,4 +1,4 @@
-import{m as I}from"./_.contribution-B157lprA.js";import{t as M}from"./editor.main-C1rp5heT.js";import"./index-DS9cDqpL.js";import"./css.contribution-C-6SYHWc.js";import"./html.contribution-D722BQbn.js";import"./javascript.contribution-BrSFz8tN.js";import"./php.contribution-oQpws1V8.js";/*!-----------------------------------------------------------------------------
+import{m as I}from"./_.contribution-B157lprA.js";import{t as M}from"./editor.main-DSS0nZfn.js";import"./index-D6rKt4QJ.js";import"./css.contribution-B27etu4V.js";import"./html.contribution-DXPgdHQW.js";import"./javascript.contribution-5B4VmpTi.js";import"./php.contribution-DrDBmDnd.js";/*!-----------------------------------------------------------------------------
  * Copyright (c) Microsoft Corporation. All rights reserved.
  * Version: 0.53.0(4e45ba0c5ff45fc61c0ccac61c0987369df04a6e)
  * Released under the MIT license

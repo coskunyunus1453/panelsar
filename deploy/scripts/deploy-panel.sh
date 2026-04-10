@@ -25,6 +25,18 @@ if command -v git >/dev/null 2>&1; then
   fi
 fi
 
+# Engine'nin sudo ile çağırdığı yardımcı; panel deploy'da da repo sürümüne sabitlenir.
+if [[ -f "$REPO_ROOT/deploy/host/hostvim-security" ]]; then
+  echo "==> /usr/local/sbin/hostvim-security (repo ile güncelle)"
+  sudo install -m 755 "$REPO_ROOT/deploy/host/hostvim-security" /usr/local/sbin/hostvim-security
+  sudo ln -sfn /usr/local/sbin/hostvim-security /usr/local/sbin/panelsar-security
+fi
+if [[ -f "$REPO_ROOT/deploy/host/hostvim-nginx-vhost" ]]; then
+  echo "==> /usr/local/sbin/hostvim-nginx-vhost (repo ile güncelle)"
+  sudo install -m 755 "$REPO_ROOT/deploy/host/hostvim-nginx-vhost" /usr/local/sbin/hostvim-nginx-vhost
+  sudo ln -sfn /usr/local/sbin/hostvim-nginx-vhost /usr/local/sbin/panelsar-nginx-vhost
+fi
+
 cd "$PANEL_ROOT"
 
 echo "==> composer install"
