@@ -42,6 +42,25 @@ function grantHostSelectOptions(current?: string | null): string[] {
   return base
 }
 
+function legacyCopyText(value: string): boolean {
+  try {
+    const ta = document.createElement('textarea')
+    ta.value = value
+    ta.setAttribute('readonly', 'true')
+    ta.style.position = 'fixed'
+    ta.style.top = '-9999px'
+    ta.style.left = '-9999px'
+    document.body.appendChild(ta)
+    ta.select()
+    ta.setSelectionRange(0, ta.value.length)
+    const ok = document.execCommand('copy')
+    document.body.removeChild(ta)
+    return ok
+  } catch {
+    return false
+  }
+}
+
 export default function DatabasesPage() {
   const { t } = useTranslation()
   const qc = useQueryClient()
@@ -267,7 +286,10 @@ export default function DatabasesPage() {
         )
         return
       }
-      window.open(php, '_blank', 'noopener,noreferrer')
+      const u = new URL(php)
+      u.searchParams.set('db', db.name)
+      u.searchParams.set('pma_username', db.username)
+      window.open(u.toString(), '_blank', 'noopener,noreferrer')
       return
     }
     if (db.type === 'postgresql') {
@@ -275,7 +297,10 @@ export default function DatabasesPage() {
         toast.error(t('databases.ui_url_missing') + ' ADMINER_URL')
         return
       }
-      window.open(adm, '_blank', 'noopener,noreferrer')
+      const u = new URL(adm)
+      u.searchParams.set('username', db.username)
+      u.searchParams.set('db', db.name)
+      window.open(u.toString(), '_blank', 'noopener,noreferrer')
       return
     }
     toast.error(t('databases.no_web_ui_for_type'))
@@ -283,9 +308,19 @@ export default function DatabasesPage() {
 
   const copyText = async (text: string, okMsg: string) => {
     try {
-      await navigator.clipboard.writeText(text)
+      if (navigator.clipboard?.writeText && window.isSecureContext) {
+        await navigator.clipboard.writeText(text)
+      } else {
+        const ok = legacyCopyText(text)
+        if (!ok) throw new Error('copy-failed')
+      }
       toast.success(okMsg)
     } catch {
+      const ok = legacyCopyText(text)
+      if (ok) {
+        toast.success(okMsg)
+        return
+      }
       toast.error(t('databases.copy_failed'))
     }
   }

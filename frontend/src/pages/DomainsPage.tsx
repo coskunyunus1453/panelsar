@@ -99,6 +99,7 @@ export default function DomainsPage() {
   const qc = useQueryClient()
   const [search, setSearch] = useState('')
   const [showAdd, setShowAdd] = useState(false)
+  const [issueLeOnCreate, setIssueLeOnCreate] = useState(true)
   const [deleteTarget, setDeleteTarget] = useState<DomainRow | null>(null)
   const [quickTarget, setQuickTarget] = useState<DomainRow | null>(null)
   const [busy, setBusy] = useState<Record<number, Busy>>({})
@@ -165,12 +166,36 @@ export default function DomainsPage() {
     }
   }, [])
 
+  type CreateDomainResponse = {
+    message?: string
+    ssl?: {
+      ok: boolean
+      message?: string
+      diagnostics?: { key: string; ok: boolean; message: string }[]
+    } | null
+  }
+
   const createM = useMutation({
-    mutationFn: async (payload: { name: string; php_version: string; server_type: string }) => {
-      await api.post('/domains', payload)
+    mutationFn: async (payload: {
+      name: string
+      php_version: string
+      server_type: string
+      issue_lets_encrypt: boolean
+      lets_encrypt_email?: string
+    }) => {
+      const { data } = await api.post<CreateDomainResponse>('/domains', payload)
+      return data
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       toast.success(t('domains.created'))
+      if (data?.ssl) {
+        if (data.ssl.ok) {
+          toast.success(data.ssl.message?.trim() || t('domains.ssl_create_success'))
+        } else {
+          const detail = data.ssl.message?.trim() || t('domains.ssl_create_unknown')
+          toast.error(`${t('domains.ssl_create_failed_prefix')}: ${detail}`, { duration: 8000 })
+        }
+      }
       qc.invalidateQueries({ queryKey: ['domains'] })
       setShowAdd(false)
     },
@@ -480,10 +505,13 @@ export default function DomainsPage() {
               onSubmit={(ev) => {
                 ev.preventDefault()
                 const fd = new FormData(ev.currentTarget)
+                const emailRaw = String(fd.get('lets_encrypt_email') || '').trim()
                 createM.mutate({
                   name: String(fd.get('name') || '').trim(),
                   php_version: String(fd.get('php_version') || '8.2'),
                   server_type: String(fd.get('server_type') || 'nginx'),
+                  issue_lets_encrypt: issueLeOnCreate,
+                  lets_encrypt_email: emailRaw !== '' ? emailRaw : undefined,
                 })
               }}
             >
@@ -509,12 +537,44 @@ export default function DomainsPage() {
                   <option value="openlitespeed">{t('domains.server_openlitespeed')}</option>
                 </select>
               </div>
+              <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-gray-200 p-3 dark:border-gray-700">
+                <input
+                  type="checkbox"
+                  className="mt-0.5"
+                  checked={issueLeOnCreate}
+                  onChange={(e) => setIssueLeOnCreate(e.target.checked)}
+                />
+                <span>
+                  <span className="block text-sm font-medium text-gray-900 dark:text-white">
+                    {t('domains.issue_lets_encrypt')}
+                  </span>
+                  <span className="mt-0.5 block text-xs text-gray-500 dark:text-gray-400">
+                    {t('domains.issue_lets_encrypt_hint')}
+                  </span>
+                </span>
+              </label>
+              {issueLeOnCreate && (
+                <div>
+                  <label className="label">{t('domains.lets_encrypt_email_optional')}</label>
+                  <input
+                    name="lets_encrypt_email"
+                    type="email"
+                    className="input w-full"
+                    placeholder={t('domains.lets_encrypt_email_placeholder')}
+                    autoComplete="email"
+                  />
+                </div>
+              )}
               <div className="flex justify-end gap-2 pt-2">
                 <button type="button" className="btn-secondary" onClick={() => setShowAdd(false)}>
                   {t('common.cancel')}
                 </button>
                 <button type="submit" className="btn-primary" disabled={createM.isPending}>
-                  {t('common.create')}
+                  {createM.isPending
+                    ? issueLeOnCreate
+                      ? t('domains.creating_with_ssl')
+                      : t('domains.creating')
+                    : t('common.create')}
                 </button>
               </div>
             </form>

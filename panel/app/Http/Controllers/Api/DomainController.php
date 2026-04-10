@@ -7,6 +7,8 @@ use App\Models\Domain;
 use App\Services\DomainService;
 use App\Services\EngineApiService;
 use App\Services\HostingQuotaService;
+use App\Services\SafeAuditLogger;
+use App\Services\SslIssueService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -16,6 +18,7 @@ class DomainController extends Controller
         private DomainService $domainService,
         private HostingQuotaService $quota,
         private EngineApiService $engine,
+        private SslIssueService $sslIssue,
     ) {}
 
     public function index(Request $request): JsonResponse
@@ -34,6 +37,8 @@ class DomainController extends Controller
             'name' => 'required|string|max:255',
             'php_version' => 'nullable|string|in:7.4,8.0,8.1,8.2,8.3,8.4',
             'server_type' => 'nullable|string|in:nginx,apache,openlitespeed',
+            'issue_lets_encrypt' => 'nullable|boolean',
+            'lets_encrypt_email' => 'nullable|email',
         ]);
 
         $this->quota->ensureCanCreateDomain($request->user());
@@ -45,9 +50,25 @@ class DomainController extends Controller
             $validated['server_type'] ?? 'nginx',
         );
 
+        $ssl = null;
+        if ($request->boolean('issue_lets_encrypt')) {
+            $ssl = $this->sslIssue->issue(
+                $request->user(),
+                $domain->fresh(),
+                $validated['lets_encrypt_email'] ?? null,
+                config('hostvim.lets_encrypt_email') ?: null
+            );
+            SafeAuditLogger::info('domains.create_ssl_attempt', [
+                'user_id' => $request->user()->id,
+                'domain_id' => $domain->id,
+                'ok' => $ssl['ok'] ?? false,
+            ], $request);
+        }
+
         return response()->json([
             'message' => __('domains.created'),
-            'domain' => $domain,
+            'domain' => $domain->fresh(['sslCertificate']),
+            'ssl' => $ssl,
         ], 201);
     }
 
