@@ -160,12 +160,15 @@ class DomainService
      *
      * @return array<string, mixed>
      */
-    public function setDocumentRootVariant(Domain $domain, string $variant): array
+    public function setDocumentRootVariant(
+        Domain $domain,
+        ?string $variant = null,
+        ?string $profile = null,
+        ?string $customPath = null,
+    ): array
     {
-        $variant = in_array($variant, ['root', 'public'], true) ? $variant : 'root';
-
-        return DB::transaction(function () use ($domain, $variant): array {
-            $resp = $this->engineApi->setSiteDocumentRoot($domain->name, $variant);
+        return DB::transaction(function () use ($domain, $variant, $profile, $customPath): array {
+            $resp = $this->engineApi->setSiteDocumentRoot($domain->name, $variant, $profile, $customPath);
             if (! empty($resp['error'])) {
                 return $resp;
             }

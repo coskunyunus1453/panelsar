@@ -24,10 +24,20 @@ class DocumentRootController extends Controller
         }
 
         $validated = $request->validate([
-            'variant' => ['required', 'string', 'in:root,public'],
+            'variant' => ['nullable', 'string', 'in:root,public'],
+            'profile' => ['nullable', 'string', 'max:64'],
+            'custom_path' => ['nullable', 'string', 'max:255'],
         ]);
+        if (! isset($validated['variant']) && ! isset($validated['profile']) && ! isset($validated['custom_path'])) {
+            return response()->json(['message' => 'variant, profile veya custom_path gerekli.'], 422);
+        }
 
-        $result = $this->domains->setDocumentRootVariant($domain, (string) $validated['variant']);
+        $result = $this->domains->setDocumentRootVariant(
+            $domain,
+            isset($validated['variant']) ? (string) $validated['variant'] : null,
+            isset($validated['profile']) ? (string) $validated['profile'] : null,
+            isset($validated['custom_path']) ? (string) $validated['custom_path'] : null,
+        );
 
         if (! empty($result['error'])) {
             return response()->json(['message' => (string) $result['error']], 422);
@@ -35,7 +45,7 @@ class DocumentRootController extends Controller
 
         return response()->json([
             'domain' => $domain->name,
-            'variant' => $result['variant'] ?? (string) $validated['variant'],
+            'variant' => $result['variant'] ?? (isset($validated['variant']) ? (string) $validated['variant'] : null),
             'document_root' => $result['document_root'] ?? $domain->fresh()->document_root,
         ]);
     }

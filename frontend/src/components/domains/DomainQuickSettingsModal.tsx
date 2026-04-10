@@ -285,6 +285,8 @@ export default function DomainQuickSettingsModal({ domain, open, onClose }: Prop
 
       let rootEntries: Array<{ name?: string; type?: string }> = []
       let publicEntries: Array<{ name?: string; type?: string }> = []
+      let publicHtmlEntries: Array<{ name?: string; type?: string }> = []
+      let publicHtmlPublicEntries: Array<{ name?: string; type?: string }> = []
       try {
         rootEntries = await detectEntries('')
       } catch {
@@ -295,43 +297,67 @@ export default function DomainQuickSettingsModal({ domain, open, onClose }: Prop
       } catch {
         // ignore
       }
+      try {
+        publicHtmlEntries = await detectEntries('public_html')
+      } catch {
+        // ignore
+      }
+      try {
+        publicHtmlPublicEntries = await detectEntries('public_html/public')
+      } catch {
+        // ignore
+      }
 
       const hasName = (arr: Array<{ name?: string; type?: string }>, n: string) =>
         arr.some((e) => String(e.name || '').toLowerCase() === n.toLowerCase())
       const hasDir = (arr: Array<{ name?: string; type?: string }>, n: string) =>
         arr.some((e) => String(e.type || '').toLowerCase() === 'directory' && String(e.name || '').toLowerCase() === n.toLowerCase())
-      const hasPublicIndex = hasName(publicEntries, 'index.php')
-      const hasPackageJson = hasName(rootEntries, 'package.json')
+      const hasNameAny = (n: string, ...sets: Array<Array<{ name?: string; type?: string }>>) =>
+        sets.some((s) => hasName(s, n))
+      const hasDirAny = (n: string, ...sets: Array<Array<{ name?: string; type?: string }>>) =>
+        sets.some((s) => hasDir(s, n))
+      const hasPublicHtmlDir = hasDir(rootEntries, 'public_html')
+      const hasPublicIndex = hasName(publicEntries, 'index.php') || hasName(publicHtmlPublicEntries, 'index.php')
+      const hasPackageJson = hasNameAny('package.json', rootEntries, publicHtmlEntries)
 
       const hasLaravel =
-        (hasName(rootEntries, 'artisan') && hasPublicIndex) ||
-        (hasName(rootEntries, '.env') && hasPublicIndex)
+        (hasNameAny('artisan', rootEntries, publicHtmlEntries) && hasPublicIndex) ||
+        (hasNameAny('.env', rootEntries, publicHtmlEntries) && hasPublicIndex)
       const hasWp =
-        hasName(rootEntries, 'wp-config.php') || hasDir(rootEntries, 'wp-content')
+        hasNameAny('wp-config.php', rootEntries, publicHtmlEntries) || hasDirAny('wp-content', rootEntries, publicHtmlEntries)
       const hasSymfony =
-        hasDir(rootEntries, 'bin') && hasName(rootEntries, 'composer.json') && hasDir(rootEntries, 'config') && hasDir(rootEntries, 'src')
-      const hasDrupal = hasDir(rootEntries, 'core') && hasDir(rootEntries, 'sites')
-      const hasJoomla = hasName(rootEntries, 'configuration.php') && hasDir(rootEntries, 'administrator')
-      const hasOpenCart = hasName(rootEntries, 'config.php') && hasDir(rootEntries, 'catalog') && hasDir(rootEntries, 'admin')
+        hasDirAny('bin', rootEntries, publicHtmlEntries) &&
+        hasNameAny('composer.json', rootEntries, publicHtmlEntries) &&
+        hasDirAny('config', rootEntries, publicHtmlEntries) &&
+        hasDirAny('src', rootEntries, publicHtmlEntries)
+      const hasDrupal = hasDirAny('core', rootEntries, publicHtmlEntries) && hasDirAny('sites', rootEntries, publicHtmlEntries)
+      const hasJoomla = hasNameAny('configuration.php', rootEntries, publicHtmlEntries) && hasDirAny('administrator', rootEntries, publicHtmlEntries)
+      const hasOpenCart = hasNameAny('config.php', rootEntries, publicHtmlEntries) && hasDirAny('catalog', rootEntries, publicHtmlEntries) && hasDirAny('admin', rootEntries, publicHtmlEntries)
       const hasMagento =
-        hasDir(rootEntries, 'app') && hasDir(rootEntries, 'vendor') && hasName(rootEntries, 'composer.json')
+        hasDirAny('app', rootEntries, publicHtmlEntries) &&
+        hasDirAny('vendor', rootEntries, publicHtmlEntries) &&
+        hasNameAny('composer.json', rootEntries, publicHtmlEntries)
       const hasNext =
         hasPackageJson &&
         (
-          hasDir(rootEntries, '.next') ||
-          hasName(rootEntries, 'next.config.js') ||
-          hasName(rootEntries, 'next.config.mjs') ||
-          hasName(rootEntries, 'next.config.ts')
+          hasDirAny('.next', rootEntries, publicHtmlEntries) ||
+          hasNameAny('next.config.js', rootEntries, publicHtmlEntries) ||
+          hasNameAny('next.config.mjs', rootEntries, publicHtmlEntries) ||
+          hasNameAny('next.config.ts', rootEntries, publicHtmlEntries)
         )
-      const hasNuxt = hasPackageJson && (hasName(rootEntries, 'nuxt.config.ts') || hasName(rootEntries, 'nuxt.config.js'))
-      const hasStrapi = hasPackageJson && hasDir(rootEntries, 'src') && hasDir(rootEntries, 'config') && (hasName(rootEntries, 'strapi.config.ts') || hasName(rootEntries, 'strapi.config.js'))
-      const hasN8n = hasPackageJson && (hasName(rootEntries, 'n8n.config.js') || hasName(rootEntries, 'n8n.json'))
+      const hasNuxt = hasPackageJson && (hasNameAny('nuxt.config.ts', rootEntries, publicHtmlEntries) || hasNameAny('nuxt.config.js', rootEntries, publicHtmlEntries))
+      const hasStrapi = hasPackageJson && hasDirAny('src', rootEntries, publicHtmlEntries) && hasDirAny('config', rootEntries, publicHtmlEntries) && (hasNameAny('strapi.config.ts', rootEntries, publicHtmlEntries) || hasNameAny('strapi.config.js', rootEntries, publicHtmlEntries))
+      const hasN8n = hasPackageJson && (hasNameAny('n8n.config.js', rootEntries, publicHtmlEntries) || hasNameAny('n8n.json', rootEntries, publicHtmlEntries))
       const hasNodeApp = hasPackageJson
-      const hasHtaccess = hasName(rootEntries, '.htaccess')
-      const hasNginxHint = hasName(rootEntries, 'nginx.conf') || hasName(rootEntries, '.nginx.conf')
+      const hasHtaccess = hasNameAny('.htaccess', rootEntries, publicHtmlEntries)
+      const hasNginxHint = hasNameAny('nginx.conf', rootEntries, publicHtmlEntries) || hasNameAny('.nginx.conf', rootEntries, publicHtmlEntries)
 
-      // Güvenlik varsayımı: otomatik mod Apache/OLS seçmez; yalnız Nginx güvenli preset uygular.
-      let targetServer: 'nginx' | 'apache' | 'openlitespeed' = 'nginx'
+      // Server tipini otomatikte zorla değiştirme; mevcut stack korunur.
+      const currentServer = String(domain.server_type ?? '').toLowerCase()
+      let targetServer: 'nginx' | 'apache' | 'openlitespeed' =
+        currentServer === 'apache' || currentServer === 'openlitespeed' || currentServer === 'nginx'
+          ? (currentServer as 'nginx' | 'apache' | 'openlitespeed')
+          : 'nginx'
       let targetVariant: 'root' | 'public' = 'root'
       let targetPerf: 'off' | 'standard' = 'standard'
       let profile:
@@ -351,90 +377,78 @@ export default function DomainQuickSettingsModal({ domain, open, onClose }: Prop
         | 'standard' = 'standard'
       const detectSignals: string[] = []
 
-      if (hasName(rootEntries, 'artisan')) detectSignals.push('artisan')
-      if (hasName(rootEntries, '.env')) detectSignals.push('.env')
+      if (hasNameAny('artisan', rootEntries, publicHtmlEntries)) detectSignals.push('artisan')
+      if (hasNameAny('.env', rootEntries, publicHtmlEntries)) detectSignals.push('.env')
       if (hasPublicIndex) detectSignals.push('public/index.php')
-      if (hasName(rootEntries, 'wp-config.php')) detectSignals.push('wp-config.php')
-      if (hasDir(rootEntries, 'wp-content')) detectSignals.push('wp-content/')
-      if (hasName(rootEntries, 'composer.json')) detectSignals.push('composer.json')
+      if (hasNameAny('wp-config.php', rootEntries, publicHtmlEntries)) detectSignals.push('wp-config.php')
+      if (hasDirAny('wp-content', rootEntries, publicHtmlEntries)) detectSignals.push('wp-content/')
+      if (hasNameAny('composer.json', rootEntries, publicHtmlEntries)) detectSignals.push('composer.json')
       if (hasPackageJson) detectSignals.push('package.json')
-      if (hasName(rootEntries, 'next.config.js') || hasName(rootEntries, 'next.config.mjs') || hasName(rootEntries, 'next.config.ts')) {
+      if (hasPublicHtmlDir) detectSignals.push('public_html/')
+      if (hasNameAny('next.config.js', rootEntries, publicHtmlEntries) || hasNameAny('next.config.mjs', rootEntries, publicHtmlEntries) || hasNameAny('next.config.ts', rootEntries, publicHtmlEntries)) {
         detectSignals.push('next.config.*')
       }
-      if (hasName(rootEntries, 'nuxt.config.js') || hasName(rootEntries, 'nuxt.config.ts')) {
+      if (hasNameAny('nuxt.config.js', rootEntries, publicHtmlEntries) || hasNameAny('nuxt.config.ts', rootEntries, publicHtmlEntries)) {
         detectSignals.push('nuxt.config.*')
       }
-      if (hasName(rootEntries, 'strapi.config.js') || hasName(rootEntries, 'strapi.config.ts')) {
+      if (hasNameAny('strapi.config.js', rootEntries, publicHtmlEntries) || hasNameAny('strapi.config.ts', rootEntries, publicHtmlEntries)) {
         detectSignals.push('strapi.config.*')
       }
-      if (hasName(rootEntries, 'n8n.config.js') || hasName(rootEntries, 'n8n.json')) {
+      if (hasNameAny('n8n.config.js', rootEntries, publicHtmlEntries) || hasNameAny('n8n.json', rootEntries, publicHtmlEntries)) {
         detectSignals.push('n8n.config')
       }
-      if (hasName(rootEntries, '.htaccess')) detectSignals.push('.htaccess')
+      if (hasNameAny('.htaccess', rootEntries, publicHtmlEntries)) detectSignals.push('.htaccess')
 
       if (hasLaravel) {
         profile = 'laravel'
-        targetServer = 'nginx'
         targetVariant = 'public'
         targetPerf = 'standard'
       } else if (hasSymfony) {
         profile = 'symfony'
-        targetServer = 'nginx'
         targetVariant = 'public'
         targetPerf = 'standard'
       } else if (hasWp) {
         profile = 'wordpress'
-        targetServer = 'nginx'
         targetVariant = 'root'
         targetPerf = 'standard'
       } else if (hasDrupal) {
         profile = 'drupal'
-        targetServer = 'nginx'
         targetVariant = 'root'
         targetPerf = 'standard'
       } else if (hasJoomla) {
         profile = 'joomla'
-        targetServer = 'nginx'
         targetVariant = 'root'
         targetPerf = 'standard'
       } else if (hasOpenCart) {
         profile = 'opencart'
-        targetServer = 'nginx'
         targetVariant = 'root'
         targetPerf = 'standard'
       } else if (hasMagento) {
         profile = 'magento'
-        targetServer = 'nginx'
         targetVariant = 'root'
         targetPerf = 'standard'
       } else if (hasNext) {
         profile = 'nextjs'
-        targetServer = 'nginx'
         targetVariant = 'root'
         targetPerf = 'standard'
       } else if (hasNuxt) {
         profile = 'nuxt'
-        targetServer = 'nginx'
         targetVariant = 'root'
         targetPerf = 'standard'
       } else if (hasStrapi) {
         profile = 'strapi'
-        targetServer = 'nginx'
         targetVariant = 'root'
         targetPerf = 'standard'
       } else if (hasN8n) {
         profile = 'n8n'
-        targetServer = 'nginx'
         targetVariant = 'root'
         targetPerf = 'standard'
       } else if (hasNodeApp) {
         profile = 'node'
-        targetServer = 'nginx'
         targetVariant = 'root'
         targetPerf = 'standard'
       } else if (hasHtaccess && !hasNginxHint) {
         profile = 'htaccess'
-        targetServer = 'nginx'
         targetVariant = 'root'
         targetPerf = 'standard'
       }
@@ -445,12 +459,14 @@ export default function DomainQuickSettingsModal({ domain, open, onClose }: Prop
         changed.push(`server=${targetServer}`)
       }
 
-      await api.post(`/domains/${domain.id}/document-root`, { variant: targetVariant })
+      await api.post(`/domains/${domain.id}/document-root`, { variant: targetVariant, profile })
       changed.push(`docroot=${targetVariant}`)
 
-      // Güvenli preset: yalnız Nginx'te standard performans; diğer durumlar otomatikte seçilmiyor.
-      await api.post(`/domains/${domain.id}/performance`, { mode: targetPerf })
-      changed.push(`perf=${targetPerf}`)
+      // Güvenli preset: performans API'si yalnız nginx'te destekleniyor.
+      if (targetServer === 'nginx') {
+        await api.post(`/domains/${domain.id}/performance`, { mode: targetPerf })
+        changed.push(`perf=${targetPerf}`)
+      }
 
       const confidence: 'high' | 'medium' | 'low' =
         profile === 'laravel' || profile === 'symfony' || profile === 'wordpress'

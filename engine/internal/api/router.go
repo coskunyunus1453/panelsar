@@ -305,27 +305,47 @@ func handleSetDocumentRoot(cfg *config.Config, d *daemon.Daemon) gin.HandlerFunc
 			return
 		}
 		var req struct {
-			Variant string `json:"variant" binding:"required"`
+			Variant string `json:"variant"`
+			Profile string `json:"profile"`
+			CustomPath string `json:"custom_path"`
 		}
 		if err := c.ShouldBindJSON(&req); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		variant := strings.ToLower(strings.TrimSpace(req.Variant))
-		if variant != "root" && variant != "public" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid variant"})
-			return
-		}
-
 		meta, err := sites.ReadSiteMeta(cfg.Paths.WebRoot, domain)
 		if err != nil || meta == nil {
 			c.JSON(http.StatusNotFound, gin.H{"error": "site not found"})
 			return
 		}
-		base := filepath.Clean(filepath.Join(cfg.Paths.WebRoot, domain, "public_html"))
-		target := base
-		if variant == "public" {
-			target = filepath.Join(base, "public")
+		base := detectDocumentRootBase(cfg.Paths.WebRoot, domain)
+		variant := strings.ToLower(strings.TrimSpace(req.Variant))
+		target := ""
+		customRel := strings.TrimSpace(req.CustomPath)
+		if customRel != "" {
+			if filepath.IsAbs(customRel) {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "custom_path must be relative to site base"})
+				return
+			}
+			cleanRel := filepath.Clean(customRel)
+			if cleanRel == "." || cleanRel == "" || cleanRel == ".." || strings.HasPrefix(cleanRel, "../") {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "invalid custom_path"})
+				return
+			}
+			target = filepath.Join(base, cleanRel)
+			variant = "custom"
+		} else {
+			if variant == "" {
+				variant = hosting.DocrootVariantForProfile(req.Profile)
+			}
+			if variant != "root" && variant != "public" {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "invalid variant"})
+				return
+			}
+			target = base
+			if variant == "public" {
+				target = filepath.Join(base, "public")
+			}
 		}
 		// Safety: only allow under base.
 		if !strings.HasPrefix(target+string(os.PathSeparator), base+string(os.PathSeparator)) && target != base {
@@ -335,7 +355,7 @@ func handleSetDocumentRoot(cfg *config.Config, d *daemon.Daemon) gin.HandlerFunc
 
 		// Ensure directory exists and is a directory.
 		if st, statErr := os.Stat(target); statErr != nil {
-			if os.IsNotExist(statErr) && variant == "public" {
+			if os.IsNotExist(statErr) && (variant == "public" || variant == "root") {
 				if mk := os.MkdirAll(target, 0o755); mk != nil {
 					c.JSON(http.StatusBadRequest, gin.H{"error": mk.Error()})
 					return
@@ -404,6 +424,11 @@ func handleSetDocumentRoot(cfg *config.Config, d *daemon.Daemon) gin.HandlerFunc
 			"document_root": meta.DocumentRoot,
 		})
 	}
+}
+
+func detectDocumentRootBase(webRoot, domain string) string {
+	// Global kural: document-root varyantları daima <domain>/public_html tabanı üzerinden hesaplanır.
+	return filepath.Clean(filepath.Join(webRoot, domain, "public_html"))
 }
 
 func handleDeleteSite(cfg *config.Config, d *daemon.Daemon) gin.HandlerFunc {

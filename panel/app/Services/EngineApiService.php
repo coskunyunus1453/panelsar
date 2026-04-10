@@ -418,13 +418,26 @@ class EngineApiService
         }
     }
 
-    public function setSiteDocumentRoot(string $domain, string $variant): array
+    public function setSiteDocumentRoot(string $domain, ?string $variant = null, ?string $profile = null, ?string $customPath = null): array
     {
-        $variant = in_array($variant, ['root', 'public'], true) ? $variant : 'root';
+        $payload = [];
+        $v = is_string($variant) ? strtolower(trim($variant)) : '';
+        if (in_array($v, ['root', 'public'], true)) {
+            $payload['variant'] = $v;
+        }
+        $p = is_string($profile) ? strtolower(trim($profile)) : '';
+        if ($p !== '') {
+            $payload['profile'] = $p;
+        }
+        $cp = is_string($customPath) ? trim($customPath) : '';
+        if ($cp !== '') {
+            $payload['custom_path'] = $cp;
+        }
+        if ($payload === []) {
+            $payload['variant'] = 'root';
+        }
 
-        return $this->postChecked('/api/v1/sites/'.rawurlencode($domain).'/document-root', [
-            'variant' => $variant,
-        ]);
+        return $this->postChecked('/api/v1/sites/'.rawurlencode($domain).'/document-root', $payload);
     }
 
     /**

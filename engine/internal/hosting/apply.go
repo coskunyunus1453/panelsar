@@ -27,11 +27,7 @@ func serverTypeOf(meta *sites.SiteMeta) string {
 	if meta == nil {
 		return "nginx"
 	}
-	s := strings.ToLower(strings.TrimSpace(meta.ServerType))
-	if s == "apache" {
-		return "apache"
-	}
-	return "nginx"
+	return sites.NormalizeServerType(meta.ServerType)
 }
 
 func resolvePHPSocket(cfg *config.Config, domain string, meta *sites.SiteMeta, explicit string) string {
