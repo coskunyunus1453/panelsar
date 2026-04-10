@@ -9,7 +9,7 @@ return [
     'rotate_password_unsupported' => 'Password rotation is not available for this database type.',
     'grant_host_mysql_only' => 'Connection host policy applies only to MySQL.',
     'update_no_changes' => 'Provide at least one field to update.',
-    'password_decrypt_failed' => 'The stored database password cannot be decrypted (the panel APP_KEY may have changed or the record is corrupted). Use “Rotate password” to set a new password, then try again—or contact support.',
+    'password_unreadable' => 'The stored database password could not be decrypted. Enter a new password or use «Rotate password».',
     'provision_failed' => 'Could not provision the database on the server (check MySQL/MariaDB credentials in panel config)',
 
     'export_not_mysql' => 'Export is only available for MySQL databases.',
