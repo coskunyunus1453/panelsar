@@ -117,10 +117,13 @@ class DatabaseService
         $newPass = Str::random(24);
 
         return DB::transaction(function () use ($database, $newPass) {
+            $row = ['password' => $this->encryptStoredPassword($newPass)];
+
             if ($database->type === 'mysql') {
                 $grant = $database->mysqlGrantHost();
                 if ($this->mysqlProvisioner->enabled()) {
-                    $this->mysqlProvisioner->rotatePassword($database->username, $grant, $newPass);
+                    $actualHost = $this->mysqlProvisioner->rotatePassword($database->username, $grant, $newPass);
+                    $row['grant_host'] = $actualHost;
                 }
             } elseif ($database->type === 'postgresql') {
                 if ($this->postgresProvisioner->enabled()) {
@@ -128,10 +131,9 @@ class DatabaseService
                 }
             }
 
-            // Query update cast uygulamaz; 'encrypted' alanı encrypt() ile yazılmalı (aksi halde sonraki okumada decrypt patlar).
             Database::query()
                 ->whereKey($database->getKey())
-                ->update(['password' => $this->encryptStoredPassword($newPass)]);
+                ->update($row);
 
             return ['password_plain' => $newPass];
         });
@@ -167,57 +169,43 @@ class DatabaseService
     }
 
     /**
-     * @return array{password_plain?: string}
+     * @return array{password_plain?: string, app_config_reminder?: true}
      */
     public function updateCredentials(
         Database $database,
-        ?string $newName,
-        ?string $newUsername,
         ?string $newPassword,
         ?string $newGrantHost = null
     ): array {
-        $name = trim((string) $newName);
-        $username = trim((string) $newUsername);
         $password = trim((string) $newPassword);
         $grantHost = trim((string) $newGrantHost);
 
         $existingPlain = $this->plainPasswordForOps($database);
 
-        $targetName = $name !== '' ? $name : $database->name;
-        $targetUser = $username !== '' ? $username : $database->username;
+        $targetName = $database->name;
+        $targetUser = $database->username;
         $targetPass = $password !== '' ? $password : $existingPlain;
         $targetGrant = $database->type === 'mysql'
             ? ($grantHost !== '' ? $grantHost : $database->mysqlGrantHost())
             : null;
 
-        $changed = $targetName !== $database->name
-            || $targetUser !== $database->username
-            || $password !== ''
+        $changed = $password !== ''
             || ($database->type === 'mysql' && $targetGrant !== $database->mysqlGrantHost());
         if (! $changed) {
             return [];
         }
 
-        DB::transaction(function () use ($database, $targetName, $targetUser, $targetPass, $targetGrant): void {
+        $remindAppConfig = $password !== '';
+
+        DB::transaction(function () use ($database, $targetName, $targetUser, $targetPass, $targetGrant, $existingPlain): void {
+            $mysqlStoredGrant = $database->type === 'mysql' ? (string) $targetGrant : null;
+
             if ($database->type === 'mysql') {
-                $oldName = $database->name;
-                $oldUser = $database->username;
                 $oldGrant = $database->mysqlGrantHost();
                 $newGrant = (string) $targetGrant;
+                $grantChanged = $oldGrant !== $newGrant;
 
                 if ($this->mysqlProvisioner->enabled()) {
-                    if ($oldName !== $targetName) {
-                        $this->mysqlProvisioner->renameDatabase($oldName, $targetName);
-                    }
-                    if ($oldUser !== $targetUser) {
-                        $this->mysqlProvisioner->renameUserAndRegrant(
-                            $oldUser,
-                            $targetUser,
-                            $oldGrant,
-                            $targetName,
-                            $targetPass
-                        );
-                    } elseif ($oldGrant !== $newGrant) {
+                    if ($grantChanged) {
                         $this->mysqlProvisioner->changeGrantHost(
                             $targetName,
                             $targetUser,
@@ -225,27 +213,15 @@ class DatabaseService
                             $newGrant,
                             $targetPass
                         );
+                        $mysqlStoredGrant = $newGrant;
                     }
-                    if ($targetPass !== $existingPlain && $oldUser === $targetUser) {
-                        $this->mysqlProvisioner->rotatePassword($targetUser, $newGrant, $targetPass);
+                    if ($targetPass !== $existingPlain && ! $grantChanged) {
+                        $mysqlStoredGrant = $this->mysqlProvisioner->rotatePassword($targetUser, $newGrant, $targetPass);
                     }
                 }
-
-                $database->grant_host = $newGrant;
             } elseif ($database->type === 'postgresql') {
-                $oldName = $database->name;
-                $oldUser = $database->username;
-
-                if ($this->postgresProvisioner->enabled()) {
-                    if ($oldName !== $targetName) {
-                        $this->postgresProvisioner->renameDatabase($oldName, $targetName);
-                    }
-                    if ($oldUser !== $targetUser) {
-                        $this->postgresProvisioner->renameRole($oldUser, $targetUser);
-                    }
-                    if ($targetPass !== $existingPlain || $oldUser !== $targetUser) {
-                        $this->postgresProvisioner->rotatePassword($targetUser, $targetPass);
-                    }
+                if ($this->postgresProvisioner->enabled() && $targetPass !== $existingPlain) {
+                    $this->postgresProvisioner->rotatePassword($targetUser, $targetPass);
                 }
             }
 
@@ -255,11 +231,19 @@ class DatabaseService
                     'name' => $targetName,
                     'username' => $targetUser,
                     'password' => $this->encryptStoredPassword($targetPass),
-                    'grant_host' => $database->type === 'mysql' ? $database->grant_host : null,
+                    'grant_host' => $database->type === 'mysql' ? $mysqlStoredGrant : null,
                 ]);
         });
 
-        return $password !== '' ? ['password_plain' => $targetPass] : [];
+        $out = [];
+        if ($password !== '') {
+            $out['password_plain'] = $targetPass;
+        }
+        if ($remindAppConfig) {
+            $out['app_config_reminder'] = true;
+        }
+
+        return $out;
     }
 
     public function delete(Database $database): void
@@ -347,6 +331,7 @@ class DatabaseService
             '-U', $database->username,
             '--no-owner',
             '--no-acl',
+            '--encoding=UTF8',
             $database->name,
         ];
 
@@ -384,25 +369,35 @@ class DatabaseService
         );
 
         $bin = (string) config('hostvim.database_tools.mysql_path', 'mysql');
-        $sql = file_get_contents($absolutePath);
-        if ($sql === false) {
+
+        $input = fopen($absolutePath, 'rb');
+        if ($input === false) {
             throw new \RuntimeException(__('databases.import_file_unreadable'));
         }
 
-        $process = new Process(
-            [
-                $bin,
-                '-h', $database->host,
-                '-P', (string) $database->port,
-                '-u', $database->username,
-                $database->name,
-            ],
-            null,
-            ['MYSQL_PWD' => $plain],
-            $sql,
-            3600.0,
-        );
-        $process->mustRun();
+        try {
+            // --one-database: dump içindeki başka veritabanlarına yönelen USE/DDL satırlarını yok sayar (hedef DB’ye yanlış yazmayı önler).
+            $process = new Process(
+                [
+                    $bin,
+                    '-h', $database->host,
+                    '-P', (string) $database->port,
+                    '-u', $database->username,
+                    '--default-character-set=utf8mb4',
+                    '--one-database',
+                    $database->name,
+                ],
+                null,
+                ['MYSQL_PWD' => $plain],
+                $input,
+                3600.0,
+            );
+            $process->mustRun();
+        } finally {
+            if (is_resource($input)) {
+                fclose($input);
+            }
+        }
     }
 
     public function importPostgresFromSqlFile(Database $database, string $absolutePath): void

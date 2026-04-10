@@ -82,37 +82,32 @@ class DatabaseController extends Controller
         $this->authorize('update', $database);
         $validated = $request->validate([
             'grant_host' => 'nullable|string|max:64',
-            'name' => 'nullable|string|max:64',
-            'username' => 'nullable|string|max:64',
             'password' => 'nullable|string|min:8|max:255',
         ]);
 
         $grantHost = isset($validated['grant_host']) ? trim((string) $validated['grant_host']) : null;
-        $name = isset($validated['name']) ? trim((string) $validated['name']) : null;
-        $username = isset($validated['username']) ? trim((string) $validated['username']) : null;
         $password = isset($validated['password']) ? trim((string) $validated['password']) : null;
 
-        $hasCredentialChange = ($name !== null && $name !== '')
-            || ($username !== null && $username !== '')
-            || ($password !== null && $password !== '');
-        $hasGrantHost = $grantHost !== null && $grantHost !== '';
+        $hasPassword = $password !== null && $password !== '';
+        $grantProvided = $grantHost !== null && $grantHost !== '';
+        $grantChanged = $database->type === 'mysql'
+            && $grantProvided
+            && $grantHost !== $database->mysqlGrantHost();
 
-        if (! $hasCredentialChange && ! $hasGrantHost) {
+        if (! $hasPassword && ! $grantChanged) {
             return response()->json(['message' => __('databases.update_no_changes')], 422);
         }
 
-        if ($hasGrantHost && $database->type !== 'mysql') {
+        if ($grantProvided && $database->type !== 'mysql') {
             return response()->json(['message' => __('databases.grant_host_mysql_only')], 422);
         }
 
         try {
-            if ($hasCredentialChange) {
+            if ($hasPassword) {
                 $result = $this->databaseService->updateCredentials(
                     $database,
-                    $name,
-                    $username,
                     $password,
-                    $grantHost
+                    $database->type === 'mysql' ? $grantHost : null,
                 );
             } else {
                 $this->databaseService->updateGrantHost($database, (string) $grantHost);
@@ -134,11 +129,16 @@ class DatabaseController extends Controller
             ], 500);
         }
 
-        return response()->json([
+        $payload = [
             'message' => __('databases.updated'),
             'database' => $database->fresh(),
             'password_plain' => $result['password_plain'] ?? null,
-        ]);
+        ];
+        if (! empty($result['app_config_reminder'])) {
+            $payload['sync_reminder'] = (string) __('databases.credentials_sync_reminder');
+        }
+
+        return response()->json($payload);
     }
 
     public function rotatePassword(Request $request, Database $database): JsonResponse

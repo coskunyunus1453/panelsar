@@ -169,16 +169,17 @@ export default function DatabasesPage() {
   const patchCredentialsM = useMutation({
     mutationFn: async (payload: {
       id: number
-      name?: string
-      username?: string
       password?: string
       grant_host?: string
     }) => {
       const { data } = await api.patch(`/databases/${payload.id}`, payload)
-      return data as { password_plain?: string }
+      return data as { password_plain?: string; sync_reminder?: string }
     },
     onSuccess: (data) => {
       toast.success(t('databases.updated'))
+      if (data.sync_reminder?.trim()) {
+        toast(data.sync_reminder.trim(), { duration: 14_000 })
+      }
       if (data.password_plain) {
         setPasswordReveal({
           value: data.password_plain,
@@ -603,8 +604,6 @@ export default function DatabasesPage() {
                 const fd = new FormData(ev.currentTarget)
                 const payload = {
                   id: editCredentialsDb.id,
-                  name: String(fd.get('name') || '').trim(),
-                  username: String(fd.get('username') || '').trim(),
                   password: String(fd.get('password') || '').trim(),
                   grant_host: editCredentialsDb.type === 'mysql'
                     ? String(fd.get('grant_host') || '').trim()
@@ -614,18 +613,24 @@ export default function DatabasesPage() {
               }}
             >
               <div>
-                <label className="label">{t('databases.name')}</label>
-                <input name="name" className="input w-full font-mono" defaultValue={editCredentialsDb.name} required />
+                <label className="label">{t('databases.db_name_readonly')}</label>
+                <div className="input w-full font-mono bg-gray-50 text-gray-700 dark:bg-gray-800 dark:text-gray-200 cursor-default">
+                  {editCredentialsDb.name}
+                </div>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  {t('databases.db_name_readonly_hint')}
+                </p>
               </div>
               <div>
-                <label className="label">{t('databases.username')}</label>
-                <input
-                  name="username"
-                  className="input w-full font-mono"
-                  defaultValue={editCredentialsDb.username}
-                  required
-                />
+                <label className="label">{t('databases.username_readonly')}</label>
+                <div className="input w-full font-mono bg-gray-50 text-gray-700 dark:bg-gray-800 dark:text-gray-200 cursor-default">
+                  {editCredentialsDb.username}
+                </div>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  {t('databases.username_readonly_hint')}
+                </p>
               </div>
+              <p className="text-xs text-gray-600 dark:text-gray-400">{t('databases.credentials_modal_app_hint')}</p>
               <div>
                 <label className="label">{t('databases.new_password_optional')}</label>
                 <input name="password" type="text" className="input w-full font-mono" autoComplete="off" />

@@ -10,6 +10,9 @@ return [
     'grant_host_mysql_only' => 'Connection host policy applies only to MySQL.',
     'update_no_changes' => 'Provide at least one field to update.',
     'password_unreadable' => 'The stored database password could not be decrypted. Enter a new password or use «Rotate password».',
+    'credentials_sync_reminder' => 'The database password was updated on the server. Update WordPress (wp-config.php), Laravel (.env), and other apps to match; the panel does not rewrite those files automatically.',
+    'mysql_user_missing' => 'MySQL user «:user» was not found in mysql.user. It may have been removed or the server differs.',
+    'mysql_user_host_ambiguous' => 'Multiple Host entries exist for «:user» (:hosts). The panel cannot pick which @host to use; remove duplicate accounts in MySQL or clarify grant_host.',
     'provision_failed' => 'Could not provision the database on the server (check MySQL/MariaDB credentials in panel config)',
 
     'export_not_mysql' => 'Export is only available for MySQL databases.',

@@ -18,6 +18,55 @@ class MysqlProvisioner
         $this->assertAllowedGrantHost($host);
     }
 
+    /**
+     * Panelde kayıtlı grant_host ile mysql.user.Host bazen farklı olur (localhost vs 127.0.0.1);
+     * ALTER USER / DROP USER yanlış host ile 1396 vb. hatalar verir.
+     */
+    public function resolveActualUserHost(string $dbUser, string $panelHost): string
+    {
+        $this->assertSafeIdentifier($dbUser);
+        $panel = trim($panelHost);
+        $this->assertAllowedGrantHost($panel);
+
+        try {
+            $pdo = $this->adminPdo();
+            $stmt = $pdo->prepare('SELECT Host FROM mysql.user WHERE User = ?');
+            $stmt->execute([$dbUser]);
+            /** @var list<string> $hosts */
+            $hosts = array_values(array_unique(array_map(static fn ($h): string => (string) $h, $stmt->fetchAll(PDO::FETCH_COLUMN) ?: [])));
+        } catch (PDOException) {
+            return $panel;
+        }
+
+        if ($hosts === []) {
+            throw new \InvalidArgumentException(__('databases.mysql_user_missing', ['user' => $dbUser]));
+        }
+
+        if (in_array($panel, $hosts, true)) {
+            return $panel;
+        }
+
+        if ($panel === 'localhost') {
+            foreach (['127.0.0.1', '::1'] as $alt) {
+                if (in_array($alt, $hosts, true)) {
+                    return $alt;
+                }
+            }
+        }
+        if ($panel === '127.0.0.1' && in_array('localhost', $hosts, true)) {
+            return 'localhost';
+        }
+
+        if (count($hosts) === 1) {
+            return $hosts[0];
+        }
+
+        throw new \InvalidArgumentException(__('databases.mysql_user_host_ambiguous', [
+            'user' => $dbUser,
+            'hosts' => implode(', ', $hosts),
+        ]));
+    }
+
     public function provision(string $dbName, string $dbUser, string $dbPass, string $grantHost): void
     {
         $this->assertSafeIdentifier($dbName);
@@ -45,7 +94,11 @@ class MysqlProvisioner
         $this->assertAllowedGrantHost($grantHost);
 
         $pdo = $this->adminPdo();
-        $grantHost = trim($grantHost);
+        try {
+            $grantHost = $this->resolveActualUserHost($dbUser, trim($grantHost));
+        } catch (\InvalidArgumentException) {
+            $grantHost = trim($grantHost);
+        }
 
         $dbQuoted = '`'.$dbName.'`';
         $u = $pdo->quote($dbUser);
@@ -76,6 +129,11 @@ class MysqlProvisioner
 
         $pdo = $this->adminPdo();
         $grantHost = trim($grantHost);
+        try {
+            $grantHost = $this->resolveActualUserHost($dbUser, $grantHost);
+        } catch (\InvalidArgumentException) {
+            // kullanıcı yoksa veya mysql.user okunamıyorsa paneldeki host ile devam
+        }
         $dbQuoted = '`'.$dbName.'`';
         $u = $pdo->quote($dbUser);
         $h = $pdo->quote($grantHost);
@@ -91,11 +149,13 @@ class MysqlProvisioner
         $pdo->exec('FLUSH PRIVILEGES');
     }
 
-    public function rotatePassword(string $dbUser, string $grantHost, string $newPassword): void
+    /**
+     * @return string MySQL’de kullanılan gerçek Host değeri (panel satırını güncellemek için).
+     */
+    public function rotatePassword(string $dbUser, string $grantHost, string $newPassword): string
     {
         $this->assertSafeIdentifier($dbUser);
-        $this->assertAllowedGrantHost($grantHost);
-        $grantHost = trim($grantHost);
+        $grantHost = $this->resolveActualUserHost($dbUser, $grantHost);
 
         $pdo = $this->adminPdo();
         $u = $pdo->quote($dbUser);
@@ -103,6 +163,8 @@ class MysqlProvisioner
 
         $pdo->exec("ALTER USER {$u}@{$h} IDENTIFIED BY ".$pdo->quote($newPassword));
         $pdo->exec('FLUSH PRIVILEGES');
+
+        return $grantHost;
     }
 
     public function renameDatabase(string $oldDbName, string $newDbName): void
@@ -156,7 +218,8 @@ class MysqlProvisioner
         }
 
         $pdo = $this->adminPdo();
-        $h = $pdo->quote(trim($grantHost));
+        $resolvedHost = $this->resolveActualUserHost($oldUsername, trim($grantHost));
+        $h = $pdo->quote($resolvedHost);
         $oldU = $pdo->quote($oldUsername);
         $newU = $pdo->quote($newUsername);
         $dbQ = '`'.$dbName.'`';
@@ -183,6 +246,8 @@ class MysqlProvisioner
         if ($oldHost === $newHost) {
             return;
         }
+
+        $oldHost = $this->resolveActualUserHost($dbUser, $oldHost);
 
         $pdo = $this->adminPdo();
         $dbQuoted = '`'.$dbName.'`';

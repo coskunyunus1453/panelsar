@@ -10,6 +10,9 @@ return [
     'grant_host_mysql_only' => 'Erişim hostu yalnızca MySQL için geçerlidir.',
     'update_no_changes' => 'Güncellenecek en az bir alan seçin.',
     'password_unreadable' => 'Kayıtlı veritabanı şifresi çözülemedi. Yeni bir şifre girin veya «Şifre döndür» ile sıfırlayın.',
+    'credentials_sync_reminder' => 'Sunucudaki veritabanı şifresi güncellendi. WordPress (wp-config.php), Laravel (.env) ve diğer uygulamalarda aynı şifreyi elle güncellemeniz gerekir; panel site dosyalarını otomatik değiştirmez.',
+    'mysql_user_missing' => 'MySQL’de «:user» kullanıcısı bulunamadı (mysql.user). Kullanıcı silinmiş veya farklı bir sunucuya bağlı olabilir.',
+    'mysql_user_host_ambiguous' => '«:user» için birden fazla MySQL Host kaydı var (:hosts). Panel hangi @host ile işlem yapacağını seçemiyor; fazla hesapları MySQL’den kaldırın veya grant_host’u netleştirin.',
     'provision_failed' => 'Veritabanı sunucuda oluşturulamadı (paneldeki MySQL/MariaDB ayarlarını kontrol edin)',
 
     'export_not_mysql' => 'Dışa aktarma yalnızca MySQL veritabanları için geçerlidir.',
