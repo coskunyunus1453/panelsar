@@ -9,6 +9,7 @@ return [
     'rotate_password_unsupported' => 'Bu veritabanı tipi için şifre döndürme yok.',
     'grant_host_mysql_only' => 'Erişim hostu yalnızca MySQL için geçerlidir.',
     'update_no_changes' => 'Güncellenecek en az bir alan seçin.',
+    'password_decrypt_failed' => 'Kayıtlı veritabanı şifresi çözülemiyor (panel APP_KEY değişmiş veya kayıt bozuk olabilir). Önce “Şifre döndür” ile yeni şifre oluşturun, sonra tekrar deneyin veya destek ile iletişime geçin.',
     'provision_failed' => 'Veritabanı sunucuda oluşturulamadı (paneldeki MySQL/MariaDB ayarlarını kontrol edin)',
 
     'export_not_mysql' => 'Dışa aktarma yalnızca MySQL veritabanları için geçerlidir.',

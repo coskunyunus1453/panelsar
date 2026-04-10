@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Database;
 use App\Models\User;
+use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Symfony\Component\Process\Process;
@@ -124,7 +125,7 @@ class DatabaseService
         }
 
         DB::transaction(function () use ($database, $old, $new) {
-            $plain = $database->password;
+            $plain = $this->requireDecryptedPassword($database);
             if ($this->mysqlProvisioner->enabled()) {
                 $this->mysqlProvisioner->changeGrantHost(
                     $database->name,
@@ -156,7 +157,8 @@ class DatabaseService
 
         $targetName = $name !== '' ? $name : $database->name;
         $targetUser = $username !== '' ? $username : $database->username;
-        $targetPass = $password !== '' ? $password : (string) $database->password;
+        $storedPlain = $this->requireDecryptedPassword($database);
+        $targetPass = $password !== '' ? $password : $storedPlain;
         $targetGrant = $database->type === 'mysql'
             ? ($grantHost !== '' ? $grantHost : $database->mysqlGrantHost())
             : null;
@@ -169,7 +171,7 @@ class DatabaseService
             return [];
         }
 
-        DB::transaction(function () use ($database, $targetName, $targetUser, $targetPass, $targetGrant): void {
+        DB::transaction(function () use ($database, $targetName, $targetUser, $targetPass, $targetGrant, $storedPlain): void {
             if ($database->type === 'mysql') {
                 $oldName = $database->name;
                 $oldUser = $database->username;
@@ -197,7 +199,7 @@ class DatabaseService
                             $targetPass
                         );
                     }
-                    if ($targetPass !== (string) $database->password && $oldUser === $targetUser) {
+                    if ($targetPass !== $storedPlain && $oldUser === $targetUser) {
                         $this->mysqlProvisioner->rotatePassword($targetUser, $newGrant, $targetPass);
                     }
                 }
@@ -214,7 +216,7 @@ class DatabaseService
                     if ($oldUser !== $targetUser) {
                         $this->postgresProvisioner->renameRole($oldUser, $targetUser);
                     }
-                    if ($targetPass !== (string) $database->password || $oldUser !== $targetUser) {
+                    if ($targetPass !== $storedPlain || $oldUser !== $targetUser) {
                         $this->postgresProvisioner->rotatePassword($targetUser, $targetPass);
                     }
                 }
@@ -285,7 +287,7 @@ class DatabaseService
             $database->name,
         ];
 
-        $plain = $database->password;
+        $plain = $this->requireDecryptedPassword($database);
         $process = new Process($args, null, ['MYSQL_PWD' => $plain], null, 3600.0);
         $process->run(function (string $type, string $buffer) use ($writeChunk): void {
             if ($type === Process::OUT) {
@@ -321,7 +323,7 @@ class DatabaseService
             $database->name,
         ];
 
-        $plain = $database->password;
+        $plain = $this->requireDecryptedPassword($database);
         $process = new Process($args, null, ['PGPASSWORD' => $plain], null, 3600.0);
         $process->run(function (string $type, string $buffer) use ($writeChunk): void {
             if ($type === Process::OUT) {
@@ -346,7 +348,7 @@ class DatabaseService
             throw new \InvalidArgumentException(__('databases.import_file_unreadable'));
         }
 
-        $plain = $database->password;
+        $plain = $this->requireDecryptedPassword($database);
         $this->mysqlProvisioner->recreateEmptyDatabase(
             $database->name,
             $database->username,
@@ -391,7 +393,7 @@ class DatabaseService
         $this->postgresProvisioner->recreateEmptyDatabase($database->name, $database->username);
 
         $bin = (string) config('hostvim.database_tools.psql_path', 'psql');
-        $plain = $database->password;
+        $plain = $this->requireDecryptedPassword($database);
         $process = new Process(
             [
                 $bin,
@@ -408,5 +410,19 @@ class DatabaseService
             3600.0,
         );
         $process->mustRun();
+    }
+
+    /**
+     * Şifreli cast ile saklanan parolayı düz metin olarak döndürür. APP_KEY uyumsuzluğunda anlamlı hata verir.
+     *
+     * @throws \InvalidArgumentException
+     */
+    private function requireDecryptedPassword(Database $database): string
+    {
+        try {
+            return (string) $database->password;
+        } catch (DecryptException $e) {
+            throw new \InvalidArgumentException(__('databases.password_decrypt_failed'));
+        }
     }
 }

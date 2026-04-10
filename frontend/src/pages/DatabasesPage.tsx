@@ -174,7 +174,13 @@ export default function DatabasesPage() {
       password?: string
       grant_host?: string
     }) => {
-      const { data } = await api.patch(`/databases/${payload.id}`, payload)
+      const { id, password, ...rest } = payload
+      const body: Record<string, string> = {}
+      if (rest.name !== undefined && rest.name !== '') body.name = rest.name
+      if (rest.username !== undefined && rest.username !== '') body.username = rest.username
+      if (password !== undefined && password !== '') body.password = password
+      if (rest.grant_host !== undefined && rest.grant_host !== '') body.grant_host = rest.grant_host
+      const { data } = await api.patch(`/databases/${id}`, body)
       return data as { password_plain?: string }
     },
     onSuccess: (data) => {
