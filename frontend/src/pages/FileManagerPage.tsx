@@ -759,12 +759,15 @@ export default function FileManagerPage() {
       fd.append('file', item.file, item.baseName)
       fd.append('path', item.parentRel)
       const sizeHint = item.file.size > 0 ? item.file.size : 0
-      await api.post(`/domains/${domainId}/files/upload`, fd, {
+      const res = await api.post<{
+        auto_web?: { applied?: boolean; profile?: string; variant?: string; error?: string }
+      }>(`/domains/${domainId}/files/upload`, fd, {
         onUploadProgress: (ev) => {
           const total = ev.total && ev.total > 0 ? ev.total : sizeHint
           onProgress?.(ev.loaded, total > 0 ? total : Math.max(ev.loaded, 1))
         },
       })
+      return res.data
     },
     [domainId],
   )
@@ -813,6 +816,7 @@ export default function FileManagerPage() {
       let ok = 0
       let failed = 0
       let completedSum = 0
+      let autoAppliedProfile: string | null = null
 
       try {
         setUploadProgressView({
@@ -846,7 +850,7 @@ export default function FileManagerPage() {
           )
 
           try {
-            await postOneUpload(it, (loaded, total) => {
+            const uploaded = await postOneUpload(it, (loaded, total) => {
               const tsize = total > 0 ? total : w
               const ld = Math.min(loaded, tsize)
               const now = performance.now()
@@ -873,6 +877,9 @@ export default function FileManagerPage() {
                   : null,
               )
             })
+            if (uploaded?.auto_web?.applied && typeof uploaded.auto_web.profile === 'string') {
+              autoAppliedProfile = uploaded.auto_web.profile
+            }
             completedSum += w
             ok++
           } catch (err: unknown) {
@@ -895,6 +902,37 @@ export default function FileManagerPage() {
           toast.success(t('files.upload_partial_ok', { ok, failed: t('files.upload_partial_fail', { n: failed }) }))
         } else if (failed > 0 && ok === 0) {
           toast.error(t('files.upload_err'))
+        }
+        if (autoAppliedProfile) {
+          const profileText =
+            autoAppliedProfile === 'laravel'
+              ? t('domains.auto_profile_laravel')
+              : autoAppliedProfile === 'symfony'
+                ? t('domains.auto_profile_symfony')
+                : autoAppliedProfile === 'wordpress'
+                  ? t('domains.auto_profile_wordpress')
+                  : autoAppliedProfile === 'drupal'
+                    ? t('domains.auto_profile_drupal')
+                    : autoAppliedProfile === 'joomla'
+                      ? t('domains.auto_profile_joomla')
+                      : autoAppliedProfile === 'opencart'
+                        ? t('domains.auto_profile_opencart')
+                        : autoAppliedProfile === 'magento'
+                          ? t('domains.auto_profile_magento')
+                          : autoAppliedProfile === 'nextjs'
+                            ? t('domains.auto_profile_nextjs')
+                            : autoAppliedProfile === 'nuxt'
+                              ? t('domains.auto_profile_nuxt')
+                              : autoAppliedProfile === 'strapi'
+                                ? t('domains.auto_profile_strapi')
+                                : autoAppliedProfile === 'n8n'
+                                  ? t('domains.auto_profile_n8n')
+                                  : autoAppliedProfile === 'node'
+                                    ? t('domains.auto_profile_node')
+                                    : autoAppliedProfile === 'htaccess'
+                                      ? t('domains.auto_profile_htaccess')
+                                      : t('domains.auto_profile_standard')
+          toast.success(t('domains.auto_web_applied', { profile: profileText }))
         }
       } finally {
         setUploadProgressView(null)
@@ -1166,8 +1204,41 @@ export default function FileManagerPage() {
         targetDir: vars.target_dir,
         if_exists: vars.if_exists ?? 'fail',
       }),
-    onSuccess: () => {
+    onSuccess: (res) => {
       toast.success(t('files.unzip_ok'))
+      const autoProfile = (res.data as { auto_web?: { applied?: boolean; profile?: string } } | undefined)?.auto_web?.profile
+      const autoApplied = (res.data as { auto_web?: { applied?: boolean } } | undefined)?.auto_web?.applied
+      if (autoApplied && autoProfile) {
+        const profileText =
+          autoProfile === 'laravel'
+            ? t('domains.auto_profile_laravel')
+            : autoProfile === 'symfony'
+              ? t('domains.auto_profile_symfony')
+              : autoProfile === 'wordpress'
+                ? t('domains.auto_profile_wordpress')
+                : autoProfile === 'drupal'
+                  ? t('domains.auto_profile_drupal')
+                  : autoProfile === 'joomla'
+                    ? t('domains.auto_profile_joomla')
+                    : autoProfile === 'opencart'
+                      ? t('domains.auto_profile_opencart')
+                      : autoProfile === 'magento'
+                        ? t('domains.auto_profile_magento')
+                        : autoProfile === 'nextjs'
+                          ? t('domains.auto_profile_nextjs')
+                          : autoProfile === 'nuxt'
+                            ? t('domains.auto_profile_nuxt')
+                            : autoProfile === 'strapi'
+                              ? t('domains.auto_profile_strapi')
+                              : autoProfile === 'n8n'
+                                ? t('domains.auto_profile_n8n')
+                                : autoProfile === 'node'
+                                  ? t('domains.auto_profile_node')
+                                  : autoProfile === 'htaccess'
+                                    ? t('domains.auto_profile_htaccess')
+                                    : t('domains.auto_profile_standard')
+        toast.success(t('domains.auto_web_applied', { profile: profileText }))
+      }
       qc.invalidateQueries({ queryKey: ['files', domainId, path] })
       setOffset(0)
     },

@@ -8,6 +8,7 @@ use App\Models\DeploymentConfig;
 use App\Models\DeploymentRun;
 use App\Models\Domain;
 use App\Services\SafeAuditLogger;
+use App\Services\AutoWebConfigurator;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Bus;
@@ -231,6 +232,14 @@ class DeploymentController extends Controller
                 $this->runCmd($docroot, 'npm run build', $push);
             } elseif ($runtime === 'php') {
                 $this->runCmd($docroot, 'composer install --no-interaction --prefer-dist --no-dev', $push);
+            }
+
+            // Güvenli otomatik web yapılandırma: deploy sonrası proje tipine göre docroot/perf güncelle.
+            $auto = app(AutoWebConfigurator::class)->detectAndApply($domain->fresh());
+            if (! ($auto['applied'] ?? false)) {
+                $push('[warn] auto web config skipped: '.(string) ($auto['error'] ?? 'unknown'));
+            } else {
+                $push('[info] auto web config applied: profile='.(string) ($auto['profile'] ?? '').' variant='.(string) ($auto['variant'] ?? ''));
             }
 
             $commit = trim((string) shell_exec('cd '.escapeshellarg($docroot).' && git rev-parse --short HEAD 2>/dev/null'));

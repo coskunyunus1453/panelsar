@@ -6,6 +6,7 @@ use App\Http\Controllers\Concerns\AuthorizesUserDomain;
 use App\Http\Controllers\Controller;
 use App\Models\Domain;
 use App\Models\PanelSetting;
+use App\Services\AutoWebConfigurator;
 use App\Services\EngineApiService;
 use App\Services\HostingQuotaService;
 use App\Services\SafeAuditLogger;
@@ -26,6 +27,7 @@ class FileManagerController extends Controller
     public function __construct(
         private EngineApiService $engine,
         private HostingQuotaService $quota,
+        private AutoWebConfigurator $autoWebConfigurator,
     ) {}
 
     /**
@@ -491,10 +493,26 @@ class FileManagerController extends Controller
         try {
             $result = $this->engine->uploadFile($domain->name, $engineRelPath, $up);
             $ok = empty($result['error']);
+            $auto = null;
             if ($ok && $templateMode !== null) {
                 $this->engine->chmodFile($domain->name, $engineTargetPath, $templateMode);
             }
+            if ($ok && $this->shouldAutoConfigureAfterUpload($baseName)) {
+                $auto = $this->autoWebConfigurator->detectAndApply($domain->fresh());
+                if (! ($auto['applied'] ?? false)) {
+                    SafeAuditLogger::warning('hostvim.file_audit', [
+                        'domain' => $domain->name,
+                        'action' => 'auto_web_config_after_upload_failed',
+                        'error' => (string) ($auto['error'] ?? 'unknown'),
+                        'profile' => (string) ($auto['profile'] ?? ''),
+                        'variant' => (string) ($auto['variant'] ?? ''),
+                    ], $request);
+                }
+            }
             $this->logFileAction($request, $domain, 'upload', $relPath, null, $ok, $result['error'] ?? null);
+            if ($auto !== null) {
+                $result['auto_web'] = $auto;
+            }
 
             $status = $ok ? 200 : 502;
 
@@ -583,6 +601,34 @@ class FileManagerController extends Controller
         }
 
         return strtolower(substr($name, $dot + 1));
+    }
+
+    private function shouldAutoConfigureAfterUpload(string $filename): bool
+    {
+        $f = strtolower(trim($filename));
+        if ($f === '') {
+            return false;
+        }
+        $markers = [
+            'artisan',
+            'composer.json',
+            'package.json',
+            'wp-config.php',
+            'next.config.js',
+            'next.config.mjs',
+            'next.config.ts',
+            'nuxt.config.js',
+            'nuxt.config.ts',
+            '.env',
+        ];
+        if (in_array($f, $markers, true)) {
+            return true;
+        }
+
+        return str_ends_with($f, '.zip')
+            || str_ends_with($f, '.tar')
+            || str_ends_with($f, '.tar.gz')
+            || str_ends_with($f, '.tgz');
     }
 
     public function rename(Request $request, Domain $domain): JsonResponse
@@ -771,6 +817,17 @@ class FileManagerController extends Controller
 
             return response()->json(['message' => $result['error']], 422);
         }
+        $auto = $this->autoWebConfigurator->detectAndApply($domain->fresh());
+        if (! ($auto['applied'] ?? false)) {
+            SafeAuditLogger::warning('hostvim.file_audit', [
+                'domain' => $domain->name,
+                'action' => 'auto_web_config_after_unzip_failed',
+                'error' => (string) ($auto['error'] ?? 'unknown'),
+                'profile' => (string) ($auto['profile'] ?? ''),
+                'variant' => (string) ($auto['variant'] ?? ''),
+            ], $request);
+        }
+        $result['auto_web'] = $auto;
         $this->logFileAction($request, $domain, 'unzip', $archive, $targetDir, true, null);
 
         return response()->json($result);
