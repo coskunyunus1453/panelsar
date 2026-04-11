@@ -265,7 +265,7 @@ final class LandingAppearance
             return null;
         }
         $path = ltrim((string) $path, '/');
-        if (! Storage::disk('public')->exists($path)) {
+        if (! self::landingUploadExists($path)) {
             return null;
         }
 
@@ -355,7 +355,7 @@ final class LandingAppearance
             return null;
         }
         $path = ltrim((string) $path, '/');
-        if (! Storage::disk('public')->exists($path)) {
+        if (! self::landingUploadExists($path)) {
             return null;
         }
 
@@ -369,7 +369,7 @@ final class LandingAppearance
             return null;
         }
         $path = ltrim((string) $path, '/');
-        if (! Storage::disk('public')->exists($path)) {
+        if (! self::landingUploadExists($path)) {
             return null;
         }
         $ext = strtolower(pathinfo($path, PATHINFO_EXTENSION));
@@ -442,11 +442,34 @@ final class LandingAppearance
             return null;
         }
         $path = ltrim((string) $path, '/');
-        if (! Storage::disk('public')->exists($path)) {
+        if (! self::landingUploadExists($path)) {
             return null;
         }
 
         return self::publicDiskBrowserUrl($path);
+    }
+
+    /** Logo / favicon / hero: `landing_assets` disk veya eski `public` disk. */
+    public static function landingUploadExists(string $relativePath): bool
+    {
+        $relativePath = ltrim($relativePath, '/');
+
+        return Storage::disk('landing_assets')->exists($relativePath)
+            || Storage::disk('public')->exists($relativePath);
+    }
+
+    /** Kayıtlı landing görselini hem disklerden siler (yükleme yeri değişince eski dosya kalmasın). */
+    public static function deleteLandingStoredPath(?string $path): void
+    {
+        if (! is_string($path) || $path === '') {
+            return;
+        }
+        if (Storage::disk('landing_assets')->exists($path)) {
+            Storage::disk('landing_assets')->delete($path);
+        }
+        if (Storage::disk('public')->exists($path)) {
+            Storage::disk('public')->delete($path);
+        }
     }
 
     /**
@@ -457,8 +480,25 @@ final class LandingAppearance
     {
         $pathOnPublicDisk = ltrim($pathOnPublicDisk, '/');
 
+        if (str_starts_with($pathOnPublicDisk, 'landing/') && Storage::disk('landing_assets')->exists($pathOnPublicDisk)) {
+            if (app()->runningInConsole()) {
+                return rtrim((string) config('app.url'), '/').'/landing-assets/'.$pathOnPublicDisk;
+            }
+
+            return asset('landing-assets/'.$pathOnPublicDisk);
+        }
+
         if (app()->runningInConsole()) {
             return Storage::disk('public')->url($pathOnPublicDisk);
+        }
+
+        if (str_starts_with($pathOnPublicDisk, 'landing/') && Storage::disk('public')->exists($pathOnPublicDisk)) {
+            $file = substr($pathOnPublicDisk, strlen('landing/'));
+            $ext = strtolower(pathinfo($file, PATHINFO_EXTENSION));
+            $stem = pathinfo($file, PATHINFO_FILENAME);
+            if ($ext !== '' && $stem !== '' && preg_match('/^[A-Za-z0-9][A-Za-z0-9_-]*$/', $stem)) {
+                return route('landing.media', ['ext' => $ext, 'base' => $stem], absolute: true);
+            }
         }
 
         return url('storage/'.$pathOnPublicDisk);

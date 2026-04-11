@@ -18,7 +18,7 @@
         </div>
 
         <div>
-            <label for="label" class="admin-label">Etiket</label>
+            <label for="label" class="admin-label">Etiket (Türkçe / varsayılan)</label>
             <input id="label" name="label" type="text" value="{{ old('label', $item->label) }}" required class="admin-field mt-1" />
             @error('label')
                 <p class="mt-1 text-xs text-rose-600 dark:text-rose-300">{{ $message }}</p>
@@ -26,9 +26,27 @@
         </div>
 
         <div>
-            <label for="href" class="admin-label">Bağlantı</label>
+            <label for="label_en" class="admin-label">İngilizce etiket</label>
+            <input id="label_en" name="label_en" type="text" value="{{ old('label_en', $item->label_en) }}" class="admin-field mt-1" />
+            <p class="admin-muted mt-1 text-xs">Dil EN iken gösterilir; boşsa varsayılan etiket kullanılır.</p>
+            @error('label_en')
+                <p class="mt-1 text-xs text-rose-600 dark:text-rose-300">{{ $message }}</p>
+            @enderror
+        </div>
+
+        <div>
+            <label for="href" class="admin-label">Bağlantı (varsayılan)</label>
             <input id="href" name="href" type="text" value="{{ old('href', $item->href) }}" required class="admin-field mt-1 font-mono text-sm" />
             @error('href')
+                <p class="mt-1 text-xs text-rose-600 dark:text-rose-300">{{ $message }}</p>
+            @enderror
+        </div>
+
+        <div>
+            <label for="href_en" class="admin-label">İngilizce bağlantı (isteğe bağlı)</label>
+            <input id="href_en" name="href_en" type="text" value="{{ old('href_en', $item->href_en) }}" class="admin-field mt-1 font-mono text-sm" />
+            <p class="admin-muted mt-1 text-xs">Farklı slug veya harici adres gerekiyorsa doldurun.</p>
+            @error('href_en')
                 <p class="mt-1 text-xs text-rose-600 dark:text-rose-300">{{ $message }}</p>
             @enderror
         </div>

@@ -7,6 +7,7 @@ use App\Http\Middleware\SetLandingLocale;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Illuminate\Http\Request;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -16,7 +17,15 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        $middleware->redirectGuestsTo(fn () => route('login'));
+        $middleware->redirectGuestsTo(function (Request $request): string {
+            $lang = $request->query('lang');
+            if (! is_string($lang) || $lang === '') {
+                $sessionLocale = $request->session()->get('landing_locale');
+                $lang = is_string($sessionLocale) ? $sessionLocale : '';
+            }
+
+            return $lang !== '' ? route('login', ['lang' => $lang]) : route('login');
+        });
         $middleware->redirectUsersTo(fn () => route('community.index'));
         $middleware->web(append: [
             SetLandingLocale::class,

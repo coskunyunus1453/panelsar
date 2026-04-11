@@ -937,3 +937,90 @@ func FirewallRulesList(cfg *config.Config) ([]gin.H, error) {
 	}
 	return out, nil
 }
+
+func patchMailStateDomain(s *mailState, oldD, newD string) {
+	oldD = strings.ToLower(strings.TrimSpace(oldD))
+	newD = strings.ToLower(strings.TrimSpace(newD))
+	if oldD == "" || newD == "" {
+		return
+	}
+	for i, m := range s.Mailboxes {
+		if em, ok := m["email"].(string); ok {
+			m["email"] = strings.ReplaceAll(strings.ToLower(em), "@"+oldD, "@"+newD)
+			s.Mailboxes[i] = m
+		}
+	}
+	for i, f := range s.Forwarders {
+		if src, ok := f["source"].(string); ok {
+			f["source"] = strings.ReplaceAll(strings.ToLower(src), "@"+oldD, "@"+newD)
+		}
+		if dst, ok := f["destination"].(string); ok {
+			dl := strings.ToLower(dst)
+			if strings.HasSuffix(dl, "@"+oldD) {
+				f["destination"] = strings.ReplaceAll(dl, "@"+oldD, "@"+newD)
+			}
+		}
+		s.Forwarders[i] = f
+	}
+	if s.SPF != "" {
+		s.SPF = strings.ReplaceAll(s.SPF, oldD, newD)
+	}
+	if s.DMARC != "" {
+		s.DMARC = strings.ReplaceAll(s.DMARC, oldD, newD)
+	}
+}
+
+// RenameDomainStateFiles engine-state içindeki dns / ftp / mail dosyalarını from → to taşır (site dizini os.Rename öncesi).
+func RenameDomainStateFiles(cfg *config.Config, from, to string) error {
+	fromD := safeDomain(from)
+	toD := safeDomain(to)
+	if fromD == "" || toD == "" || fromD == toD {
+		return fmt.Errorf("invalid domain rename")
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	base := dir(cfg)
+	dnsFrom := filepath.Join(base, "dns", fromD+".json")
+	dnsTo := filepath.Join(base, "dns", toD+".json")
+	if _, err := os.Stat(dnsTo); err == nil {
+		return fmt.Errorf("dns state already exists for %s", toD)
+	}
+	if _, err := os.Stat(dnsFrom); err == nil {
+		if err := os.Rename(dnsFrom, dnsTo); err != nil {
+			return err
+		}
+	} else if !os.IsNotExist(err) {
+		return err
+	}
+	ftpFrom := filepath.Join(base, "ftp", fromD+".json")
+	ftpTo := filepath.Join(base, "ftp", toD+".json")
+	if _, err := os.Stat(ftpTo); err == nil {
+		return fmt.Errorf("ftp state already exists for %s", toD)
+	}
+	if _, err := os.Stat(ftpFrom); err == nil {
+		if err := os.Rename(ftpFrom, ftpTo); err != nil {
+			return err
+		}
+	} else if !os.IsNotExist(err) {
+		return err
+	}
+	mailFrom := filepath.Join(base, "mail", fromD+".json")
+	mailTo := filepath.Join(base, "mail", toD+".json")
+	if _, err := os.Stat(mailTo); err == nil {
+		return fmt.Errorf("mail state already exists for %s", toD)
+	}
+	if _, err := os.Stat(mailFrom); err == nil {
+		s, err := readMail(mailFrom)
+		if err != nil {
+			return err
+		}
+		patchMailStateDomain(s, fromD, toD)
+		if err := writeMail(mailTo, s); err != nil {
+			return err
+		}
+		_ = os.Remove(mailFrom)
+	} else if !os.IsNotExist(err) {
+		return err
+	}
+	return nil
+}

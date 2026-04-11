@@ -9,6 +9,7 @@ use App\Services\TotpService;
 use App\Services\WhiteLabelBrandingService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 
@@ -179,6 +180,61 @@ class AuthController extends Controller
             'token' => $token->plainTextToken,
             'expires_at' => $expiresAt,
             'abilities' => $abilities,
+        ]);
+    }
+
+    /**
+     * WHMCS / harici SSO: tek kullanımlık cache anahtarı → Sanctum token (müşteri paneli).
+     */
+    public function consumeWhmcsSso(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'token' => ['required', 'string', 'uuid'],
+        ]);
+
+        $payload = Cache::pull('whmcs_sso:'.$validated['token']);
+        if (! is_array($payload) || empty($payload['user_id'])) {
+            return response()->json([
+                'message' => 'Geçersiz veya süresi dolmuş bağlantı.',
+            ], 401);
+        }
+
+        $user = User::query()->find((int) $payload['user_id']);
+        if ($user === null || $user->status !== 'active') {
+            return response()->json(['message' => 'Hesap kullanılamıyor.'], 403);
+        }
+
+        $forAdmin = ! empty($payload['admin']);
+
+        if ($forAdmin) {
+            if (! $user->isAdmin()) {
+                return response()->json(['message' => 'Bu SSO bağlantısı yalnızca yönetici hesapları içindir.'], 403);
+            }
+        } else {
+            if ($user->isAdmin() || $user->isVendorOperator()) {
+                return response()->json(['message' => 'Bu hesap türü için müşteri SSO kullanılamaz.'], 403);
+            }
+        }
+
+        if ($user->two_factor_enabled && $user->two_factor_secret) {
+            return response()->json(['message' => '2FA etkin hesaplar için SSO kullanılamaz.'], 403);
+        }
+
+        $expiresAt = now()->addHours(24);
+        $abilities = $user->sanctumAbilities();
+        $tokenName = $forAdmin ? 'panel-token-sso-whmcs-admin' : 'panel-token-sso-whmcs';
+        $sanctumToken = $user->createToken($tokenName, $abilities, $expiresAt);
+
+        $userPayload = $user->load('roles')->toArray();
+        $userPayload['abilities'] = $abilities;
+
+        return response()->json([
+            'user' => $userPayload,
+            'token' => $sanctumToken->plainTextToken,
+            'expires_at' => $expiresAt,
+            'enforce_admin_2fa' => (bool) config('hostvim.enforce_admin_2fa', false),
+            'force_password_change' => (bool) $user->force_password_change,
+            'white_label' => $this->whiteLabelBranding->uiPayloadForUser($user),
         ]);
     }
 }

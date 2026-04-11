@@ -25,6 +25,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        $this->normalizeStaleAssetUrlForRootDeployment();
+
         RateLimiter::for('api', function (Request $request) {
             return Limit::perMinute(120)->by($request->ip());
         });
@@ -93,6 +95,49 @@ class AppServiceProvider extends ServiceProvider
                 @mkdir($path, 0777, true);
             }
             config(['view.compiled' => $path]);
+        }
+    }
+
+    /**
+     * Canlıda document root public/ iken .env'de XAMPP alt klasörü için kalan ASSET_URL
+     * (örn. /hostvim/landing/public) Vite chunk'larını yanlış yola iter. APP_URL kök
+     * alan adındaysa bu kalıntıyı yok say.
+     */
+    private function normalizeStaleAssetUrlForRootDeployment(): void
+    {
+        $raw = config('app.asset_url');
+        if ($raw === null || $raw === '') {
+            return;
+        }
+
+        $assetStr = is_string($raw) ? trim($raw) : '';
+        if ($assetStr === '') {
+            return;
+        }
+
+        $appUrl = (string) config('app.url');
+        if ($appUrl === '') {
+            return;
+        }
+
+        $appPath = parse_url($appUrl, PHP_URL_PATH);
+        $appPath = is_string($appPath) ? rtrim($appPath, '/') : '';
+        if ($appPath !== '' && $appPath !== '/') {
+            return;
+        }
+
+        $staleMarkers = [
+            '/hostvim/landing/public',
+            '/htdocs/hostvim',
+            'localhost/hostvim',
+        ];
+
+        foreach ($staleMarkers as $needle) {
+            if (str_contains($assetStr, $needle)) {
+                config(['app.asset_url' => null]);
+
+                return;
+            }
         }
     }
 }

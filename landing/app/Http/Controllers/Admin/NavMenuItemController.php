@@ -80,14 +80,16 @@ class NavMenuItemController extends Controller
     }
 
     /**
-     * @return array{zone: string, label: string, href: string, is_active: bool, open_in_new_tab: bool, sort_order?: int}
+     * @return array{zone: string, label: string, label_en: ?string, href: string, href_en: ?string, is_active: bool, open_in_new_tab: bool, sort_order?: int}
      */
     private function validated(Request $request, bool $withSortOrder): array
     {
         $rules = [
             'zone' => ['required', Rule::in([NavMenuItem::ZONE_HEADER, NavMenuItem::ZONE_FOOTER])],
             'label' => ['required', 'string', 'max:255'],
-            'href' => ['required', 'string', 'max:2048', $this->hrefRule()],
+            'label_en' => ['nullable', 'string', 'max:255'],
+            'href' => ['required', 'string', 'max:2048', $this->hrefRule(false)],
+            'href_en' => ['nullable', 'string', 'max:2048', $this->hrefRule(true)],
             'is_active' => ['sometimes', 'boolean'],
             'open_in_new_tab' => ['sometimes', 'boolean'],
         ];
@@ -99,13 +101,17 @@ class NavMenuItemController extends Controller
         $data = $request->validate($rules);
         $data['is_active'] = $request->boolean('is_active');
         $data['open_in_new_tab'] = $request->boolean('open_in_new_tab');
+        $data['label_en'] = isset($data['label_en']) ? trim((string) $data['label_en']) : null;
+        $data['label_en'] = $data['label_en'] === '' ? null : $data['label_en'];
+        $data['href_en'] = isset($data['href_en']) ? trim((string) $data['href_en']) : null;
+        $data['href_en'] = $data['href_en'] === '' ? null : $data['href_en'];
 
         return $data;
     }
 
-    private function hrefRule(): \Closure
+    private function hrefRule(bool $allowEmpty): \Closure
     {
-        return function (string $attribute, mixed $value, \Closure $fail): void {
+        return function (string $attribute, mixed $value, \Closure $fail) use ($allowEmpty): void {
             if (! is_string($value)) {
                 $fail('Bağlantı metin olmalıdır.');
 
@@ -113,6 +119,9 @@ class NavMenuItemController extends Controller
             }
             $v = trim($value);
             if ($v === '') {
+                if ($allowEmpty) {
+                    return;
+                }
                 $fail('Bağlantı boş olamaz.');
 
                 return;

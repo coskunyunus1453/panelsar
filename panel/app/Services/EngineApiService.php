@@ -116,6 +116,19 @@ class EngineApiService
         return $this->deleteChecked($path);
     }
 
+    /**
+     * Ana site dizini + vhost + engine-state (dns/mail/ftp) yeniden adlandırma.
+     *
+     * @return array<string, mixed>
+     */
+    public function renameSite(string $from, string $to): array
+    {
+        return $this->postLongChecked('/api/v1/sites/rename', [
+            'from' => $from,
+            'to' => $to,
+        ], 180);
+    }
+
     public function suspendSite(string $domain): array
     {
         return $this->postChecked('/api/v1/sites/'.rawurlencode($domain).'/suspend', []);
@@ -1219,6 +1232,20 @@ class EngineApiService
         $lines = max(100, min(20000, $lines));
 
         return $this->get('/api/v1/sites/'.rawurlencode($domain).'/traffic?lines='.$lines);
+    }
+
+    /**
+     * Erişim günlüğü örneğinden tahmini çıkan bayt (UsageUpdate / bant genişliği göstergesi).
+     */
+    public function getSiteTrafficSampleBytesTotal(string $domain, int $lines = 8000): int
+    {
+        $res = $this->getSiteTraffic($domain, $lines);
+        if (! empty($res['error'])) {
+            return 0;
+        }
+        $traffic = $res['traffic'] ?? [];
+
+        return (int) ($traffic['bytes_total'] ?? 0);
     }
 
     /**

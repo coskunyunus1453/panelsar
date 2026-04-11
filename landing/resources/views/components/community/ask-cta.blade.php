@@ -5,11 +5,16 @@
 ])
 @php
     /** @var \App\Models\CommunityCategory|null $category */
-    $askQuery = $category ? ['kategori' => $category->slug] : [];
+    $askQuery = [];
+    if ($category) {
+        $param = app()->getLocale() === 'en' ? 'category' : 'kategori';
+        $askQuery[$param] = $category->slug;
+    }
     $askUrl = route('community.ask', $askQuery);
     $redirectPath = route('community.ask', $askQuery, absolute: false);
-    $loginUrl = route('login', ['redirect' => $redirectPath]);
-    $registerUrl = route('register', ['redirect' => $redirectPath]);
+    $authQuery = ['redirect' => $redirectPath, 'lang' => app()->getLocale()];
+    $loginUrl = route('login', $authQuery);
+    $registerUrl = route('register', $authQuery);
 @endphp
 
 @if ($layout === 'fab')
@@ -17,13 +22,13 @@
         @auth
             <a href="{{ $askUrl }}"
                class="inline-flex h-14 w-14 items-center justify-center rounded-full bg-[rgb(var(--hv-brand-600)/1)] text-2xl font-light leading-none text-white shadow-lg ring-2 ring-white/40 hover:opacity-95"
-               title="Yeni konu aç"
-               aria-label="Yeni konu aç">+</a>
+               title="{{ landing_t('community.fab_title_new_topic') }}"
+               aria-label="{{ landing_t('community.fab_aria_new_topic') }}">+</a>
         @else
             <a href="{{ $loginUrl }}"
                class="inline-flex h-14 w-14 items-center justify-center rounded-full bg-[rgb(var(--hv-brand-600)/1)] text-sm font-semibold text-white shadow-lg ring-2 ring-white/40 hover:opacity-95"
-               title="Konu açmak için giriş"
-               aria-label="Konu açmak için giriş">?</a>
+               title="{{ landing_t('community.fab_title_login') }}"
+               aria-label="{{ landing_t('community.fab_aria_login') }}">?</a>
         @endauth
     </div>
 @elseif ($layout === 'hero')
@@ -31,16 +36,16 @@
         @auth
             <a href="{{ $askUrl }}"
                class="inline-flex items-center justify-center rounded-xl bg-[rgb(var(--hv-brand-600)/1)] px-5 py-3 text-sm font-semibold text-white shadow-sm hover:opacity-95">
-                Yeni konu aç
+                {{ landing_t('community.hero_new_topic') }}
             </a>
         @else
             <a href="{{ $loginUrl }}"
                class="inline-flex items-center justify-center rounded-xl bg-[rgb(var(--hv-brand-600)/1)] px-5 py-3 text-sm font-semibold text-white shadow-sm hover:opacity-95">
-                Giriş yap
+                {{ landing_t('community.hero_login') }}
             </a>
             <a href="{{ $registerUrl }}"
                class="inline-flex items-center justify-center rounded-xl border-2 border-[rgb(var(--hv-brand-600)/0.5)] bg-white px-5 py-3 text-sm font-semibold text-[rgb(var(--hv-brand-700)/1)] dark:bg-slate-900 dark:text-slate-100">
-                Ücretsiz kayıt
+                {{ landing_t('community.hero_register_free') }}
             </a>
         @endauth
     </div>
@@ -49,16 +54,16 @@
         @auth
             <a href="{{ $askUrl }}"
                class="inline-flex items-center justify-center rounded-lg bg-[rgb(var(--hv-brand-600)/1)] px-3 py-1.5 text-xs font-semibold text-white hover:opacity-95 sm:text-sm sm:px-4 sm:py-2">
-                Soru sor
+                {{ landing_t('community.compact_ask') }}
             </a>
         @else
             <a href="{{ $loginUrl }}"
                class="inline-flex items-center justify-center rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-800 dark:border-slate-600 dark:text-slate-200 sm:text-sm">
-                Giriş
+                {{ landing_t('community.compact_login') }}
             </a>
             <a href="{{ $registerUrl }}"
                class="inline-flex items-center justify-center rounded-lg bg-[rgb(var(--hv-brand-600)/1)] px-3 py-1.5 text-xs font-semibold text-white hover:opacity-95 sm:text-sm">
-                Kayıt
+                {{ landing_t('community.compact_register') }}
             </a>
         @endauth
     </div>
@@ -68,16 +73,16 @@
         @auth
             <a href="{{ $askUrl }}"
                class="inline-flex items-center justify-center rounded-xl bg-[rgb(var(--hv-brand-600)/1)] px-4 py-2.5 text-sm font-semibold text-white hover:opacity-95">
-                Yeni konu aç
+                {{ landing_t('community.strip_new_topic') }}
             </a>
         @else
             <a href="{{ $loginUrl }}"
                class="inline-flex items-center justify-center rounded-xl bg-[rgb(var(--hv-brand-600)/1)] px-4 py-2.5 text-sm font-semibold text-white hover:opacity-95">
-                Giriş — konu aç
+                {{ landing_t('community.strip_login_ask') }}
             </a>
             <a href="{{ $registerUrl }}"
                class="inline-flex items-center justify-center rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-800 dark:border-slate-600 dark:text-slate-200">
-                Kayıt ol
+                {{ landing_t('community.strip_register') }}
             </a>
         @endauth
     </div>

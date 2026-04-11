@@ -63,6 +63,10 @@ return [
     | npm run build öncesinde .env'de tanımlayın; aksi halde ön yüz /build/ ile
     | kökten yanlış adres ister.
     |
+    | Canlıda sunucu kökü doğrudan public/ ise ASSET_URL boş bırakın; aksi halde
+    | @vite dinamik chunk (admin-editor vb.) 404 verir. AppServiceProvider, APP_URL
+    | alan adı kökündeyken tipik XAMPP kalıntı yollarını otomatik yok sayar.
+    |
     */
 
     'asset_url' => env('ASSET_URL'),

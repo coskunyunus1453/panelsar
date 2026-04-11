@@ -4,6 +4,7 @@
 <x-admin.layout title="Ön yüz menüleri">
     <p class="admin-muted max-w-2xl">
         Üst başlık ve alt bilgi bağlantıları. Site içi adresler <code class="rounded bg-slate-200 px-1 text-xs dark:bg-slate-800">/</code> ile başlamalı (ör. <code class="rounded bg-slate-200 px-1 text-xs dark:bg-slate-800">/blog</code>, <code class="rounded bg-slate-200 px-1 text-xs dark:bg-slate-800">/#faq</code>). Harici sayfa için tam <code class="text-xs">https://</code> adresi kullanın.
+        İngilizce arayüz için <strong>İngilizce etiket</strong> (ve isteğe bağlı ayrı yol) alanlarını doldurun; boşsa Türkçe metin ve yol kullanılır.
     </p>
 
     <div class="mt-8 space-y-10">
@@ -38,8 +39,18 @@
                                             <input type="number" name="items[{{ $i }}][sort_order]" value="{{ $row->sort_order }}" min="0" max="500"
                                                    class="admin-field w-20 px-2 py-1.5 text-sm" />
                                         </td>
-                                        <td class="admin-td-strong px-4 py-2">{{ $row->label }}</td>
-                                        <td class="admin-td-muted px-4 py-2 font-mono text-xs">{{ $row->href }}</td>
+                                        <td class="px-4 py-2">
+                                            <span class="admin-td-strong block">{{ $row->label }}</span>
+                                            @if ($row->label_en)
+                                                <span class="mt-0.5 block text-xs text-slate-500 dark:text-slate-400">EN: {{ $row->label_en }}</span>
+                                            @endif
+                                        </td>
+                                        <td class="admin-td-muted px-4 py-2 font-mono text-xs">
+                                            <span class="block">{{ $row->href }}</span>
+                                            @if ($row->href_en)
+                                                <span class="mt-0.5 block text-[11px] text-slate-500">EN: {{ $row->href_en }}</span>
+                                            @endif
+                                        </td>
                                         <td class="px-4 py-2 text-xs">
                                             @if ($row->is_active)
                                                 <span class="admin-badge-ok">Açık</span>
@@ -101,8 +112,18 @@
                                             <input type="number" name="items[{{ $i }}][sort_order]" value="{{ $row->sort_order }}" min="0" max="500"
                                                    class="admin-field w-20 px-2 py-1.5 text-sm" />
                                         </td>
-                                        <td class="admin-td-strong px-4 py-2">{{ $row->label }}</td>
-                                        <td class="admin-td-muted px-4 py-2 font-mono text-xs">{{ $row->href }}</td>
+                                        <td class="px-4 py-2">
+                                            <span class="admin-td-strong block">{{ $row->label }}</span>
+                                            @if ($row->label_en)
+                                                <span class="mt-0.5 block text-xs text-slate-500 dark:text-slate-400">EN: {{ $row->label_en }}</span>
+                                            @endif
+                                        </td>
+                                        <td class="admin-td-muted px-4 py-2 font-mono text-xs">
+                                            <span class="block">{{ $row->href }}</span>
+                                            @if ($row->href_en)
+                                                <span class="mt-0.5 block text-[11px] text-slate-500">EN: {{ $row->href_en }}</span>
+                                            @endif
+                                        </td>
                                         <td class="px-4 py-2 text-xs">
                                             @if ($row->is_active)
                                                 <span class="admin-badge-ok">Açık</span>

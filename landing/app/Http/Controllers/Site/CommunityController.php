@@ -92,7 +92,7 @@ class CommunityController extends Controller
         $robotsContent = $this->topicRobots($site, $topic);
 
         $breadcrumbs = [
-            ['name' => 'Ana sayfa', 'url' => url('/')],
+            ['name' => landing_t('nav.home'), 'url' => url('/')],
             ['name' => $site->site_title, 'url' => route('community.index', absolute: true)],
         ];
         if ($topic->category) {
@@ -148,7 +148,7 @@ class CommunityController extends Controller
             $description = $site->default_meta_description;
             $canonicalBase = route('community.tag', $tag->slug, absolute: true);
         } else {
-            $title = $site->default_meta_title ?: ($site->site_title.' — Soru & Cevap');
+            $title = $site->default_meta_title ?: ($site->site_title.' — '.landing_t('community.listing_meta_suffix'));
             $description = $site->default_meta_description;
             $canonicalBase = route('community.index', absolute: true);
         }
@@ -315,7 +315,7 @@ class CommunityController extends Controller
     ): string {
         $brand = landing_p('brand.name');
         $crumbs = [
-            ['name' => 'Ana sayfa', 'url' => url('/')],
+            ['name' => landing_t('nav.home'), 'url' => url('/')],
             ['name' => $site->site_title, 'url' => route('community.index', absolute: true)],
         ];
         if ($activeCategory instanceof CommunityCategory) {

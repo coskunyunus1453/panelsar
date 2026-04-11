@@ -35,7 +35,7 @@ class LoginController extends Controller
             'password' => $credentials['password'],
         ], $request->boolean('remember'))) {
             throw ValidationException::withMessages([
-                'email' => 'Bu e-posta ve şifre ile eşleşen bir hesap bulunamadı.',
+                'email' => landing_t('auth.error_login_credentials'),
             ]);
         }
 
@@ -56,6 +56,6 @@ class LoginController extends Controller
         $request->session()->invalidate();
         $request->session()->regenerateToken();
 
-        return redirect()->route('landing.home')->with('status', 'Oturumunuz kapatıldı.');
+        return redirect()->route('landing.home')->with('status', landing_t('auth.flash_logout'));
     }
 }

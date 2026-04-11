@@ -43,11 +43,15 @@ class NewPasswordController extends Controller
         );
 
         if ($status === Password::PASSWORD_RESET) {
-            return redirect()->route('login')->with('status', 'Şifreniz güncellendi. Giriş yapabilirsiniz.');
+            $lang = $request->session()->get('landing_locale');
+
+            return redirect()->route('login', array_filter([
+                'lang' => is_string($lang) ? $lang : null,
+            ]))->with('status', landing_t('auth.flash_password_updated'));
         }
 
         return back()->withErrors([
-            'email' => 'Şifre sıfırlama bağlantısı geçersiz veya süresi dolmuş. Yeni bir istek oluşturun.',
+            'email' => landing_t('auth.error_reset_token_invalid'),
         ]);
     }
 }

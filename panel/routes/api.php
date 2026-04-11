@@ -24,6 +24,8 @@ use App\Http\Controllers\Api\DomainNginxVhostController;
 use App\Http\Controllers\Api\EmailAccountController;
 use App\Http\Controllers\Api\FileManagerController;
 use App\Http\Controllers\Api\FtpController;
+use App\Http\Controllers\Api\Integrations\WhmcsProvisioningController;
+use App\Http\Controllers\Api\Integrations\WhmcsResourcesController;
 use App\Http\Controllers\Api\InstallerController;
 use App\Http\Controllers\Api\LicenseController;
 use App\Http\Controllers\Api\MonitoringController;
@@ -62,6 +64,7 @@ Route::get('branding/wl/{userId}/{filename}', [BrandingController::class, 'serve
 
 Route::prefix('auth')->group(function () {
     Route::post('login', [AuthController::class, 'login'])->middleware('throttle:login');
+    Route::post('sso/whmcs-consume', [AuthController::class, 'consumeWhmcsSso'])->middleware('throttle:sso-consume');
 
     Route::middleware(['auth:sanctum', 'abilities:access:customer-panel'])->group(function () {
         Route::get('2fa/status', [TwoFactorController::class, 'status']);
@@ -454,3 +457,43 @@ Route::get('health', fn () => response()->json([
     'panel' => 'hostvim',
     'version' => config('hostvim.version', '0.1.0'),
 ]));
+
+Route::prefix('integrations/whmcs')
+    ->middleware(['whmcs.integration', 'throttle:whmcs-integration'])
+    ->group(function () {
+        Route::get('test', [WhmcsProvisioningController::class, 'test']);
+        Route::get('packages', [WhmcsProvisioningController::class, 'packages']);
+        Route::post('provision', [WhmcsProvisioningController::class, 'provision']);
+        Route::post('suspend', [WhmcsProvisioningController::class, 'suspend']);
+        Route::post('unsuspend', [WhmcsProvisioningController::class, 'unsuspend']);
+        Route::post('terminate', [WhmcsProvisioningController::class, 'terminate']);
+        Route::post('change-password', [WhmcsProvisioningController::class, 'changePassword']);
+        Route::post('change-package', [WhmcsProvisioningController::class, 'changePackage']);
+        Route::post('change-domain', [WhmcsProvisioningController::class, 'changeDomain']);
+        Route::post('service/renew', [WhmcsProvisioningController::class, 'serviceRenew']);
+        Route::post('site/update', [WhmcsProvisioningController::class, 'updateSite']);
+        Route::get('usage/accounts', [WhmcsResourcesController::class, 'usageAccounts']);
+        Route::get('usage/domain', [WhmcsResourcesController::class, 'usageDomain']);
+        Route::post('email/create', [WhmcsResourcesController::class, 'emailCreate']);
+        Route::post('email/delete', [WhmcsResourcesController::class, 'emailDelete']);
+        Route::post('ftp/create', [WhmcsResourcesController::class, 'ftpCreate']);
+        Route::post('ftp/delete', [WhmcsResourcesController::class, 'ftpDelete']);
+        Route::post('database/create', [WhmcsResourcesController::class, 'databaseCreate']);
+        Route::post('database/delete', [WhmcsResourcesController::class, 'databaseDelete']);
+        Route::get('cron/list', [WhmcsResourcesController::class, 'cronList']);
+        Route::post('cron/create', [WhmcsResourcesController::class, 'cronCreate']);
+        Route::post('cron/delete', [WhmcsResourcesController::class, 'cronDelete']);
+        Route::post('sso/mint', [WhmcsResourcesController::class, 'ssoMint']);
+        Route::post('sso/mint-admin', [WhmcsResourcesController::class, 'ssoMintAdmin']);
+        Route::get('dns/list', [WhmcsResourcesController::class, 'dnsList']);
+        Route::post('dns/create', [WhmcsResourcesController::class, 'dnsCreate']);
+        Route::post('dns/import', [WhmcsResourcesController::class, 'dnsImport']);
+        Route::post('dns/import-zone', [WhmcsResourcesController::class, 'dnsImportZone']);
+        Route::post('dns/delete', [WhmcsResourcesController::class, 'dnsDelete']);
+        Route::post('email/forwarder/create', [WhmcsResourcesController::class, 'emailForwarderCreate']);
+        Route::post('email/forwarder/delete', [WhmcsResourcesController::class, 'emailForwarderDelete']);
+        Route::post('database/rotate-password', [WhmcsResourcesController::class, 'databaseRotatePassword']);
+        Route::post('ssl/issue', [WhmcsResourcesController::class, 'sslIssue']);
+        Route::post('ssl/renew', [WhmcsResourcesController::class, 'sslRenew']);
+        Route::post('backup/queue', [WhmcsResourcesController::class, 'backupQueue']);
+    });

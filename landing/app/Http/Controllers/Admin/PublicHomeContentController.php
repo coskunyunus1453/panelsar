@@ -9,7 +9,6 @@ use App\Services\LandingI18n;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 
 class PublicHomeContentController extends Controller
@@ -113,19 +112,19 @@ class PublicHomeContentController extends Controller
 
         if ($request->boolean('remove_hero_image')) {
             $old = LandingSiteSetting::getValue('landing.hero_image_path', '');
-            if (is_string($old) && $old !== '' && Storage::disk('public')->exists($old)) {
-                Storage::disk('public')->delete($old);
+            if (is_string($old) && $old !== '') {
+                LandingAppearance::deleteLandingStoredPath($old);
             }
             LandingSiteSetting::put('landing.hero_image_path', '');
         } elseif ($request->hasFile('hero_image')) {
             $file = $request->file('hero_image');
             if ($file !== null && $file->isValid()) {
                 $old = LandingSiteSetting::getValue('landing.hero_image_path', '');
-                if (is_string($old) && $old !== '' && Storage::disk('public')->exists($old)) {
-                    Storage::disk('public')->delete($old);
+                if (is_string($old) && $old !== '') {
+                    LandingAppearance::deleteLandingStoredPath($old);
                 }
                 $ext = $file->getClientOriginalExtension() ?: 'jpg';
-                $path = $file->storeAs('landing', 'hero-'.time().'.'.$ext, 'public');
+                $path = $file->storeAs('landing', 'hero-'.time().'.'.$ext, 'landing_assets');
                 LandingSiteSetting::put('landing.hero_image_path', $path);
             }
         }

@@ -26,13 +26,13 @@ class PasswordResetLinkController extends Controller
         );
 
         if ($status === Password::RESET_LINK_SENT) {
-            return back()->with('status', 'Şifre sıfırlama bağlantısı e-posta adresinize gönderildi.');
+            return back()->with('status', landing_t('auth.flash_reset_link_sent'));
         }
 
         return back()->withErrors([
             'email' => $status === Password::INVALID_USER
-                ? 'Bu e-posta ile kayıtlı hesap bulunamadı.'
-                : 'İşlem tamamlanamadı. Lütfen bir süre sonra tekrar deneyin.',
+                ? landing_t('auth.error_reset_unknown_email')
+                : landing_t('auth.error_reset_generic'),
         ]);
     }
 }

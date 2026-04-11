@@ -33,7 +33,7 @@ class RegisterController extends Controller
             'email' => ['required', 'string', 'lowercase', 'email:rfc', 'max:255', 'unique:users,email'],
             'password' => ['required', 'confirmed', Password::min(10)->mixedCase()->numbers()],
         ], [
-            'name.regex' => 'Ad yalnızca harf, boşluk ve tire içerebilir.',
+            'name.regex' => landing_t('auth.validation_name_regex'),
         ]);
 
         $user = User::create([
@@ -50,9 +50,9 @@ class RegisterController extends Controller
 
         $to = SafeInternalRedirect::path($request->input('redirect'));
         if ($to) {
-            return redirect()->to($to)->with('status', 'Hesabınız oluşturuldu. Topluluğa hoş geldiniz.');
+            return redirect()->to($to)->with('status', landing_t('auth.flash_register_welcome'));
         }
 
-        return redirect()->route('community.index')->with('status', 'Hesabınız oluşturuldu. Topluluğa hoş geldiniz.');
+        return redirect()->route('community.index')->with('status', landing_t('auth.flash_register_welcome'));
     }
 }

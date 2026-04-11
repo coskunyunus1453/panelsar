@@ -147,4 +147,14 @@ return [
         'password' => env('POSTGRES_PROVISION_PASSWORD', ''),
         'admin_database' => env('POSTGRES_PROVISION_ADMIN_DB', 'postgres'),
     ],
+
+    /**
+     * WHMCS provisioning modülü → panel REST (Bearer paylaşımlı gizli anahtar).
+     * @see integrations/whmcs/modules/servers/hostvim/hostvim.php
+     */
+    'whmcs_integration' => [
+        'secret' => trim((string) env('HOSTVIM_WHMCS_SECRET', '')),
+        /** WHMCS SSO sonrası tarayıcı yönlendirmesi (örn. https://panel.example.com/admin) */
+        'sso_redirect_base' => rtrim(trim((string) env('HOSTVIM_SSO_PANEL_URL', '')), '/'),
+    ],
 ];

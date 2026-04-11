@@ -9,7 +9,6 @@ use App\Services\LandingI18n;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 
 class SiteSettingsController extends Controller
@@ -102,39 +101,39 @@ class SiteSettingsController extends Controller
 
         if ($request->boolean('remove_site_logo')) {
             $old = LandingSiteSetting::getValue('landing.site_logo_path', '');
-            if (is_string($old) && $old !== '' && Storage::disk('public')->exists($old)) {
-                Storage::disk('public')->delete($old);
+            if (is_string($old) && $old !== '') {
+                LandingAppearance::deleteLandingStoredPath($old);
             }
             LandingSiteSetting::put('landing.site_logo_path', '');
         } elseif ($request->hasFile('site_logo')) {
             $file = $request->file('site_logo');
             if ($file !== null && $file->isValid()) {
                 $old = LandingSiteSetting::getValue('landing.site_logo_path', '');
-                if (is_string($old) && $old !== '' && Storage::disk('public')->exists($old)) {
-                    Storage::disk('public')->delete($old);
+                if (is_string($old) && $old !== '') {
+                    LandingAppearance::deleteLandingStoredPath($old);
                 }
                 $ext = $file->getClientOriginalExtension() ?: 'png';
-                $path = $file->storeAs('landing', 'logo-'.time().'.'.$ext, 'public');
+                $path = $file->storeAs('landing', 'logo-'.time().'.'.$ext, 'landing_assets');
                 LandingSiteSetting::put('landing.site_logo_path', $path);
             }
         }
 
         if ($request->boolean('remove_favicon')) {
             $old = LandingSiteSetting::getValue('landing.favicon_path', '');
-            if (is_string($old) && $old !== '' && Storage::disk('public')->exists($old)) {
-                Storage::disk('public')->delete($old);
+            if (is_string($old) && $old !== '') {
+                LandingAppearance::deleteLandingStoredPath($old);
             }
             LandingSiteSetting::put('landing.favicon_path', '');
         } elseif ($request->hasFile('favicon')) {
             $file = $request->file('favicon');
             if ($file !== null && $file->isValid()) {
                 $old = LandingSiteSetting::getValue('landing.favicon_path', '');
-                if (is_string($old) && $old !== '' && Storage::disk('public')->exists($old)) {
-                    Storage::disk('public')->delete($old);
+                if (is_string($old) && $old !== '') {
+                    LandingAppearance::deleteLandingStoredPath($old);
                 }
                 $ext = strtolower($file->getClientOriginalExtension() ?: 'png');
                 $ext = in_array($ext, ['png', 'jpg', 'jpeg', 'webp', 'ico', 'svg'], true) ? $ext : 'png';
-                $path = $file->storeAs('landing', 'favicon-'.time().'.'.$ext, 'public');
+                $path = $file->storeAs('landing', 'favicon-'.time().'.'.$ext, 'landing_assets');
                 LandingSiteSetting::put('landing.favicon_path', $path);
             }
         }

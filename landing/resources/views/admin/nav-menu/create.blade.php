@@ -12,7 +12,7 @@
         </div>
 
         <div>
-            <label for="label" class="admin-label">Etiket</label>
+            <label for="label" class="admin-label">Etiket (Türkçe / varsayılan)</label>
             <input id="label" name="label" type="text" value="{{ old('label') }}" required class="admin-field mt-1" />
             @error('label')
                 <p class="mt-1 text-xs text-rose-600 dark:text-rose-300">{{ $message }}</p>
@@ -20,9 +20,27 @@
         </div>
 
         <div>
-            <label for="href" class="admin-label">Bağlantı</label>
+            <label for="label_en" class="admin-label">İngilizce etiket</label>
+            <input id="label_en" name="label_en" type="text" value="{{ old('label_en') }}" class="admin-field mt-1" placeholder="Features, Pricing…" />
+            <p class="admin-muted mt-1 text-xs">Dil EN iken gösterilir; boşsa üstteki etiket kullanılır.</p>
+            @error('label_en')
+                <p class="mt-1 text-xs text-rose-600 dark:text-rose-300">{{ $message }}</p>
+            @enderror
+        </div>
+
+        <div>
+            <label for="href" class="admin-label">Bağlantı (varsayılan)</label>
             <input id="href" name="href" type="text" value="{{ old('href') }}" required class="admin-field mt-1 font-mono text-sm" placeholder="/blog veya https://..." />
             @error('href')
+                <p class="mt-1 text-xs text-rose-600 dark:text-rose-300">{{ $message }}</p>
+            @enderror
+        </div>
+
+        <div>
+            <label for="href_en" class="admin-label">İngilizce bağlantı (isteğe bağlı)</label>
+            <input id="href_en" name="href_en" type="text" value="{{ old('href_en') }}" class="admin-field mt-1 font-mono text-sm" placeholder="/en/blog yalnız farklı yol gerekiyorsa" />
+            <p class="admin-muted mt-1 text-xs">Genelde boş bırakın; aynı yol <code class="text-[11px]">?lang=en</code> ile çalışır.</p>
+            @error('href_en')
                 <p class="mt-1 text-xs text-rose-600 dark:text-rose-300">{{ $message }}</p>
             @enderror
         </div>

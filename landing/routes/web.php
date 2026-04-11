@@ -35,6 +35,7 @@ use App\Http\Controllers\Site\CommunityController;
 use App\Http\Controllers\Site\CommunityParticipationController;
 use App\Http\Controllers\Site\CommunityProfileController;
 use App\Http\Controllers\Site\DocController;
+use App\Http\Controllers\Site\LandingMediaController;
 use App\Http\Controllers\Site\PricingController;
 use App\Http\Controllers\Site\SitemapController;
 use App\Http\Controllers\Site\SitePageController;
@@ -43,6 +44,12 @@ use Illuminate\Support\Facades\Route;
 
 Route::permanentRedirect('/kurulum', '/setup');
 Route::permanentRedirect('/fiyatlandirma', '/pricing');
+
+// /media/ birçok sunucuda Nginx alias veya panel tarafından ele geçirilir; Laravel'e hiç düşmez. Çakışmasız önek kullan.
+Route::get('/hv-landing/{ext}/{base}', [LandingMediaController::class, 'show'])
+    ->where('ext', 'png|jpg|jpeg|webp|svg|ico')
+    ->where('base', '[A-Za-z0-9][A-Za-z0-9_-]*')
+    ->name('landing.media');
 
 Route::get('/blog/kategori/{slug}', function (string $slug) {
     $map = [

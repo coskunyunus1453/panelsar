@@ -35,8 +35,13 @@ class CommunityParticipationController extends Controller
             ->get();
 
         $preselectedCategory = null;
+        $slug = null;
         if ($request->filled('kategori')) {
             $slug = Str::limit($request->string('kategori')->trim()->toString(), 191);
+        } elseif ($request->filled('category')) {
+            $slug = Str::limit($request->string('category')->trim()->toString(), 191);
+        }
+        if ($slug !== null && $slug !== '') {
             $preselectedCategory = CommunityCategory::query()
                 ->where('slug', $slug)
                 ->where('is_active', true)
@@ -44,8 +49,8 @@ class CommunityParticipationController extends Controller
         }
 
         $site = CommunitySiteMeta::singleton();
-        $seoTitle = 'Yeni soru — '.$site->site_title;
-        $seoDescription = 'Topluluğa soru sorun; arama motorları için isteğe bağlı başlık ve açıklama ayarlayabilirsiniz.';
+        $seoTitle = landing_t('community.ask_meta_title', ['site' => $site->site_title]);
+        $seoDescription = landing_t('community.ask_meta_description');
 
         return view('site.community.ask', [
             'categories' => $categories,
@@ -67,17 +72,17 @@ class CommunityParticipationController extends Controller
             'tags' => ['nullable', 'string', 'max:220'],
             'body' => ['required', 'string', 'max:60000', function (string $attribute, mixed $value, Closure $fail): void {
                 if (! is_string($value)) {
-                    $fail('Geçersiz içerik.');
+                    $fail(landing_t('community.validation_invalid_content'));
 
                     return;
                 }
                 if (CommunityRichContent::isEffectivelyEmpty($value)) {
-                    $fail('İçerik boş olamaz.');
+                    $fail(landing_t('community.validation_body_empty'));
 
                     return;
                 }
                 if (CommunityRichContent::plainTextLength($value) < 10) {
-                    $fail('Metin olarak en az 10 karakter girin.');
+                    $fail(landing_t('community.validation_body_min'));
                 }
             }],
             'meta_title' => 'nullable|string|max:70',
@@ -86,7 +91,7 @@ class CommunityParticipationController extends Controller
 
         $category = CommunityCategory::query()->where('id', $data['community_category_id'])->where('is_active', true)->first();
         if (! $category) {
-            return back()->withErrors(['community_category_id' => 'Geçersiz kategori.'])->withInput();
+            return back()->withErrors(['community_category_id' => landing_t('community.validation_invalid_category')])->withInput();
         }
 
         $body = $this->sanitizer->finalizeRichBody($data['body']);
@@ -124,8 +129,8 @@ class CommunityParticipationController extends Controller
         CommunityTag::syncToTopic($topic, CommunityTag::parseNamesFromCsv($data['tags'] ?? null, 5), 5);
 
         $msg = $mod === CommunityTopic::MODERATION_PENDING
-            ? 'Konu gönderildi; moderasyon onayından sonra herkese açılır.'
-            : 'Konu oluşturuldu.';
+            ? landing_t('community.flash_topic_pending')
+            : landing_t('community.flash_topic_created');
 
         return redirect()->route('community.topic', $topic->slug)->with('status', $msg);
     }
@@ -136,24 +141,24 @@ class CommunityParticipationController extends Controller
             abort(404);
         }
         if ($topic->is_locked) {
-            return back()->withErrors(['reply' => 'Bu konu kilitli.']);
+            return back()->withErrors(['reply' => landing_t('community.validation_topic_locked')]);
         }
 
         $data = $request->validate([
             'hv_company' => ['nullable', 'string', 'max:0'],
             'body' => ['required', 'string', 'max:60000', function (string $attribute, mixed $value, Closure $fail): void {
                 if (! is_string($value)) {
-                    $fail('Geçersiz içerik.');
+                    $fail(landing_t('community.validation_invalid_content'));
 
                     return;
                 }
                 if (CommunityRichContent::isEffectivelyEmpty($value)) {
-                    $fail('Yanıt boş olamaz.');
+                    $fail(landing_t('community.validation_reply_empty'));
 
                     return;
                 }
                 if (CommunityRichContent::plainTextLength($value) < 2) {
-                    $fail('Yanıt çok kısa.');
+                    $fail(landing_t('community.validation_reply_short'));
                 }
             }],
         ]);
@@ -178,8 +183,8 @@ class CommunityParticipationController extends Controller
         $topic->update(['last_activity_at' => now()]);
 
         $msg = $postMod === CommunityPost::MODERATION_PENDING
-            ? 'Yanıtınız alındı; onay sonrasında görünür olacak.'
-            : 'Yanıt gönderildi.';
+            ? landing_t('community.flash_reply_pending')
+            : landing_t('community.flash_reply_sent');
 
         return back()->with('status', $msg);
     }
@@ -199,7 +204,7 @@ class CommunityParticipationController extends Controller
 
         $post = CommunityPost::query()->whereKey($data['post_id'])->where('community_topic_id', $topic->getKey())->first();
         if (! $post || $post->is_hidden || $post->moderation_status !== CommunityPost::MODERATION_APPROVED) {
-            return back()->withErrors(['post_id' => 'Geçersiz yanıt.']);
+            return back()->withErrors(['post_id' => landing_t('community.validation_invalid_post')]);
         }
 
         $topic->update([
@@ -208,7 +213,7 @@ class CommunityParticipationController extends Controller
             'last_activity_at' => now(),
         ]);
 
-        return back()->with('status', 'En iyi yanıt işaretlendi.');
+        return back()->with('status', landing_t('community.flash_best_answer'));
     }
 
     private function userCanAccessTopicForParticipation(Request $request, CommunityTopic $topic): bool

@@ -16,8 +16,8 @@ class CommunityProfileController extends Controller
 
         return view('site.community.profile', [
             'site' => $site,
-            'seoTitle' => 'Topluluk profili — '.$site->site_title,
-            'seoDescription' => 'Görünen ad ve güvenli HTTPS profil görseli.',
+            'seoTitle' => landing_t('community.profile_meta_title', ['site' => $site->site_title]),
+            'seoDescription' => landing_t('community.profile_meta_description'),
             'canonicalUrl' => route('community.profile.edit', absolute: true),
             'robotsContent' => 'noindex, follow',
         ]);
@@ -33,10 +33,10 @@ class CommunityProfileController extends Controller
         $avatar = isset($data['avatar_url']) ? trim((string) $data['avatar_url']) : '';
         if ($avatar !== '') {
             if (! str_starts_with($avatar, 'https://') || preg_match('/[\s<>"\'\\\\]/', $avatar)) {
-                return back()->withErrors(['avatar_url' => 'Yalnızca güvenli (HTTPS) görsel adresi kullanın.'])->withInput();
+                return back()->withErrors(['avatar_url' => landing_t('community.validation_avatar_https')])->withInput();
             }
             if (filter_var($avatar, FILTER_VALIDATE_URL) === false) {
-                return back()->withErrors(['avatar_url' => 'Geçerli bir adres girin.'])->withInput();
+                return back()->withErrors(['avatar_url' => landing_t('community.validation_avatar_url')])->withInput();
             }
         }
 
@@ -46,6 +46,6 @@ class CommunityProfileController extends Controller
             'avatar_url' => $avatar !== '' ? $avatar : null,
         ])->save();
 
-        return redirect()->route('community.profile.edit')->with('status', 'Profiliniz güncellendi.');
+        return redirect()->route('community.profile.edit')->with('status', landing_t('community.flash_profile_updated'));
     }
 }

@@ -73,6 +73,7 @@ func NewRouter(cfg *config.Config, d *daemon.Daemon, log *logrus.Logger) *gin.En
 		site := api.Group("/sites")
 		{
 			site.POST("", handleCreateSite(cfg, d))
+			site.POST("/rename", handleRenameSite(cfg))
 			site.POST("/:domain/suspend", handleSuspendSite(cfg, d))
 			site.POST("/:domain/activate", handleActivateSite(cfg, d))
 			site.POST("/:domain/document-root", handleSetDocumentRoot(cfg, d))
@@ -255,6 +256,31 @@ func phpfpmSettings(cfg *config.Config) phpfpm.HostingPoolSettings {
 		SocketListenDir: cfg.Hosting.PHPFPMlistenDir,
 		FPMUser:         cfg.Hosting.PHPFPMpoolUser,
 		FPMGroup:        cfg.Hosting.PHPFPMpoolGroup,
+	}
+}
+
+func handleRenameSite(cfg *config.Config) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var req struct {
+			From string `json:"from" binding:"required"`
+			To   string `json:"to" binding:"required"`
+		}
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		from := strings.ToLower(strings.TrimSpace(req.From))
+		to := strings.ToLower(strings.TrimSpace(req.To))
+		if from == "" || to == "" || from == to || strings.Contains(from, "..") || strings.Contains(to, "..") ||
+			!nginx.DomainSafe(from) || !nginx.DomainSafe(to) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid domain"})
+			return
+		}
+		if err := hosting.RenamePrimarySite(cfg, from, to); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"message": "site renamed", "from": from, "to": to})
 	}
 }
 

@@ -47,6 +47,16 @@ return [
             'report' => false,
         ],
 
+        // Logo, favicon, hero: doğrudan public/ altında; Nginx/Apache statik sunar (storage symlink / PHP route gerekmez).
+        'landing_assets' => [
+            'driver' => 'local',
+            'root' => public_path('landing-assets'),
+            'url' => rtrim(env('APP_URL', 'http://localhost'), '/').'/landing-assets',
+            'visibility' => 'public',
+            'throw' => false,
+            'report' => false,
+        ],
+
         's3' => [
             'driver' => 's3',
             'key' => env('AWS_ACCESS_KEY_ID'),

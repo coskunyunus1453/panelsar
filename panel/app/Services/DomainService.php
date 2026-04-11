@@ -3,13 +3,16 @@
 namespace App\Services;
 
 use App\Models\Domain;
+use App\Models\EmailForwarder;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class DomainService
 {
     public function __construct(
         private EngineApiService $engineApi,
+        private HostnameReservationService $hostnames,
     ) {}
 
     public function create(User $user, string $name, string $phpVersion, string $serverType): Domain
@@ -177,6 +180,140 @@ class DomainService
             }
             return $resp;
         });
+    }
+
+    /**
+     * WHMCS ChangeDomain: motor + panel kayıtlarında birincil FQDN değişimi (SSL sıfırlanır, LE yeniden gerekir).
+     */
+    public function renamePrimarySite(User $user, Domain $domain, string $newName): Domain
+    {
+        $newName = strtolower(trim($newName));
+        $oldName = strtolower(trim((string) $domain->name));
+        if ($newName === $oldName) {
+            return $domain->fresh();
+        }
+        if ((int) $domain->user_id !== (int) $user->id) {
+            abort(403, 'Bu site bu kullanıcıya ait değil.');
+        }
+        if (Domain::query()->where('name', $newName)->where('id', '!=', $domain->id)->exists()) {
+            throw ValidationException::withMessages([
+                'domain' => [__('domains.name_owned_elsewhere')],
+            ]);
+        }
+        $this->hostnames->assertPrimaryDomainForUser($user, $newName);
+
+        return DB::transaction(function () use ($domain, $newName, $oldName): Domain {
+            $domain->load(['emailAccounts', 'siteSubdomains', 'siteDomainAliases']);
+
+            $engine = $this->engineApi->renameSite($oldName, $newName);
+            if (! empty($engine['error'])) {
+                abort(503, (string) $engine['error']);
+            }
+
+            $oldRoot = (string) $domain->document_root;
+            $sep = DIRECTORY_SEPARATOR;
+            $newRoot = $oldRoot;
+            if (str_contains($oldRoot, $sep.$oldName.$sep)) {
+                $newRoot = str_replace($sep.$oldName.$sep, $sep.$newName.$sep, $oldRoot);
+            } elseif (str_contains($oldRoot, '/'.$oldName.'/')) {
+                $newRoot = str_replace('/'.$oldName.'/', '/'.$newName.'/', $oldRoot);
+            }
+
+            $domain->update([
+                'name' => $newName,
+                'document_root' => $newRoot,
+                'ssl_enabled' => false,
+                'ssl_expiry' => null,
+            ]);
+            $domain->sslCertificate()?->delete();
+
+            foreach ($domain->emailAccounts as $acct) {
+                $acct->update(['email' => $this->replaceEmailHost((string) $acct->email, $oldName, $newName)]);
+            }
+
+            foreach (EmailForwarder::query()->where('domain_id', $domain->id)->get() as $fw) {
+                $fw->update([
+                    'source' => $this->replaceForwarderLocal((string) $fw->source, $oldName, $newName),
+                    'destination' => $this->replaceEmailHostIfLocal((string) $fw->destination, $oldName, $newName),
+                ]);
+            }
+
+            foreach ($domain->siteSubdomains as $sub) {
+                $doc = $sub->document_root;
+                $newDoc = ($doc !== null && $doc !== '')
+                    ? $this->patchDocumentRootPath((string) $doc, $oldName, $newName)
+                    : $doc;
+                $sub->update([
+                    'hostname' => $this->replaceHostSuffix((string) $sub->hostname, $oldName, $newName),
+                    'document_root' => $newDoc,
+                ]);
+            }
+
+            foreach ($domain->siteDomainAliases as $alias) {
+                $alias->update([
+                    'hostname' => $this->replaceHostSuffix((string) $alias->hostname, $oldName, $newName),
+                ]);
+            }
+
+            return $domain->fresh();
+        });
+    }
+
+    private function replaceHostSuffix(string $host, string $oldFqdn, string $newFqdn): string
+    {
+        $h = strtolower(trim($host));
+        $o = strtolower(trim($oldFqdn));
+        $n = strtolower(trim($newFqdn));
+        if ($h === $o) {
+            return $n;
+        }
+        $suf = '.'.$o;
+
+        return str_ends_with($h, $suf)
+            ? substr($h, 0, -strlen($suf)).'.'.$n
+            : $h;
+    }
+
+    private function replaceEmailHost(string $email, string $oldFqdn, string $newFqdn): string
+    {
+        $e = strtolower(trim($email));
+        $needle = '@'.strtolower($oldFqdn);
+
+        return str_ends_with($e, $needle)
+            ? substr($e, 0, -strlen($needle)).'@'.strtolower($newFqdn)
+            : $email;
+    }
+
+    /** Yönlendirici kaynağı: tam adres veya sadece yerel parça (@eski eklenmiş). */
+    private function replaceForwarderLocal(string $source, string $oldFqdn, string $newFqdn): string
+    {
+        $s = trim($source);
+        if (str_contains($s, '@')) {
+            return $this->replaceEmailHost($s, $oldFqdn, $newFqdn);
+        }
+
+        return $s.'@'.strtolower($newFqdn);
+    }
+
+    private function replaceEmailHostIfLocal(string $email, string $oldFqdn, string $newFqdn): string
+    {
+        $e = strtolower(trim($email));
+        if (! str_contains($e, '@')) {
+            return $email;
+        }
+
+        return $this->replaceEmailHost($e, $oldFqdn, $newFqdn);
+    }
+
+    private function patchDocumentRootPath(string $path, string $oldFqdn, string $newFqdn): string
+    {
+        $sep = DIRECTORY_SEPARATOR;
+
+        return str_contains($path, $sep.$oldFqdn.$sep)
+            ? str_replace($sep.$oldFqdn.$sep, $sep.$newFqdn.$sep, $path)
+            : (str_contains($path, '/'.$oldFqdn.'/')
+                ? str_replace('/'.$oldFqdn.'/', '/'.$newFqdn.'/', $path)
+                : $path);
     }
 
     public function setPanelStatus(Domain $domain, string $status): void

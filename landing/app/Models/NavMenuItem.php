@@ -15,7 +15,9 @@ class NavMenuItem extends Model
     protected $fillable = [
         'zone',
         'label',
+        'label_en',
         'href',
+        'href_en',
         'sort_order',
         'is_active',
         'open_in_new_tab',
@@ -41,9 +43,22 @@ class NavMenuItem extends Model
             ->orderBy('id');
     }
 
+    public function displayLabel(): string
+    {
+        if ($this->localeUsesEnglish()) {
+            $en = trim((string) ($this->label_en ?? ''));
+            if ($en !== '') {
+                return $en;
+            }
+        }
+
+        return (string) $this->label;
+    }
+
     public function resolvedHref(): string
     {
-        $raw = trim($this->href);
+        $raw = $this->rawHrefForCurrentLocale();
+        $raw = trim($raw);
         if ($raw === '') {
             return URL::to('/');
         }
@@ -69,5 +84,22 @@ class NavMenuItem extends Model
         }
 
         return $base;
+    }
+
+    private function rawHrefForCurrentLocale(): string
+    {
+        if ($this->localeUsesEnglish()) {
+            $en = trim((string) ($this->href_en ?? ''));
+            if ($en !== '') {
+                return $en;
+            }
+        }
+
+        return (string) $this->href;
+    }
+
+    private function localeUsesEnglish(): bool
+    {
+        return str_starts_with(strtolower((string) app()->getLocale()), 'en');
     }
 }

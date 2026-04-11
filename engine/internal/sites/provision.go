@@ -132,6 +132,12 @@ func normalizeDomain(v string) string {
 }
 
 func isValidDomain(v string) bool {
+	return IsValidDomain(v)
+}
+
+// IsValidDomain barındırma FQDN doğrulaması (engine site oluşturma / yeniden adlandırma).
+func IsValidDomain(v string) bool {
+	v = normalizeDomain(v)
 	if v == "" || v == "." || strings.Contains(v, "..") || strings.Contains(v, "/") || strings.Contains(v, "\\") || filepath.IsAbs(v) {
 		return false
 	}
@@ -195,6 +201,26 @@ func RemoveSubdomain(webRoot, parentDomain, pathSegment string) (hostname string
 	_ = os.Remove(metaPath)
 	_ = os.Remove(legacyMetaPath)
 	return hostname, nil
+}
+
+// WriteSubdomainMeta .hostvim/subdomains/<pathSegment>.json yazar (alan adı yeniden adlandırma sonrası güncelleme için).
+func WriteSubdomainMeta(webRoot, parentDomain, pathSegment string, meta *SiteMeta) error {
+	parentDomain = strings.ToLower(strings.TrimSpace(parentDomain))
+	pathSegment = strings.TrimSpace(pathSegment)
+	if parentDomain == "" || pathSegment == "" || strings.Contains(parentDomain, "..") ||
+		strings.Contains(pathSegment, "/") || strings.Contains(pathSegment, "..") || meta == nil {
+		return fmt.Errorf("invalid subdomain meta write")
+	}
+	subMetaDir := filepath.Join(webRoot, parentDomain, ".hostvim", "subdomains")
+	if err := os.MkdirAll(subMetaDir, 0o750); err != nil {
+		return err
+	}
+	metaPath := filepath.Join(subMetaDir, pathSegment+".json")
+	b, err := json.MarshalIndent(meta, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(metaPath, b, 0o640)
 }
 
 func ListDomains(webRoot string) ([]string, error) {

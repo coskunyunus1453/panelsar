@@ -39,6 +39,7 @@ import ResellerBrandingPage from './pages/ResellerBrandingPage'
 import OnboardingPage from './pages/OnboardingPage'
 import AiAdvisorPage from './pages/AiAdvisorPage'
 import PluginsStorePage from './pages/PluginsStorePage'
+import WhmcsSsoBootstrap from './components/WhmcsSsoBootstrap'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
@@ -80,7 +81,9 @@ export default function App() {
   }, [isDark])
 
   return (
-    <Routes>
+    <>
+      <WhmcsSsoBootstrap />
+      <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route
         path="/"
@@ -127,5 +130,6 @@ export default function App() {
       </Route>
       <Route path="*" element={<UnknownRoute />} />
     </Routes>
+    </>
   )
 }
