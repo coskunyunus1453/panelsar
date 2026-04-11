@@ -21,7 +21,7 @@
             <div class="flex shrink-0 items-center gap-2">
                 @if (! empty($landingEnabledLocales) && count($landingEnabledLocales) > 1)
                     <select class="hv-neon-select hidden rounded-lg py-1.5 pl-2 pr-7 text-xs font-medium sm:block"
-                            aria-label="Dil"
+                            aria-label="{{ landing_t('nav.language') }}"
                             onchange="(function(v){if(!v)return;var p=new window.URLSearchParams(window.location.search);p.set('lang',v);var q=p.toString();window.location=window.location.pathname+(q?'?'+q:'')+window.location.hash;})(this.value)">
                         @foreach ($landingEnabledLocales as $code)
                             <option value="{{ $code }}" @selected(($landingLocale ?? app()->getLocale()) === $code)>

@@ -25,6 +25,7 @@ import BillingPage from './pages/BillingPage'
 import SettingsPage from './pages/SettingsPage'
 import AdminUsersPage from './pages/AdminUsersPage'
 import AdminPackagesPage from './pages/AdminPackagesPage'
+import AdminWhmcsPage from './pages/AdminWhmcsPage'
 import AdminSystemPage from './pages/AdminSystemPage'
 import AdminLicensePage from './pages/AdminLicensePage'
 import TerminalPage from './pages/TerminalPage'
@@ -118,6 +119,7 @@ export default function App() {
         <Route path="admin/users" element={<AdvancedRoute><AdminUsersPage /></AdvancedRoute>} />
         <Route path="admin/roles" element={<AdvancedRoute><AdminRolesPage /></AdvancedRoute>} />
         <Route path="admin/packages" element={<AdvancedRoute><AdminPackagesPage /></AdvancedRoute>} />
+        <Route path="admin/whmcs" element={<AdvancedRoute><AdminWhmcsPage /></AdvancedRoute>} />
         <Route path="admin/system" element={<AdvancedRoute><AdminSystemPage /></AdvancedRoute>} />
         <Route path="admin/license" element={<AdvancedRoute><AdminLicensePage /></AdvancedRoute>} />
         <Route path="admin/terminal" element={<AdvancedRoute><TerminalPage /></AdvancedRoute>} />

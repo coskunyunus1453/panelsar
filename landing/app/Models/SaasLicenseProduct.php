@@ -17,6 +17,7 @@ class SaasLicenseProduct extends Model
         'sort_order',
         'price_try_minor',
         'price_usd_minor',
+        'price_eur_minor',
     ];
 
     protected function casts(): array

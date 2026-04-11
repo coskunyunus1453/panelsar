@@ -8,6 +8,7 @@ use App\Http\Controllers\Admin\StackController;
 use App\Http\Controllers\Admin\TerminalSettingsController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Admin\WebServerSettingsController;
+use App\Http\Controllers\Admin\WhmcsModuleController;
 use App\Http\Controllers\Api\AiAdvisorController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BackupController;
@@ -349,6 +350,7 @@ Route::middleware(['auth:sanctum', 'abilities:access:customer-panel', 'require_p
         Route::post('users/{user}/activate', [UserController::class, 'activate']);
         Route::post('users/{user}/reset-password', [UserController::class, 'resetPassword']);
         Route::apiResource('packages', PackageController::class);
+        Route::get('integrations/whmcs/module-zip', [WhmcsModuleController::class, 'downloadModuleZip']);
     });
 
     Route::prefix('admin')->middleware(['role:admin', 'require_admin_2fa', 'ability:webserver:read'])->group(function () {

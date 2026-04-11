@@ -59,6 +59,13 @@ return [
     'lets_encrypt_email' => env('HOSTVIM_LETS_ENCRYPT_EMAIL', env('PANELSAR_LETS_ENCRYPT_EMAIL', '')),
 
     /**
+     * WHMCS modül zip indirimi (admin panel sayfası).
+     * Boş: önce ../integrations/.../hostvim, yoksa storage/app/whmcs/hostvim-whmcs-module.zip
+     */
+    'whmcs_module_source_dir' => env('HOSTVIM_WHMCS_MODULE_SOURCE_DIR', ''),
+    'whmcs_module_prebuilt_zip' => env('HOSTVIM_WHMCS_MODULE_PREBUILT_ZIP', ''),
+
+    /**
      * Merkezi lisans doğrulama adresi. .env’de LICENSE_SERVER_URL yoksa varsayılan hub kullanılır;
      * müşteri kurulumunda ek ayar gerekmez. Özel / hava boşluklu kurulum: LICENSE_SERVER_URL= ile kapatın.
      */

@@ -42,7 +42,7 @@ class StripeLicensingService
                 ],
                 'line_items' => [[
                     'price_data' => [
-                        'currency' => 'usd',
+                        'currency' => strtolower((string) $order->currency),
                         'unit_amount' => (int) $order->amount_minor,
                         'product_data' => [
                             'name' => $product->name,

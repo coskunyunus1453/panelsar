@@ -1,5 +1,5 @@
 <x-site.layout
-    :title="$post->effectiveMetaTitle() . ' · Blog · ' . landing_p('brand.name')"
+    :title="$post->effectiveMetaTitle() . ' · ' . landing_t('blog.heading') . ' · ' . landing_p('brand.name')"
     :description="$seoDescription"
     :canonical-url="$seoCanonical"
     :og-title="$post->effectiveMetaTitle()"

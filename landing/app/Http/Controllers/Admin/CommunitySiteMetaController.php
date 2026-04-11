@@ -21,8 +21,11 @@ class CommunitySiteMetaController extends Controller
     {
         $data = $request->validate([
             'site_title' => 'sometimes|string|max:255',
+            'site_title_en' => 'nullable|string|max:255',
             'default_meta_title' => 'nullable|string|max:255',
+            'default_meta_title_en' => 'nullable|string|max:255',
             'default_meta_description' => 'nullable|string|max:2000',
+            'default_meta_description_en' => 'nullable|string|max:2000',
             'og_image_url' => 'nullable|string|max:2048',
             'twitter_site' => 'nullable|string|max:64',
         ]);

@@ -14,7 +14,8 @@
     $metaDescription = $description;
     $ogPageTitle = $ogTitle ?? $pageTitle;
     $ogPageDescription = $ogDescription ?? $metaDescription;
-    $ogPageUrl = $canonicalUrl ?? url()->current();
+    $canonicalEffective = $canonicalUrl ?? landing_localized_url(app()->getLocale());
+    $ogPageUrl = $canonicalEffective;
     $twitterCard = $ogImage ? 'summary_large_image' : 'summary';
 @endphp
 <!DOCTYPE html>
@@ -27,14 +28,12 @@
     @if ($metaDescription)
         <meta name="description" content="{{ $metaDescription }}">
     @endif
-    @if ($canonicalUrl)
-        <link rel="canonical" href="{{ $canonicalUrl }}">
-    @endif
+    <link rel="canonical" href="{{ $canonicalEffective }}">
     @if ($robotsContent)
         <meta name="robots" content="{{ $robotsContent }}">
     @endif
 
-    <meta property="og:locale" content="{{ str_replace('_', '-', app()->getLocale()) }}">
+    <meta property="og:locale" content="{{ landing_og_locale_tag(app()->getLocale()) }}">
     <meta property="og:site_name" content="{{ landing_p('brand.name') }}">
     <meta property="og:title" content="{{ $ogPageTitle }}">
     @if ($ogPageDescription)
@@ -60,6 +59,8 @@
     @if ($schemaJsonLd)
         <script type="application/ld+json">{!! $schemaJsonLd !!}</script>
     @endif
+
+    <x-landing.seo-locale />
 
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 
@@ -108,7 +109,7 @@
                 <div class="hidden items-center gap-3 md:flex">
                     @if (! empty($landingEnabledLocales) && count($landingEnabledLocales) > 1)
                         <div class="relative">
-                            <label for="hv-lang-site" class="sr-only">Dil</label>
+                            <label for="hv-lang-site" class="sr-only">{{ landing_t('nav.language') }}</label>
                             <select id="hv-lang-site"
                                     class="rounded-full border border-slate-300/90 bg-white/90 py-1.5 pl-3 pr-8 text-xs font-semibold text-slate-700 dark:border-slate-600 dark:bg-slate-900/80 dark:text-slate-200"
                                     onchange="(function(v){if(!v)return;var p=new window.URLSearchParams(window.location.search);p.set('lang',v);var q=p.toString();window.location=window.location.pathname+(q?'?'+q:'')+window.location.hash;})(this.value)">
@@ -160,7 +161,7 @@
                             onchange="(function(v){if(!v)return;var p=new window.URLSearchParams(window.location.search);p.set('lang',v);var q=p.toString();window.location=window.location.pathname+(q?'?'+q:'')+window.location.hash;})(this.value)">
                         @foreach ($landingEnabledLocales as $code)
                             <option value="{{ $code }}" @selected(($landingLocale ?? app()->getLocale()) === $code)>
-                                {{ $landingLocaleLabels[$code] ?? $code }}
+                                {{ landing_locale_tag($code) }}
                             </option>
                         @endforeach
                     </select>

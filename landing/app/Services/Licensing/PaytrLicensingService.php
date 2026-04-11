@@ -7,6 +7,7 @@ use App\Models\SaasCheckoutOrder;
 use App\Models\SaasLicenseProduct;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use RuntimeException;
 
 class PaytrLicensingService
@@ -89,13 +90,13 @@ class PaytrLicensingService
             ->post('https://www.paytr.com/odeme/api/get-token', $post);
 
         if (! $response->successful()) {
-            Log::warning('PayTR get-token HTTP error', ['status' => $response->status(), 'body' => $response->body()]);
+            Log::warning('PayTR get-token HTTP error', ['status' => $response->status(), 'body' => Str::limit($response->body(), 500)]);
             throw new RuntimeException('paytr_http_error');
         }
 
         $json = $response->json();
         if (! is_array($json) || ($json['status'] ?? '') !== 'success' || empty($json['token'])) {
-            Log::warning('PayTR get-token failed', ['body' => $response->body()]);
+            Log::warning('PayTR get-token failed', ['body' => Str::limit($response->body(), 500)]);
             throw new RuntimeException('paytr_token_failed: '.(is_array($json) ? (string) ($json['reason'] ?? '') : ''));
         }
 

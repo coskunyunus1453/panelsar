@@ -15,6 +15,10 @@ class SecurityHeaders
     {
         $response = $next($request);
 
+        if ($request->secure() && ! $response->headers->has('Strict-Transport-Security')) {
+            $response->headers->set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+        }
+
         if (! $response->headers->has('X-Content-Type-Options')) {
             $response->headers->set('X-Content-Type-Options', 'nosniff');
         }

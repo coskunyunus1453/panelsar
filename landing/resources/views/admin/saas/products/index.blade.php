@@ -9,8 +9,9 @@
                 <tr>
                     <th class="px-4 py-3">Kod</th>
                     <th class="px-4 py-3">Ad</th>
-                    <th class="px-4 py-3">PayTR (kr)</th>
-                    <th class="px-4 py-3">Stripe (¢)</th>
+                    <th class="px-4 py-3">TRY (kr)</th>
+                    <th class="px-4 py-3">USD (¢)</th>
+                    <th class="px-4 py-3">EUR (¢)</th>
                     <th class="px-4 py-3">Aktif</th>
                     <th class="px-4 py-3 text-right">İşlem</th>
                 </tr>
@@ -22,6 +23,7 @@
                         <td class="px-4 py-3 admin-td-strong">{{ $p->name }}</td>
                         <td class="px-4 py-3 font-mono text-xs text-slate-600 dark:text-slate-400">{{ $p->price_try_minor ?? '—' }}</td>
                         <td class="px-4 py-3 font-mono text-xs text-slate-600 dark:text-slate-400">{{ $p->price_usd_minor ?? '—' }}</td>
+                        <td class="px-4 py-3 font-mono text-xs text-slate-600 dark:text-slate-400">{{ $p->price_eur_minor ?? '—' }}</td>
                         <td class="px-4 py-3">{{ $p->is_active ? 'Evet' : 'Hayır' }}</td>
                         <td class="px-4 py-3 text-right text-xs">
                             <a href="{{ route('admin.saas.products.edit', $p) }}" class="admin-link-emerald">Düzenle</a>

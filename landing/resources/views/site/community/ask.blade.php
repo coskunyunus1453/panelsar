@@ -6,7 +6,7 @@
 >
     <div class="hv-container max-w-2xl py-10">
         <nav class="mb-6 text-sm text-slate-600 dark:text-slate-400" aria-label="{{ landing_t('community.breadcrumb_nav_aria') }}">
-            <a href="{{ route('community.index') }}" class="hover:text-[rgb(var(--hv-brand-600)/1)]">{{ $site->site_title }}</a>
+            <a href="{{ route('community.index') }}" class="hover:text-[rgb(var(--hv-brand-600)/1)]">{{ $site->displaySiteTitle() }}</a>
             <span class="mx-2">/</span>
             <span class="text-slate-900 dark:text-slate-200">{{ landing_t('community.ask_breadcrumb') }}</span>
         </nav>
@@ -27,7 +27,7 @@
                     <select name="community_category_id" required class="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 dark:border-slate-600 dark:bg-slate-900">
                         <option value="">{{ landing_t('community.select_placeholder') }}</option>
                         @foreach ($categories as $c)
-                            <option value="{{ $c->id }}" @selected(old('community_category_id', $preselectedCategory?->id) == $c->id)>{{ $c->name }}</option>
+                            <option value="{{ $c->id }}" @selected(old('community_category_id', $preselectedCategory?->id) == $c->id)>{{ $c->displayName() }}</option>
                         @endforeach
                     </select>
                     @error('community_category_id')

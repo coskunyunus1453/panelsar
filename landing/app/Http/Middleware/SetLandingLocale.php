@@ -42,6 +42,7 @@ class SetLandingLocale
         $localeLabels = collect(config('landing.locales', []))->only($enabled)->all();
 
         View::share('landingLocale', $locale);
+        View::share('landingDefaultLocale', $default);
         View::share('landingEnabledLocales', $enabled);
         View::share('landingLocaleLabels', $localeLabels);
 

@@ -48,6 +48,36 @@
         </section>
 
         <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
+            <h2 class="text-base font-semibold">Satış para birimi ve kurlar</h2>
+            <p class="mt-1 text-xs text-slate-500">Ön yüzde gösterim ve havale talimatı bu para birimine göre hesaplanır. PayTR her zaman TRY kullanır; eksik TRY fiyatında USD/EUR ve aşağıdaki kurlarla TRY türetilir.</p>
+            <div class="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                <div>
+                    <label class="block text-sm font-medium">Satış / havale gösterim para birimi</label>
+                    <select name="sales_display_currency" class="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 dark:border-slate-700 dark:bg-slate-900">
+                        @foreach (['TRY' => 'TRY (TL)', 'USD' => 'USD', 'EUR' => 'EUR'] as $key => $label)
+                            <option value="{{ $key }}" @selected(old('sales_display_currency', $salesDisplayCurrency) === $key)>{{ $label }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium">Stripe Checkout para birimi</label>
+                    <select name="stripe_checkout_currency" class="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 dark:border-slate-700 dark:bg-slate-900">
+                        <option value="usd" @selected(old('stripe_checkout_currency', $stripeCheckoutCurrency) === 'usd')>USD</option>
+                        <option value="eur" @selected(old('stripe_checkout_currency', $stripeCheckoutCurrency) === 'eur')>EUR</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium">1 USD = ? TRY</label>
+                    <input type="text" inputmode="decimal" name="fx_try_per_usd" value="{{ old('fx_try_per_usd', $fxTryPerUsd) }}" class="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 font-mono text-sm dark:border-slate-700 dark:bg-slate-900" required>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium">1 EUR = ? TRY</label>
+                    <input type="text" inputmode="decimal" name="fx_try_per_eur" value="{{ old('fx_try_per_eur', $fxTryPerEur) }}" class="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 font-mono text-sm dark:border-slate-700 dark:bg-slate-900" required>
+                </div>
+            </div>
+        </section>
+
+        <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
             <h2 class="text-base font-semibold">PayTR ayarlari</h2>
             <div class="mt-4 grid gap-4 md:grid-cols-2">
                 <div>

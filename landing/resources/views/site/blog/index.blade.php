@@ -1,7 +1,7 @@
 <x-site.layout
     :title="landing_t('blog.page_title')"
     :description="landing_t('blog.meta_description')"
-    :canonical-url="route('blog.index', absolute: true)"
+    :canonical-url="landing_url_with_lang(route('blog.index', absolute: true), app()->getLocale())"
     :schema-json-ld="$seoSchema"
 >
     <div class="hv-container">

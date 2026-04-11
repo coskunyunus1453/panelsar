@@ -86,6 +86,17 @@ class BlogPost extends Model
         return route('blog.show', $this->slug, absolute: true);
     }
 
+    /** Harici tam URL değilse ?lang= ile çok dilli canonical. */
+    public function seoCanonicalAbsoluteUrl(): string
+    {
+        $raw = trim((string) $this->canonical_url);
+        if ($raw !== '' && preg_match('#^https?://#i', $raw)) {
+            return $this->canonicalAbsoluteUrl();
+        }
+
+        return landing_url_with_lang(route('blog.show', $this->slug, absolute: true), (string) $this->locale);
+    }
+
     public function ogImageAbsolute(): ?string
     {
         return SeoUrls::absolute($this->og_image);

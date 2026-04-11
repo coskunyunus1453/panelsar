@@ -32,6 +32,10 @@ class BillingSettingsController extends Controller
             'bankBranch' => $this->settingString('billing.bank_transfer.branch', ''),
             'bankIban' => $this->settingString('billing.bank_transfer.iban', ''),
             'bankInstructions' => $this->settingString('billing.bank_transfer.instructions', ''),
+            'salesDisplayCurrency' => $this->settingString('billing.sales.display_currency', 'TRY'),
+            'stripeCheckoutCurrency' => $this->settingString('billing.stripe.checkout_currency', 'usd'),
+            'fxTryPerUsd' => $this->settingString('billing.fx.try_per_usd', '35'),
+            'fxTryPerEur' => $this->settingString('billing.fx.try_per_eur', '38'),
         ]);
     }
 
@@ -57,6 +61,10 @@ class BillingSettingsController extends Controller
             'bank_branch' => ['nullable', 'string', 'max:255'],
             'bank_iban' => ['nullable', 'string', 'max:64'],
             'bank_instructions' => ['nullable', 'string', 'max:4000'],
+            'sales_display_currency' => ['required', 'in:TRY,USD,EUR'],
+            'stripe_checkout_currency' => ['required', 'in:usd,eur'],
+            'fx_try_per_usd' => ['required', 'numeric', 'min:0.0001', 'max:999999'],
+            'fx_try_per_eur' => ['required', 'numeric', 'min:0.0001', 'max:999999'],
         ]);
 
         LandingSiteSetting::put('billing.methods.paytr.enabled', $request->boolean('paytr_enabled') ? '1' : '0');
@@ -82,6 +90,11 @@ class BillingSettingsController extends Controller
         LandingSiteSetting::put('billing.bank_transfer.iban', preg_replace('/\s+/', '', trim((string) ($validated['bank_iban'] ?? ''))) ?: '');
         LandingSiteSetting::put('billing.bank_transfer.instructions', trim((string) ($validated['bank_instructions'] ?? '')));
 
+        LandingSiteSetting::put('billing.sales.display_currency', strtoupper(trim((string) ($validated['sales_display_currency'] ?? 'TRY'))));
+        LandingSiteSetting::put('billing.stripe.checkout_currency', strtolower(trim((string) ($validated['stripe_checkout_currency'] ?? 'usd'))));
+        LandingSiteSetting::put('billing.fx.try_per_usd', $this->normalizeFxInput($validated['fx_try_per_usd'] ?? '35'));
+        LandingSiteSetting::put('billing.fx.try_per_eur', $this->normalizeFxInput($validated['fx_try_per_eur'] ?? '38'));
+
         return redirect()->route('admin.billing-settings.edit')->with('status', 'Odeme yontemleri ayarlari kaydedildi.');
     }
 
@@ -95,5 +108,12 @@ class BillingSettingsController extends Controller
         $fallback = $default ? '1' : '0';
 
         return $this->settingString($key, $fallback) === '1';
+    }
+
+    private function normalizeFxInput(mixed $value): string
+    {
+        $s = str_replace(',', '.', trim((string) $value));
+
+        return $s === '' ? '0' : $s;
     }
 }

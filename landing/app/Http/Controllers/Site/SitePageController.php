@@ -34,7 +34,8 @@ class SitePageController extends Controller
     private function renderPage(SitePage $page): View
     {
         $brand = landing_p('brand.name');
-        $canonical = $page->canonicalAbsoluteUrl();
+        $locale = (string) $page->locale;
+        $canonical = $page->seoCanonicalAbsoluteUrl();
         $ogImage = $page->ogImageAbsolute();
 
         $schema = SchemaBuilder::graph([
@@ -46,7 +47,7 @@ class SitePageController extends Controller
                 $ogImage
             ),
             SchemaBuilder::breadcrumbList([
-                ['name' => $brand, 'url' => url('/')],
+                ['name' => $brand, 'url' => landing_home_localized_url($locale)],
                 ['name' => $page->title, 'url' => $canonical],
             ]),
         ]);

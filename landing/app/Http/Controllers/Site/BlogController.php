@@ -32,8 +32,8 @@ class BlogController extends Controller
 
         $schema = SchemaBuilder::graph([
             SchemaBuilder::breadcrumbList([
-                ['name' => landing_p('brand.name'), 'url' => url('/')],
-                ['name' => landing_t('blog.heading'), 'url' => route('blog.index', absolute: true)],
+                ['name' => landing_p('brand.name'), 'url' => landing_home_localized_url($locale)],
+                ['name' => landing_t('blog.heading'), 'url' => landing_url_with_lang(route('blog.index', absolute: true), $locale)],
             ]),
         ]);
 
@@ -64,13 +64,13 @@ class BlogController extends Controller
             ->orderBy('name')
             ->get();
 
-        $canonical = route('blog.category', $blog_category->slug, absolute: true);
+        $canonical = landing_url_with_lang(route('blog.category', $blog_category->slug, absolute: true), $locale);
         $desc = $blog_category->listingDescription() ?: landing_t('blog.meta_description');
 
         $schema = SchemaBuilder::graph([
             SchemaBuilder::breadcrumbList([
-                ['name' => landing_p('brand.name'), 'url' => url('/')],
-                ['name' => landing_t('blog.heading'), 'url' => route('blog.index', absolute: true)],
+                ['name' => landing_p('brand.name'), 'url' => landing_home_localized_url($locale)],
+                ['name' => landing_t('blog.heading'), 'url' => landing_url_with_lang(route('blog.index', absolute: true), $locale)],
                 ['name' => $blog_category->name, 'url' => $canonical],
             ]),
         ]);
@@ -94,18 +94,19 @@ class BlogController extends Controller
             ->with('category')
             ->firstOrFail();
 
-        $canonical = $post->canonicalAbsoluteUrl();
+        $locale = (string) $post->locale;
+        $canonical = $post->seoCanonicalAbsoluteUrl();
         $brand = landing_p('brand.name');
         $ogImage = $post->ogImageAbsolute();
 
         $breadcrumbs = [
-            ['name' => $brand, 'url' => url('/')],
-            ['name' => landing_t('blog.heading'), 'url' => route('blog.index', absolute: true)],
+            ['name' => $brand, 'url' => landing_home_localized_url($locale)],
+            ['name' => landing_t('blog.heading'), 'url' => landing_url_with_lang(route('blog.index', absolute: true), $locale)],
         ];
         if ($post->category) {
             $breadcrumbs[] = [
                 'name' => $post->category->name,
-                'url' => route('blog.category', $post->category->slug, absolute: true),
+                'url' => landing_url_with_lang(route('blog.category', $post->category->slug, absolute: true), $locale),
             ];
         }
         $breadcrumbs[] = ['name' => $post->title, 'url' => $canonical];

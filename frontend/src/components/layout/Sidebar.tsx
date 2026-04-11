@@ -43,6 +43,7 @@ import {
   Sparkles,
   Store,
   Palette,
+  Link2,
 } from 'lucide-react'
 
 type NavLeaf = {
@@ -166,6 +167,7 @@ export default function Sidebar() {
         { path: '/admin/users', icon: Users, label: 'nav.users', allow: isAdmin },
         { path: '/admin/roles', icon: Tags, label: 'nav.roles', allow: isAdmin },
         { path: '/admin/packages', icon: Package, label: 'nav.packages', allow: isAdmin },
+        { path: '/admin/whmcs', icon: Link2, label: 'nav.whmcs_integration', allow: isAdmin },
         { path: '/admin/license', icon: KeyRound, label: 'nav.license', allow: isAdmin },
       ],
     },

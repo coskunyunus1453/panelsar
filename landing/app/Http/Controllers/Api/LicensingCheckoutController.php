@@ -8,6 +8,7 @@ use App\Models\SaasCheckoutOrder;
 use App\Models\SaasLicenseProduct;
 use App\Services\Licensing\BillingProviderResolver;
 use App\Services\Licensing\PaytrLicensingService;
+use App\Services\Licensing\SalesCurrencyService;
 use App\Services\Licensing\StripeLicensingService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -21,6 +22,7 @@ class LicensingCheckoutController extends Controller
         BillingProviderResolver $resolver,
         PaytrLicensingService $paytr,
         StripeLicensingService $stripe,
+        SalesCurrencyService $salesCurrency,
     ): JsonResponse {
         $validated = $request->validate([
             'product_code' => ['required', 'string', 'max:64', 'regex:/^[a-z0-9_\-]+$/'],
@@ -47,37 +49,36 @@ class LicensingCheckoutController extends Controller
         $provider = $resolver->resolve($billingInput, app()->getLocale());
 
         if ($provider === 'paytr') {
-            if ($product->price_try_minor === null || (int) $product->price_try_minor <= 0) {
-                return response()->json(['message' => 'TRY price not configured for this product (admin: price_try_minor).'], 422);
-            }
             if (! $paytr->isConfigured()) {
                 return response()->json(['message' => 'PayTR is not configured (PAYTR_* env).'], 503);
             }
-            $amountMinor = (int) $product->price_try_minor;
-            $currency = 'TRY';
-        } elseif ($provider === 'stripe') {
-            if ($product->price_usd_minor === null || (int) $product->price_usd_minor <= 0) {
-                return response()->json(['message' => 'USD price not configured for this product (admin: price_usd_minor).'], 422);
+            $resolved = $salesCurrency->resolveForProvider($product, 'paytr');
+            if ($resolved === null) {
+                return response()->json(['message' => 'Bu ürün için PayTR (TRY) tutarı hesaplanamıyor. En az bir fiyat (TRY/USD/EUR) veya kur ayarlarını kontrol edin.'], 422);
             }
+            $amountMinor = $resolved['minor'];
+            $currency = $resolved['currency'];
+        } elseif ($provider === 'stripe') {
             if (! $stripe->isConfigured()) {
                 return response()->json(['message' => 'Stripe is not configured (STRIPE_SECRET).'], 503);
             }
-            $amountMinor = (int) $product->price_usd_minor;
-            $currency = 'USD';
+            $resolved = $salesCurrency->resolveForProvider($product, 'stripe');
+            if ($resolved === null) {
+                return response()->json(['message' => 'Bu ürün için Stripe Checkout tutarı hesaplanamıyor. Ürün fiyatları ve ödeme ayarlarındaki Stripe para birimini kontrol edin.'], 422);
+            }
+            $amountMinor = $resolved['minor'];
+            $currency = $resolved['currency'];
         } else {
             $bankEnabled = trim((string) (LandingSiteSetting::getValue('billing.methods.bank_transfer.enabled', '0') ?? '0')) === '1';
             if (! $bankEnabled) {
                 return response()->json(['message' => 'Bank transfer is not enabled.'], 422);
             }
-            if ($product->price_try_minor !== null && (int) $product->price_try_minor > 0) {
-                $amountMinor = (int) $product->price_try_minor;
-                $currency = 'TRY';
-            } elseif ($product->price_usd_minor !== null && (int) $product->price_usd_minor > 0) {
-                $amountMinor = (int) $product->price_usd_minor;
-                $currency = 'USD';
-            } else {
-                return response()->json(['message' => 'No configured product price for bank transfer.'], 422);
+            $resolved = $salesCurrency->resolveForProvider($product, 'bank_transfer');
+            if ($resolved === null) {
+                return response()->json(['message' => 'Bu ürün için havale tutarı hesaplanamıyor. Fiyatlar veya satış para birimi / kurları kontrol edin.'], 422);
             }
+            $amountMinor = $resolved['minor'];
+            $currency = $resolved['currency'];
         }
 
         $orderRef = 'hv'.Str::lower(Str::random(22));

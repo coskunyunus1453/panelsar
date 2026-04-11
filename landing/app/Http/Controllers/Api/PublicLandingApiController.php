@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\LandingSiteSetting;
 use App\Models\LandingTranslation;
 use App\Services\LandingAppearance;
+use App\Services\Licensing\SalesCurrencyService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Config;
@@ -15,7 +16,7 @@ class PublicLandingApiController extends Controller
     /**
      * SPA / headless landing için site görünümü ve dil meta verisi.
      */
-    public function settings(): JsonResponse
+    public function settings(SalesCurrencyService $salesCurrency): JsonResponse
     {
         $enabledJson = LandingSiteSetting::getValue('landing.enabled_locales', '["tr","en"]');
         $enabled = json_decode((string) $enabledJson, true) ?: ['tr', 'en'];
@@ -78,6 +79,7 @@ class PublicLandingApiController extends Controller
                 'ga4_measurement_id' => LandingAppearance::analyticsMeasurementId(),
             ],
             'footer_extra_note' => LandingAppearance::footerExtraNote(),
+            'billing' => $salesCurrency->publicConfig(),
         ]);
     }
 

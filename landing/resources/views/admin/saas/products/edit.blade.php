@@ -22,18 +22,21 @@
             <label class="block text-sm font-medium">Sıra</label>
             <input type="number" name="sort_order" value="{{ old('sort_order', $product->sort_order) }}" min="0" class="mt-1 w-32 rounded-xl border border-slate-300 px-3 py-2 dark:border-slate-700 dark:bg-slate-900">
         </div>
-        <div class="grid gap-4 sm:grid-cols-2">
+        <div class="grid gap-4 sm:grid-cols-3">
             <div>
-                <label class="block text-sm font-medium">PayTR fiyat (TL kuruş)</label>
+                <label class="block text-sm font-medium">TL kuruş (PayTR / TRY)</label>
                 <input type="number" name="price_try_minor" value="{{ old('price_try_minor', $product->price_try_minor) }}" min="0" step="1" placeholder="örn. 199900 = 1999,00 TL" class="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 font-mono text-sm dark:border-slate-700 dark:bg-slate-900">
-                <p class="mt-1 text-xs text-slate-500">Boş bırakılırsa TR ödemesi açılmaz.</p>
             </div>
             <div>
-                <label class="block text-sm font-medium">Stripe fiyat (USD cent)</label>
+                <label class="block text-sm font-medium">USD cent</label>
                 <input type="number" name="price_usd_minor" value="{{ old('price_usd_minor', $product->price_usd_minor) }}" min="0" step="1" placeholder="örn. 19900 = 199,00 USD" class="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 font-mono text-sm dark:border-slate-700 dark:bg-slate-900">
-                <p class="mt-1 text-xs text-slate-500">Boş bırakılırsa global Stripe ödemesi açılmaz.</p>
+            </div>
+            <div>
+                <label class="block text-sm font-medium">EUR cent</label>
+                <input type="number" name="price_eur_minor" value="{{ old('price_eur_minor', $product->price_eur_minor) }}" min="0" step="1" placeholder="örn. 18500" class="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 font-mono text-sm dark:border-slate-700 dark:bg-slate-900">
             </div>
         </div>
+        <p class="text-xs text-slate-500">Eksik tutarlar ödeme ayarlarındaki manuel kurlarla tamamlanır.</p>
         <div>
             <label class="block text-sm font-medium">Varsayılan limitler (JSON)</label>
             <textarea name="default_limits_raw" rows="4" class="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 font-mono text-xs dark:border-slate-700 dark:bg-slate-900">{{ $default_limits_raw }}</textarea>

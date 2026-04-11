@@ -19,6 +19,7 @@
     "settings": "Ayarlar",
     "users": "Kullanıcılar",
     "packages": "Paketler",
+    "whmcs_integration": "WHMCS",
     "reseller": "Bayi",
     "reseller_branding": "White-label",
     "installer": "Uygulama Yükleyici",
@@ -131,6 +132,24 @@
     "wizard_step_4": "Deploy now ile ilk dağıtımı başlat",
     "first_setup_hint": "İlk kurulumda repo henüz clone edilmemiş olabilir. Önce Kaydet, sonra Deploy now çalıştırın; hata alırsanız repo URL/erişim anahtarını kontrol edin.",
     "runtime_hint_laravel": "Laravel için öneri: runtime Laravel/PHP, branch main ve webhook auto deploy açık."
+  },
+  "whmcs_integration": {
+    "title": "WHMCS bağlantısı",
+    "subtitle": "Türkiye’de hosting faturalaması için WHMCS kullanıyorsanız: tek ZIP ile sunucu modülünü indirip aşağıdaki adımları izleyin. Müşterileriniz API anahtarı girmez.",
+    "download": "WHMCS modülünü indir (ZIP)",
+    "downloading": "İndiriliyor…",
+    "download_ok": "ZIP indirildi",
+    "download_error": "İndirme başarısız",
+    "need_login": "Oturum gerekli",
+    "steps_title": "Kurulum (bir kez, hosting firmanız için)",
+    "step_1": "Bu panelin .env dosyasında HOSTVIM_WHMCS_SECRET için uzun ve rastgele bir değer tanımlayın (ör. openssl rand -hex 32).",
+    "step_2": "ZIP’i açın. İçindeki hostvim klasörünü WHMCS sunucunuzda şu konuma kopyalayın: whmcs_kökü/modules/servers/hostvim/ (hostvim.php bu klasörde görünmeli).",
+    "step_3": "WHMCS yönetim → Yapılandırma → Sunucular → Yeni sunucu: Modül olarak hostvim seçin.",
+    "step_4": "Sunucu Hostname: bu panelin adresi (örn. https://panel.sizinadresiniz.com). Şifre alanına .env’deki HOSTVIM_WHMCS_SECRET ile aynı değeri yazın. İsteğe bağlı: Kullanıcı adı = Hostvim admin e-postanız (yönetici SSO için).",
+    "step_5": "Bağlantıyı test edin. Paket ID listesi için WHMCS’ten veya tarayıcıdan: GET .../api/integrations/whmcs/packages (Authorization: Bearer ile aynı secret).",
+    "step_6": "Hosting ürününüzü bu sunucuya bağlayın; sipariş onayında hesap ve site otomatik oluşur. Müşteri WHMCS e-postası = panel kullanıcı e-postası olur.",
+    "step_7": "Müşteri paneline giriş: WHMCS müşteri alanı → Hizmet detayı → SSO / “Panele git” (şablonda veya WHMCS’in oturum aç bağlantısı ile).",
+    "footer_note": "Bu sayfa yalnızca yöneticilere görünür. ZIP, repodaki hostvim sunucu modülünün güncel kopyasıdır; panel güncellemelerinden sonra yeniden indirmeniz önerilir."
   },
   "plugins": {
     "subtitle": "Ek özellikleri tek tıkla kurun ve aktif edin. Ilk surumde migration modulleri hazir.",

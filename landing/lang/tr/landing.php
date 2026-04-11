@@ -19,6 +19,7 @@ return [
         'menu' => 'Menü',
         'close' => 'Kapat',
         'theme' => 'Tema',
+        'language' => 'Dil',
     ],
 
     'footer' => [
@@ -84,6 +85,23 @@ return [
 
     'docs' => [
         'index_meta_description' => 'Hostvim kurulumu, mimari ve kullanım rehberleri.',
+        'breadcrumb' => 'Dokümantasyon',
+        'index_page_title' => 'Dokümantasyon · :brand',
+        'index_heading' => 'Dokümantasyon',
+        'index_lead' => 'Başlangıç rehberleri ve teknik konular.',
+        'index_empty' => 'Henüz doküman sayfası yok.',
+    ],
+
+    'license' => [
+        'success_title' => 'Ödeme tamamlandı',
+        'success_meta' => 'Ödeme sonrası lisans anahtarı e-posta ile gönderilir; sipariş referansı ile durum sorgulanabilir.',
+        'success_lead' => 'Ödemeniz alındıysa lisans anahtarınız kısa süre içinde e-posta adresinize gönderilir. Bildirim URL’si (callback) tamamlandıktan sonra sipariş durumunu lisans API’si ile sorgulayabilirsiniz.',
+        'order_ref_label' => 'Sipariş referansı',
+        'back_pricing' => 'Fiyatlandırmaya dön',
+        'cancel_title' => 'Ödeme iptal',
+        'cancel_meta' => 'Ödeme tamamlanmadı; fiyatlandırma sayfasından tekrar deneyebilirsiniz.',
+        'cancel_lead' => 'Ödeme tamamlanmadı. İsterseniz tekrar deneyebilirsiniz.',
+        'pricing_link' => 'Fiyatlandırma',
     ],
 
     'blog' => [
@@ -115,6 +133,8 @@ return [
     ],
 
     'community' => [
+        'fallback_site_title_short' => 'Topluluk',
+        'schema_anonymous_member' => 'Üye',
         'listing_meta_suffix' => 'Soru & Cevap',
         'index_subtitle' => 'Soru & cevap topluluğu — yardım isteyin veya bilginizi paylaşın.',
         'cta_have_question_title' => 'Bir sorunuz mu var?',

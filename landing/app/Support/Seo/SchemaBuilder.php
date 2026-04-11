@@ -79,9 +79,6 @@ final class SchemaBuilder
     /**
      * @return array<string, mixed>
      */
-    /**
-     * @return array<string, mixed>
-     */
     public static function webPageSimple(string $name, string $url, string $description, string $siteName, ?string $primaryImageUrl = null): array
     {
         $data = [
@@ -166,7 +163,7 @@ final class SchemaBuilder
             'datePublished' => $topic->created_at?->toAtomString(),
             'author' => [
                 '@type' => 'Person',
-                'name' => Str::limit((string) ($topic->author?->name ?: 'Üye'), 120),
+                'name' => Str::limit((string) ($topic->author?->name ?: landing_t('community.schema_anonymous_member')), 120),
             ],
         ];
 
@@ -175,11 +172,11 @@ final class SchemaBuilder
             $main['acceptedAnswer'] = [
                 '@type' => 'Answer',
                 'text' => $answerPlain,
-                'url' => $pageUrl.'#cevap-'.$acceptedAnswer->getKey(),
+                'url' => $pageUrl.'#reply-'.$acceptedAnswer->getKey(),
                 'datePublished' => $acceptedAnswer->created_at?->toAtomString(),
                 'author' => [
                     '@type' => 'Person',
-                    'name' => Str::limit((string) ($acceptedAnswer->author?->name ?: 'Üye'), 120),
+                    'name' => Str::limit((string) ($acceptedAnswer->author?->name ?: landing_t('community.schema_anonymous_member')), 120),
                 ],
             ];
         }
@@ -205,7 +202,7 @@ final class SchemaBuilder
             'dateModified' => $topic->updated_at?->toAtomString(),
             'author' => [
                 '@type' => 'Person',
-                'name' => Str::limit((string) ($topic->author?->name ?: 'Üye'), 120),
+                'name' => Str::limit((string) ($topic->author?->name ?: landing_t('community.schema_anonymous_member')), 120),
             ],
             'publisher' => [
                 '@type' => 'Organization',

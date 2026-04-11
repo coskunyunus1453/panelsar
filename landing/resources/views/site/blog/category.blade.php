@@ -1,5 +1,5 @@
 <x-site.layout
-    :title="$category->listingTitle() . ' · Blog · ' . landing_p('brand.name')"
+    :title="$category->listingTitle() . ' · ' . landing_t('blog.heading') . ' · ' . landing_p('brand.name')"
     :description="$seoDescription"
     :canonical-url="$seoCanonical"
     :schema-json-ld="$seoSchema"

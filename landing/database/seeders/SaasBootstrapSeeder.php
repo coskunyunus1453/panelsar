@@ -57,9 +57,10 @@ class SaasBootstrapSeeder extends Seeder
                 ],
                 'is_active' => true,
                 'sort_order' => 10,
-                /** Örnek perakende: admin’den güncelleyin; PayTR = TL×100, Stripe = USD×100 */
+                /** Örnek perakende: admin’den güncelleyin; minor birim (TL kuruş / cent) */
                 'price_try_minor' => 199900,
                 'price_usd_minor' => 19900,
+                'price_eur_minor' => 18500,
             ]
         );
     }

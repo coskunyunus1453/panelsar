@@ -16,7 +16,7 @@ class CommunityProfileController extends Controller
 
         return view('site.community.profile', [
             'site' => $site,
-            'seoTitle' => landing_t('community.profile_meta_title', ['site' => $site->site_title]),
+            'seoTitle' => landing_t('community.profile_meta_title', ['site' => $site->displaySiteTitle()]),
             'seoDescription' => landing_t('community.profile_meta_description'),
             'canonicalUrl' => route('community.profile.edit', absolute: true),
             'robotsContent' => 'noindex, follow',

@@ -77,11 +77,15 @@ class CommunityCategoryController extends Controller
 
         return $request->validate([
             'name' => 'required|string|max:255',
+            'name_en' => 'nullable|string|max:255',
             'slug' => $slugRule,
             'description' => 'nullable|string|max:20000',
+            'description_en' => 'nullable|string|max:20000',
             'sort_order' => 'nullable|integer|min:0|max:999999',
             'meta_title' => 'nullable|string|max:255',
+            'meta_title_en' => 'nullable|string|max:255',
             'meta_description' => 'nullable|string|max:2000',
+            'meta_description_en' => 'nullable|string|max:2000',
             'robots_override' => 'nullable|in:index,noindex',
         ]);
     }

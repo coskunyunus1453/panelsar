@@ -40,6 +40,11 @@ class DocPage extends Model
         return $this->hasMany(DocPage::class, 'parent_id')->orderBy('sort_order');
     }
 
+    public function seoCanonicalAbsoluteUrl(): string
+    {
+        return landing_url_with_lang(route('docs.show', $this->slug, absolute: true), (string) $this->locale);
+    }
+
     public function scopePublished(Builder $query): Builder
     {
         return $query->where('is_published', true);

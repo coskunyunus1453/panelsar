@@ -22,9 +22,12 @@ class PricingController extends Controller
             ->orderBy('sort_order')
             ->get();
 
+        $locale = app()->getLocale();
+
         return view('site.pricing', [
             'intro' => $intro,
             'plans' => $plans,
+            'seoCanonical' => landing_url_with_lang(route('site.pricing', absolute: true), $locale),
         ]);
     }
 }

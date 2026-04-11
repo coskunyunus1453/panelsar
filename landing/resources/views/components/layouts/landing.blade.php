@@ -1,10 +1,16 @@
 @props([
     'title' => null,
     'description' => null,
+    'canonicalUrl' => null,
+    'ogImage' => null,
+    'schemaJsonLd' => null,
 ])
 @php
     $title = $title ?? landing_p('home.meta_title');
     $description = $description ?? landing_p('home.meta_description');
+    $canonicalEffective = $canonicalUrl ?? landing_localized_url(app()->getLocale());
+    $ogPageUrl = $canonicalEffective;
+    $twitterCard = $ogImage ? 'summary_large_image' : 'summary';
 @endphp
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}" class="h-full scroll-smooth {{ $landingThemeClass ?? 'hv-theme-orange' }}" @if(! empty($landingThemeInlineStyle)) style="{{ $landingThemeInlineStyle }}" @endif>
@@ -14,8 +20,32 @@
 
     <title>{{ $title }}</title>
     <meta name="description" content="{{ $description }}">
+    <link rel="canonical" href="{{ $canonicalEffective }}">
+
+    <meta property="og:locale" content="{{ landing_og_locale_tag(app()->getLocale()) }}">
+    <meta property="og:site_name" content="{{ landing_p('brand.name') }}">
+    <meta property="og:title" content="{{ $title }}">
+    <meta property="og:description" content="{{ $description }}">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="{{ $ogPageUrl }}">
+    @if ($ogImage)
+        <meta property="og:image" content="{{ $ogImage }}">
+    @endif
+
+    <meta name="twitter:card" content="{{ $twitterCard }}">
+    <meta name="twitter:title" content="{{ $title }}">
+    <meta name="twitter:description" content="{{ $description }}">
+    @if ($ogImage)
+        <meta name="twitter:image" content="{{ $ogImage }}">
+    @endif
 
     <x-landing.head-extras />
+
+    @if ($schemaJsonLd)
+        <script type="application/ld+json">{!! $schemaJsonLd !!}</script>
+    @endif
+
+    <x-landing.seo-locale />
 
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 
@@ -68,7 +98,7 @@
                 <div class="hidden items-center gap-3 md:flex">
                     @if (! empty($landingEnabledLocales) && count($landingEnabledLocales) > 1)
                         <div class="relative">
-                            <label for="hv-lang" class="sr-only">Dil</label>
+                            <label for="hv-lang" class="sr-only">{{ landing_t('nav.language') }}</label>
                             <select id="hv-lang"
                                     class="rounded-full border border-slate-300/90 bg-white/90 py-1.5 pl-3 pr-8 text-xs font-semibold text-slate-700 dark:border-slate-600 dark:bg-slate-900/80 dark:text-slate-200"
                                     onchange="(function(v){if(!v)return;var p=new window.URLSearchParams(window.location.search);p.set('lang',v);var q=p.toString();window.location=window.location.pathname+(q?'?'+q:'')+window.location.hash;})(this.value)">

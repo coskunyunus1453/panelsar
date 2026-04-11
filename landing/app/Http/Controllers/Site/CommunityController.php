@@ -85,20 +85,24 @@ class CommunityController extends Controller
 
         $site = CommunitySiteMeta::singleton();
 
-        $title = $topic->meta_title ?: ($topic->title.' — '.$site->site_title);
-        $description = $topic->meta_description ?: ($topic->excerpt ?: $site->default_meta_description);
-        $canonical = $topic->canonical_url ?: route('community.topic', $topic->slug, absolute: true);
+        $title = $topic->meta_title ?: ($topic->title.' — '.$site->displaySiteTitle());
+        $description = $topic->meta_description ?: ($topic->excerpt ?: $site->displayDefaultMetaDescription());
+        $locale = app()->getLocale();
+        $rawCanon = trim((string) $topic->canonical_url);
+        $canonical = ($rawCanon !== '' && preg_match('#^https?://#i', $rawCanon))
+            ? $rawCanon
+            : landing_url_with_lang(route('community.topic', $topic->slug, absolute: true), $locale);
 
         $robotsContent = $this->topicRobots($site, $topic);
 
         $breadcrumbs = [
-            ['name' => landing_t('nav.home'), 'url' => url('/')],
-            ['name' => $site->site_title, 'url' => route('community.index', absolute: true)],
+            ['name' => landing_t('nav.home'), 'url' => landing_home_localized_url($locale)],
+            ['name' => $site->displaySiteTitle(), 'url' => landing_url_with_lang(route('community.index', absolute: true), $locale)],
         ];
         if ($topic->category) {
             $breadcrumbs[] = [
-                'name' => $topic->category->name,
-                'url' => route('community.category', $topic->category->slug, absolute: true),
+                'name' => $topic->category->displayName(),
+                'url' => landing_url_with_lang(route('community.category', $topic->category->slug, absolute: true), $locale),
             ];
         }
         $breadcrumbs[] = ['name' => $topic->title, 'url' => $canonical];
@@ -140,16 +144,18 @@ class CommunityController extends Controller
         $topics = $q->with(['category', 'author', 'tags'])->paginate(20)->withQueryString();
 
         if ($category instanceof CommunityCategory) {
-            $title = $category->meta_title ?: ($category->name.' — '.$site->site_title);
-            $description = $category->meta_description ?: $site->default_meta_description;
+            $title = $category->displayMetaTitle() ?: ($category->displayName().' — '.$site->displaySiteTitle());
+            $description = $category->displayMetaDescription() !== ''
+                ? $category->displayMetaDescription()
+                : $site->displayDefaultMetaDescription();
             $canonicalBase = route('community.category', $category->slug, absolute: true);
         } elseif ($tag instanceof CommunityTag) {
-            $title = '#'.$tag->name.' — '.$site->site_title;
-            $description = $site->default_meta_description;
+            $title = '#'.$tag->name.' — '.$site->displaySiteTitle();
+            $description = $site->displayDefaultMetaDescription();
             $canonicalBase = route('community.tag', $tag->slug, absolute: true);
         } else {
-            $title = $site->default_meta_title ?: ($site->site_title.' — '.landing_t('community.listing_meta_suffix'));
-            $description = $site->default_meta_description;
+            $title = $site->displayDefaultMetaTitle() ?: ($site->displaySiteTitle().' — '.landing_t('community.listing_meta_suffix'));
+            $description = $site->displayDefaultMetaDescription();
             $canonicalBase = route('community.index', absolute: true);
         }
 
@@ -302,6 +308,8 @@ class CommunityController extends Controller
             $canonical = $base;
         }
 
+        $canonical = landing_url_with_lang($canonical, app()->getLocale());
+
         return ['robots' => $robots, 'canonical' => $canonical];
     }
 
@@ -314,15 +322,16 @@ class CommunityController extends Controller
         ?CommunityTag $activeTag = null,
     ): string {
         $brand = landing_p('brand.name');
+        $locale = app()->getLocale();
         $crumbs = [
-            ['name' => landing_t('nav.home'), 'url' => url('/')],
-            ['name' => $site->site_title, 'url' => route('community.index', absolute: true)],
+            ['name' => landing_t('nav.home'), 'url' => landing_home_localized_url($locale)],
+            ['name' => $site->displaySiteTitle(), 'url' => landing_url_with_lang(route('community.index', absolute: true), $locale)],
         ];
         if ($activeCategory instanceof CommunityCategory) {
-            $crumbs[] = ['name' => $activeCategory->name, 'url' => route('community.category', $activeCategory->slug, absolute: true)];
+            $crumbs[] = ['name' => $activeCategory->displayName(), 'url' => landing_url_with_lang(route('community.category', $activeCategory->slug, absolute: true), $locale)];
         }
         if ($activeTag instanceof CommunityTag) {
-            $crumbs[] = ['name' => '#'.$activeTag->name, 'url' => route('community.tag', $activeTag->slug, absolute: true)];
+            $crumbs[] = ['name' => '#'.$activeTag->name, 'url' => landing_url_with_lang(route('community.tag', $activeTag->slug, absolute: true), $locale)];
         }
 
         $nodes = [

@@ -23,15 +23,15 @@ class DocController extends Controller
 
         $schema = SchemaBuilder::graph([
             SchemaBuilder::breadcrumbList([
-                ['name' => landing_p('brand.name'), 'url' => url('/')],
-                ['name' => 'Docs', 'url' => route('docs.index', absolute: true)],
+                ['name' => landing_p('brand.name'), 'url' => landing_home_localized_url($locale)],
+                ['name' => landing_t('docs.breadcrumb'), 'url' => landing_url_with_lang(route('docs.index', absolute: true), $locale)],
             ]),
         ]);
 
         return view('site.docs.index', [
             'roots' => $roots,
             'seoSchema' => SchemaBuilder::encode($schema),
-            'seoCanonical' => route('docs.index', absolute: true),
+            'seoCanonical' => landing_url_with_lang(route('docs.index', absolute: true), $locale),
             'seoDescription' => landing_t('docs.index_meta_description'),
         ]);
     }
@@ -47,17 +47,17 @@ class DocController extends Controller
             ->with('parent')
             ->firstOrFail();
 
-        $canonical = route('docs.show', $page->slug, absolute: true);
+        $canonical = $page->seoCanonicalAbsoluteUrl();
         $brand = landing_p('brand.name');
 
         $breadcrumbs = [
-            ['name' => $brand, 'url' => url('/')],
-            ['name' => 'Docs', 'url' => route('docs.index', absolute: true)],
+            ['name' => $brand, 'url' => landing_home_localized_url($locale)],
+            ['name' => landing_t('docs.breadcrumb'), 'url' => landing_url_with_lang(route('docs.index', absolute: true), $locale)],
         ];
         if ($page->parent) {
             $breadcrumbs[] = [
                 'name' => $page->parent->title,
-                'url' => route('docs.show', $page->parent->slug, absolute: true),
+                'url' => landing_url_with_lang(route('docs.show', $page->parent->slug, absolute: true), $locale),
             ];
         }
         $breadcrumbs[] = ['name' => $page->title, 'url' => $canonical];

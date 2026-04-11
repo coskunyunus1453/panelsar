@@ -1,14 +1,14 @@
 <x-site.layout
-    :title="$page->effectiveMetaTitle() . ' · Docs · ' . landing_p('brand.name')"
+    :title="$page->effectiveMetaTitle() . ' · ' . landing_t('docs.breadcrumb') . ' · ' . landing_p('brand.name')"
     :description="$seoDescription"
     :canonical-url="$seoCanonical"
     :schema-json-ld="$seoSchema"
 >
     <div class="hv-container max-w-3xl">
         <nav class="mb-8 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-slate-500 dark:text-slate-500">
-            <a href="{{ route('landing.home') }}" class="hv-muted-nav">Ana sayfa</a>
+            <a href="{{ route('landing.home') }}" class="hv-muted-nav">{{ landing_t('nav.home') }}</a>
             <span class="text-slate-400">/</span>
-            <a href="{{ route('docs.index') }}" class="hv-muted-nav">Docs</a>
+            <a href="{{ route('docs.index') }}" class="hv-muted-nav">{{ landing_t('docs.breadcrumb') }}</a>
             @if ($page->parent)
                 <span class="text-slate-400">/</span>
                 <a href="{{ route('docs.show', $page->parent->slug) }}" class="hv-muted-nav">{{ $page->parent->title }}</a>

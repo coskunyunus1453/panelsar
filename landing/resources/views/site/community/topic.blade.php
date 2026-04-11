@@ -14,7 +14,7 @@
                 <a href="{{ route('community.index') }}" class="hover:text-[rgb(var(--hv-brand-600)/1)]">{{ landing_t('community.breadcrumb_community') }}</a>
                 <span class="mx-2">/</span>
                 @if ($topic->category)
-                    <a href="{{ route('community.category', $topic->category->slug) }}" class="hover:text-[rgb(var(--hv-brand-600)/1)]">{{ $topic->category->name }}</a>
+                    <a href="{{ route('community.category', $topic->category->slug) }}" class="hover:text-[rgb(var(--hv-brand-600)/1)]">{{ $topic->category->displayName() }}</a>
                     <span class="mx-2">/</span>
                 @endif
                 <span class="text-slate-900 dark:text-slate-200">{{ Str::limit($topic->title, 80) }}</span>
@@ -73,7 +73,7 @@
             <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-100">{{ landing_t('community.replies_title') }}</h2>
             <div class="mt-4 space-y-4">
                 @foreach ($posts as $post)
-                    <div id="cevap-{{ $post->id }}" class="scroll-mt-28 rounded-2xl border p-4 {{ $topic->best_answer_post_id === $post->id ? 'border-emerald-400/80 bg-emerald-50/50 dark:border-emerald-800 dark:bg-emerald-950/20' : 'border-slate-200 dark:border-slate-800' }}">
+                    <div id="reply-{{ $post->id }}" class="scroll-mt-28 rounded-2xl border p-4 {{ $topic->best_answer_post_id === $post->id ? 'border-emerald-400/80 bg-emerald-50/50 dark:border-emerald-800 dark:bg-emerald-950/20' : 'border-slate-200 dark:border-slate-800' }}">
                         <div class="flex flex-wrap items-center justify-between gap-2">
                             <span class="inline-flex items-center gap-2 text-sm font-semibold">
                                 <img src="{{ community_user_avatar_url($post->author, 64) }}" alt="" width="28" height="28" class="h-7 w-7 rounded-full object-cover" loading="lazy" decoding="async" />

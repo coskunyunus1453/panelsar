@@ -49,7 +49,7 @@ class CommunityParticipationController extends Controller
         }
 
         $site = CommunitySiteMeta::singleton();
-        $seoTitle = landing_t('community.ask_meta_title', ['site' => $site->site_title]);
+        $seoTitle = landing_t('community.ask_meta_title', ['site' => $site->displaySiteTitle()]);
         $seoDescription = landing_t('community.ask_meta_description');
 
         return view('site.community.ask', [

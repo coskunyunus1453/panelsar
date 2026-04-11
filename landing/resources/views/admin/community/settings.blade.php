@@ -7,16 +7,28 @@
         @csrf
         @method('PUT')
         <div>
-            <label class="block text-sm font-medium">Site başlığı (topluluk)</label>
+            <label class="block text-sm font-medium">Site başlığı (topluluk) — TR</label>
             <input type="text" name="site_title" value="{{ old('site_title', $meta->site_title) }}" class="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 dark:border-slate-700 dark:bg-slate-900" />
         </div>
         <div>
-            <label class="block text-sm font-medium">Varsayılan meta başlık</label>
+            <label class="block text-sm font-medium">Site başlığı — EN (İngilizce arayüz, boşsa “Community” çevirisi)</label>
+            <input type="text" name="site_title_en" value="{{ old('site_title_en', $meta->site_title_en) }}" class="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 dark:border-slate-700 dark:bg-slate-900" placeholder="Community" />
+        </div>
+        <div>
+            <label class="block text-sm font-medium">Varsayılan meta başlık — TR</label>
             <input type="text" name="default_meta_title" value="{{ old('default_meta_title', $meta->default_meta_title) }}" class="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 dark:border-slate-700 dark:bg-slate-900" />
         </div>
         <div>
-            <label class="block text-sm font-medium">Varsayılan meta açıklama</label>
+            <label class="block text-sm font-medium">Varsayılan meta başlık — EN</label>
+            <input type="text" name="default_meta_title_en" value="{{ old('default_meta_title_en', $meta->default_meta_title_en) }}" class="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 dark:border-slate-700 dark:bg-slate-900" />
+        </div>
+        <div>
+            <label class="block text-sm font-medium">Varsayılan meta açıklama — TR</label>
             <textarea name="default_meta_description" rows="3" class="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 dark:border-slate-700 dark:bg-slate-900">{{ old('default_meta_description', $meta->default_meta_description) }}</textarea>
+        </div>
+        <div>
+            <label class="block text-sm font-medium">Varsayılan meta açıklama — EN</label>
+            <textarea name="default_meta_description_en" rows="3" class="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 dark:border-slate-700 dark:bg-slate-900">{{ old('default_meta_description_en', $meta->default_meta_description_en) }}</textarea>
         </div>
         <div>
             <label class="block text-sm font-medium">OG görsel URL</label>

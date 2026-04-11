@@ -19,6 +19,7 @@ return [
         'menu' => 'Menu',
         'close' => 'Close',
         'theme' => 'Theme',
+        'language' => 'Language',
     ],
 
     'footer' => [
@@ -84,6 +85,23 @@ return [
 
     'docs' => [
         'index_meta_description' => 'Hostvim installation, architecture, and usage guides.',
+        'breadcrumb' => 'Documentation',
+        'index_page_title' => 'Documentation · :brand',
+        'index_heading' => 'Documentation',
+        'index_lead' => 'Getting started guides and technical references.',
+        'index_empty' => 'No documentation pages yet.',
+    ],
+
+    'license' => [
+        'success_title' => 'Payment complete',
+        'success_meta' => 'After payment, your license key is emailed; check order status with your reference.',
+        'success_lead' => 'If your payment succeeded, your license key will be emailed shortly after our server confirms it. You can poll order status with the licensing API using your email and order reference.',
+        'order_ref_label' => 'Order reference',
+        'back_pricing' => 'Back to pricing',
+        'cancel_title' => 'Payment cancelled',
+        'cancel_meta' => 'Checkout was not completed; you can try again from pricing.',
+        'cancel_lead' => 'Checkout was not completed. You can try again when ready.',
+        'pricing_link' => 'Pricing',
     ],
 
     'blog' => [
@@ -115,6 +133,8 @@ return [
     ],
 
     'community' => [
+        'fallback_site_title_short' => 'Community',
+        'schema_anonymous_member' => 'Member',
         'listing_meta_suffix' => 'Q&A',
         'index_subtitle' => 'Q&A community — ask for help or share what you know.',
         'cta_have_question_title' => 'Have a question?',

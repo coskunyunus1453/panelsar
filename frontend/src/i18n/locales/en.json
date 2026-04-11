@@ -19,6 +19,7 @@
     "settings": "Settings",
     "users": "Users",
     "packages": "Packages",
+    "whmcs_integration": "WHMCS",
     "reseller": "Reseller",
     "reseller_branding": "White-label",
     "installer": "App Installer",
@@ -131,6 +132,24 @@
     "wizard_step_4": "Run Deploy now for first release",
     "first_setup_hint": "On first setup, repository clone may not exist yet. Save first, then run Deploy now; if it fails, verify repo URL and access credentials.",
     "runtime_hint_laravel": "Laravel recommendation: runtime Laravel/PHP, branch main, and auto deploy enabled."
+  },
+  "whmcs_integration": {
+    "title": "WHMCS integration",
+    "subtitle": "If you bill hosting with WHMCS: download the server module ZIP and follow the steps below. End customers never enter API keys.",
+    "download": "Download WHMCS module (ZIP)",
+    "downloading": "Downloading…",
+    "download_ok": "ZIP downloaded",
+    "download_error": "Download failed",
+    "need_login": "Session required",
+    "steps_title": "One-time setup (for your hosting company)",
+    "step_1": "In this panel’s .env set HOSTVIM_WHMCS_SECRET to a long random value (e.g. openssl rand -hex 32).",
+    "step_2": "Extract the ZIP. Copy the hostvim folder to your WHMCS server at: whmcs_root/modules/servers/hostvim/ (hostvim.php must sit in that folder).",
+    "step_3": "WHMCS admin → Configuration → System Settings → Servers → Add New Server and choose module hostvim.",
+    "step_4": "Server hostname: this panel’s URL (e.g. https://panel.example.com). Password field: same value as HOSTVIM_WHMCS_SECRET. Optional username: Hostvim admin email (admin SSO).",
+    "step_5": "Test connection. Package IDs: GET .../api/integrations/whmcs/packages with Authorization: Bearer and the same secret.",
+    "step_6": "Attach your hosting product to this server; on provision the panel user and site are created automatically. WHMCS client email = panel user email.",
+    "step_7": "Customer access: WHMCS client area → service details → SSO / “Open panel” (template link or WHMCS single sign-on).",
+    "footer_note": "This page is admin-only. The ZIP is the current hostvim server module; re-download after panel upgrades."
   },
   "plugins": {
     "subtitle": "Install and activate extra capabilities with one click. First release includes migration modules.",

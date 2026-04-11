@@ -15,7 +15,7 @@
     <div class="hv-container py-10">
         <div class="mb-6 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div class="max-w-2xl">
-                <h1 class="text-3xl font-semibold tracking-tight text-slate-900 dark:text-slate-50">{{ $site->site_title }}</h1>
+                <h1 class="text-3xl font-semibold tracking-tight text-slate-900 dark:text-slate-50">{{ $site->displaySiteTitle() }}</h1>
                 <p class="mt-2 text-slate-600 dark:text-slate-400">{{ landing_t('community.index_subtitle') }}</p>
             </div>
             <x-community.ask-cta layout="hero" :category="$activeCategory ?? null" class="lg:pt-1" />
@@ -52,7 +52,7 @@
             <a href="{{ route('community.index') }}" class="rounded-full px-3 py-1 text-sm font-medium {{ (! isset($activeCategory) && ! isset($activeTag)) ? 'bg-[rgb(var(--hv-brand-500)/0.2)] text-[rgb(var(--hv-brand-700)/1)]' : 'border border-slate-200 dark:border-slate-700' }}">{{ landing_t('community.filter_all') }}</a>
             @foreach ($categories as $cat)
                 <a href="{{ route('community.category', $cat->slug) }}" class="rounded-full px-3 py-1 text-sm font-medium {{ isset($activeCategory) && $activeCategory->id === $cat->id ? 'bg-[rgb(var(--hv-brand-500)/0.2)] text-[rgb(var(--hv-brand-700)/1)]' : 'border border-slate-200 dark:border-slate-700' }}">
-                    {{ $cat->name }}
+                    {{ $cat->displayName() }}
                 </a>
             @endforeach
         </div>

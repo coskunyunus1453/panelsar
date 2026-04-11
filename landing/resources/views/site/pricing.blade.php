@@ -3,7 +3,7 @@
     $meta = $intro?->meta_description ?? landing_t('pricing_page.meta_default');
 @endphp
 
-<x-site.layout :title="$pageTitle" :description="$meta">
+<x-site.layout :title="$pageTitle" :description="$meta" :canonical-url="$seoCanonical ?? null">
     <div class="hv-container">
         <div class="mb-10 max-w-3xl">
             <div class="hv-section-eyebrow mb-4">{{ landing_t('pricing_page.badge') }}</div>

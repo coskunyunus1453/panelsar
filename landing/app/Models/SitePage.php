@@ -81,6 +81,17 @@ class SitePage extends Model
         return $this->defaultCanonicalUrl();
     }
 
+    /** Yalnızca harici https canonical ise aksi halde ?lang= eklenir. */
+    public function seoCanonicalAbsoluteUrl(): string
+    {
+        $raw = trim((string) $this->canonical_url);
+        if ($raw !== '' && preg_match('#^https?://#i', $raw)) {
+            return $this->canonicalAbsoluteUrl();
+        }
+
+        return landing_url_with_lang($this->defaultCanonicalUrl(), (string) $this->locale);
+    }
+
     public function ogImageAbsolute(): ?string
     {
         return SeoUrls::absolute($this->og_image);

@@ -50,3 +50,65 @@ function community_user_avatar_url(?User $user, int $size = 80): string
 
     return 'https://www.gravatar.com/avatar/'.$hash.'?s='.$size.'&d=mp';
 }
+
+/**
+ * Mevcut istek path’i için belirtilen dilde tam URL (?lang=… birleştirilir).
+ */
+function landing_localized_url(string $locale): string
+{
+    $request = request();
+    if ($request === null) {
+        return url('/').'?lang='.rawurlencode($locale);
+    }
+
+    $qs = $request->query();
+    $qs['lang'] = $locale;
+    ksort($qs);
+
+    return $request->url().($qs === [] ? '' : '?'.http_build_query($qs));
+}
+
+/**
+ * Mutlak URL’ye (veya path + mevcut site köküne) lang parametresi ekler — canonical ve sitemap için.
+ */
+function landing_url_with_lang(string $absoluteUrl, string $locale): string
+{
+    $parts = parse_url($absoluteUrl);
+    if ($parts === false) {
+        return $absoluteUrl;
+    }
+
+    $scheme = $parts['scheme'] ?? (request()?->getScheme() ?? 'https');
+    $host = $parts['host'] ?? (request()?->getHost() ?? '');
+    $port = isset($parts['port']) ? ':'.$parts['port'] : '';
+    $path = $parts['path'] ?? '/';
+
+    $query = [];
+    if (! empty($parts['query'])) {
+        parse_str($parts['query'], $query);
+    }
+    $query['lang'] = $locale;
+    ksort($query);
+
+    return $scheme.'://'.$host.$port.$path.'?'.http_build_query($query);
+}
+
+/** Open Graph locale biçimi (tr_TR, en_US). */
+function landing_og_locale_tag(string $code): string
+{
+    $primary = strtolower(substr(str_replace('_', '-', $code), 0, 2));
+
+    return match ($primary) {
+        'tr' => 'tr_TR',
+        'en' => 'en_US',
+        default => str_replace('-', '_', $code),
+    };
+}
+
+/** Ana sayfa mutlak adresi, aktif içerik dili ile. */
+function landing_home_localized_url(?string $locale = null): string
+{
+    $locale ??= app()->getLocale();
+
+    return landing_url_with_lang(url('/'), $locale);
+}
